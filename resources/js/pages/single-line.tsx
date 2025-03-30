@@ -1,7 +1,7 @@
-import TableHMI from '@/components/app-table-hmi';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
+import SingleLine from "@/components/app-single-line"
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -14,7 +14,7 @@ export default function TableMonitor() {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Table Monitor" />
-            <TableHMI />
+            <SingleLine/>
         </AppLayout>
     );
 }

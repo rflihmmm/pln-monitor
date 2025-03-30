@@ -11,9 +11,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {
         return Inertia::render('dashboard');
     })->name('dashboard');
-    Route::get('table-monitor', function () {
+     Route::get('table-monitor', function () {
         return Inertia::render('table-monitor');
     })->name('table-monitor');
+   Route::get('single-line', function () {
+        return Inertia::render('single-line');
+    })->name('single-line');
 });
 
 require __DIR__.'/settings.php';
