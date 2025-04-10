@@ -18,4 +18,7 @@ Route::middleware('auth')->group(function () {
     Route::get('settings/appearance', function () {
         return Inertia::render('settings/appearance');
     })->name('appearance');
+    Route::get('settings/manage-users', function () {
+        return Inertia::render('settings/manage-users');
+    })->name('manage-users');
 });
