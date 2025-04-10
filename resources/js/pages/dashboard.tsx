@@ -40,7 +40,6 @@ export default function Dashboard() {
                     </div>
 
                     <div className="space-y-6">
-                        <AlarmLog />
                         <LoadData />
                     </div>
                 </div>
