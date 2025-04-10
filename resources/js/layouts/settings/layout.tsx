@@ -22,6 +22,11 @@ const sidebarNavItems: NavItem[] = [
         href: '/settings/appearance',
         icon: null,
     },
+    {
+        title: 'Manage Users',
+        href: '/settings/manage-users',
+        icon: null,
+    },
 ];
 
 export default function SettingsLayout({ children }: PropsWithChildren) {
