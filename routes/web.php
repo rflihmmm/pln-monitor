@@ -8,9 +8,12 @@ Route::get('/', function () {
 })->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('dashboard', function () {
+     Route::get('dashboard', function () {
         return Inertia::render('dashboard');
     })->name('dashboard');
+   Route::get('alarm', function () {
+        return Inertia::render('alarm');
+    })->name('alarm');
      Route::get('table-monitor', function () {
         return Inertia::render('table-monitor');
     })->name('table-monitor');
