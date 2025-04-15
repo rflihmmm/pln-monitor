@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
+use App\Http\Controllers\Settings\UserController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -18,7 +19,10 @@ Route::middleware('auth')->group(function () {
     Route::get('settings/appearance', function () {
         return Inertia::render('settings/appearance');
     })->name('appearance');
-    Route::get('settings/manage-users', function () {
-        return Inertia::render('settings/manage-users');
-    })->name('manage-users');
+
+    Route::prefix('settings')->group(function () {
+        // Route::get('manage-users', )->name('manage-users')->middleware(['role:admin']);
+        Route::apiResource('manage-users', UserController::class)->middleware(['role:admin']);
+    });
+
 });
