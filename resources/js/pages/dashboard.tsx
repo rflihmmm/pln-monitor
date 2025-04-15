@@ -1,4 +1,3 @@
-import AlarmLog from '@/components/alarm-log';
 import LoadData from '@/components/load-data-map';
 import MapComponent from '@/components/map-component';
 import MapFilter from '@/components/map-filter';

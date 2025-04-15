@@ -5,6 +5,7 @@ import { type BreadcrumbItem } from '@/types';
 
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import TableUsers from '@/components/table-users';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -21,6 +22,11 @@ export default function Appearance() {
             <SettingsLayout>
                 <div className="space-y-6">
                     <HeadingSmall title="Manage Users" description="Add or Delete user" />
+                    { // user?.roles === "ADMIN" && (
+
+                        <TableUsers />
+                        //)
+                    }
                 </div>
             </SettingsLayout>
         </AppLayout>
