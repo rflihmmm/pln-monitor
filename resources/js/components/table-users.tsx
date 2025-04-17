@@ -1,5 +1,6 @@
 import { MoreHorizontal, Plus, Search, Trash, UserCog } from 'lucide-react';
-import { useState} from 'react';
+import { useState } from 'react';
+import { router } from '@inertiajs/react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -22,69 +23,31 @@ interface User {
     id: string;
     name: string;
     email: string;
-    role: 'admin' | 'user' | 'editor';
+    role: string;
     createdAt: string;
     avatarUrl?: string;
 }
 
-// Sample data
-const initialUsers: User[] = [
-    {
-        id: '1',
-        name: 'Alex Johnson',
-        email: 'alex@example.com',
-        role: 'admin',
-        createdAt: '2023-01-15T10:30:00.000Z',
-        avatarUrl: '/placeholder.svg?height=40&width=40',
-    },
-    {
-        id: '2',
-        name: 'Sarah Williams',
-        email: 'sarah@example.com',
-        role: 'user',
-        createdAt: '2023-02-20T14:45:00.000Z',
-    },
-    {
-        id: '3',
-        name: 'Michael Brown',
-        email: 'michael@example.com',
-        role: 'user',
-        createdAt: '2023-03-05T09:15:00.000Z',
-        avatarUrl: '/placeholder.svg?height=40&width=40',
-    },
-    {
-        id: '4',
-        name: 'Emily Davis',
-        email: 'emily@example.com',
-        role: 'user',
-        createdAt: '2023-03-18T16:20:00.000Z',
-        avatarUrl: '/placeholder.svg?height=40&width=40',
-    },
-    {
-        id: '5',
-        name: 'David Wilson',
-        email: 'david@example.com',
-        role: 'user',
-        createdAt: '2023-04-01T11:10:00.000Z',
-        avatarUrl: '/placeholder.svg?height=40&width=40',
-    },
-];
+interface TableUsersProps {
+    users: User[];
+}
 
-export default function TableUsers() {
-    const [users, setUsers] = useState<User[]>(initialUsers);
+export default function TableUsers({ users: initialUsers }: TableUsersProps) {
     const [searchTerm, setSearchTerm] = useState('');
     const [roleFilter, setRoleFilter] = useState<string>('all');
     const [isAddUserOpen, setIsAddUserOpen] = useState(false);
     const [isEditUserOpen, setIsEditUserOpen] = useState(false);
-    const [newUser, setNewUser] = useState<Partial<User>>({
+    const [newUser, setNewUser] = useState<Partial<User> & { password?: string, password_confirmation?: string }>({
         name: '',
         email: '',
         role: 'user',
+        password: '',
+        password_confirmation: '',
     });
     const [editingUser, setEditingUser] = useState<User | null>(null);
 
     // Filter users based on search term and filters
-    const filteredUsers = users.filter((user) => {
+    const filteredUsers = initialUsers.filter((user) => {
         const matchesSearch =
             user.name.toLowerCase().includes(searchTerm.toLowerCase()) || user.email.toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -105,32 +68,42 @@ export default function TableUsers() {
 
     // Handle adding a new user
     const handleAddUser = () => {
-        if (!newUser.name || !newUser.email) return;
+        if (!newUser.name || !newUser.email || !newUser.password) return;
 
-        const user: User = {
-            id: (users.length + 1).toString(),
+        router.post('/settings/manage-users', {
             name: newUser.name,
             email: newUser.email,
-            role: newUser.role as 'admin' | 'user',
-            createdAt: new Date().toISOString(),
-        };
-
-        setUsers([...users, user]);
-        setNewUser({
-            name: '',
-            email: '',
-            role: 'user',
+            password: newUser.password,
+            password_confirmation: newUser.password_confirmation,
+            role: newUser.role,
+        }, {
+            onSuccess: () => {
+                setIsAddUserOpen(false);
+                setNewUser({
+                    name: '',
+                    email: '',
+                    role: 'user',
+                    password: '',
+                    password_confirmation: '',
+                });
+            }
         });
-        setIsAddUserOpen(false);
     };
 
     // Handle editing a user
     const handleEditUser = () => {
         if (!editingUser || !editingUser.name || !editingUser.email) return;
 
-        setUsers(users.map((user) => (user.id === editingUser.id ? { ...user, ...editingUser } : user)));
-        setIsEditUserOpen(false);
-        setEditingUser(null);
+        router.put(`/settings/manage-users/${editingUser.id}`, {
+            name: editingUser.name,
+            email: editingUser.email,
+            role: editingUser.role,
+        }, {
+            onSuccess: () => {
+                setIsEditUserOpen(false);
+                setEditingUser(null);
+            }
+        });
     };
 
     // Open edit dialog for a user
@@ -141,11 +114,15 @@ export default function TableUsers() {
 
     // Handle deleting a user
     const handleDeleteUser = (userId: string) => {
-        setUsers(users.filter((user) => user.id !== userId));
+        if (confirm('Are you sure you want to delete this user?')) {
+            router.delete(`/settings/manage-users/${userId}`);
+        }
     };
+
     return (
         <div>
             <div className="flex flex-col gap-4">
+                {/* Rest of your component remains the same */}
                 <div className="flex flex-col justify-between gap-4 sm:flex-row">
                     <div className="relative w-full sm:w-64">
                         <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
@@ -201,10 +178,28 @@ export default function TableUsers() {
                                         />
                                     </div>
                                     <div className="grid gap-2">
+                                        <Label htmlFor="password">Password</Label>
+                                        <Input
+                                            id="password"
+                                            type="password"
+                                            value={newUser.password}
+                                            onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="password_confirmation">Confirm Password</Label>
+                                        <Input
+                                            id="password_confirmation"
+                                            type="password"
+                                            value={newUser.password_confirmation}
+                                            onChange={(e) => setNewUser({ ...newUser, password_confirmation: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
                                         <Label htmlFor="role">Role</Label>
                                         <Select
                                             value={newUser.role}
-                                            onValueChange={(value) => setNewUser({ ...newUser, role: value as any })}
+                                            onValueChange={(value) => setNewUser({ ...newUser, role: value })}
                                         >
                                             <SelectTrigger id="role">
                                                 <SelectValue placeholder="Select role" />
@@ -297,18 +292,7 @@ export default function TableUsers() {
 
                 <div className="flex items-center justify-between">
                     <div className="text-muted-foreground text-sm">
-                        Showing <strong>{filteredUsers.length}</strong> of <strong>{users.length}</strong> users
-                    </div>
-                    <div className="flex items-center space-x-2">
-                        <Button variant="outline" size="sm" disabled>
-                            Previous
-                        </Button>
-                        <Button variant="outline" size="sm" className="px-4">
-                            1
-                        </Button>
-                        <Button variant="outline" size="sm" disabled>
-                            Next
-                        </Button>
+                        Showing <strong>{filteredUsers.length}</strong> of <strong>{initialUsers.length}</strong> users
                     </div>
                 </div>
             </div>
@@ -339,6 +323,21 @@ export default function TableUsers() {
                                 onChange={(e) => setEditingUser(editingUser ? { ...editingUser, email: e.target.value } : null)}
                                 placeholder="john@example.com"
                             />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="edit-role">Role</Label>
+                            <Select
+                                value={editingUser?.role || ''}
+                                onValueChange={(value) => setEditingUser(editingUser ? { ...editingUser, role: value } : null)}
+                            >
+                                <SelectTrigger id="edit-role">
+                                    <SelectValue placeholder="Select role" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="admin">Admin</SelectItem>
+                                    <SelectItem value="user">User</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                     </div>
                     <DialogFooter>
