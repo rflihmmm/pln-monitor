@@ -83,7 +83,7 @@ export default function TreeDiagram() {
                 id: '1',
                 type: 'custom',
                 position: { x: 0, y: 150 },
-                data: { label: 'UPZ Makassar Selatan', status: 'active' },
+                data: { label: 'UPZ Makassar Selatan', status: 'active', location: 'Makassar' },
                 style: { width: 180 },
             },
             {
