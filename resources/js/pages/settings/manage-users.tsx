@@ -14,7 +14,19 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-export default function Appearance() {
+interface User {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    createdAt: string;
+}
+
+interface ManageUserProps {
+    users: User[];
+}
+
+export default function ManageUser({ users }: ManageUserProps) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Manage Users" />
@@ -23,7 +35,7 @@ export default function Appearance() {
                 <div className="space-y-6">
                     <HeadingSmall title="Manage Users" description="Add or Delete user" />
 
-                    <TableUsers />
+                    <TableUsers users={users} />
                 </div>
             </SettingsLayout>
         </AppLayout>
