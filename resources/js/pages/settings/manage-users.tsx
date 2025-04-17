@@ -3,9 +3,9 @@ import { Head } from '@inertiajs/react';
 import HeadingSmall from '@/components/heading-small';
 import { type BreadcrumbItem } from '@/types';
 
+import TableUsers from '@/components/table-users';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
-import TableUsers from '@/components/table-users';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -22,11 +22,8 @@ export default function Appearance() {
             <SettingsLayout>
                 <div className="space-y-6">
                     <HeadingSmall title="Manage Users" description="Add or Delete user" />
-                    { // user?.roles === "ADMIN" && (
 
-                        <TableUsers />
-                        //)
-                    }
+                    <TableUsers />
                 </div>
             </SettingsLayout>
         </AppLayout>
