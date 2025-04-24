@@ -129,7 +129,7 @@ export default function TableUsers({ users: initialUsers }: TableUsersProps) {
 
     return (
         <div>
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 mt-5">
                 {/* Rest of your component remains the same */}
                 <div className="flex flex-col justify-between gap-4 sm:flex-row">
                     <div className="relative w-full sm:w-64">

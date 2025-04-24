@@ -15,7 +15,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 export default function GarduInduk() {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Manage Users" />
+            <Head title="Gardu Induk" />
 
             <TableGarduInduk />
         </AppLayout>
