@@ -1,7 +1,7 @@
+import TreeDiagram from '@/components/tree-diagram';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
-import TreeDiagram from "@/components/tree-diagram"
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
