@@ -1,17 +1,13 @@
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 interface MapFilterProps {
-    currentFilter: "GI" | "GH" | "ALL"
-    onFilterChange: (filter: "GI" | "GH" | "ALL") => void
+    currentFilter: 'GI' | 'GH' | 'ALL';
+    onFilterChange: (filter: 'GI' | 'GH' | 'ALL') => void;
 }
 
 export default function MapFilter({ currentFilter, onFilterChange }: MapFilterProps) {
     return (
-        <ToggleGroup
-            type="single"
-            value={currentFilter}
-            onValueChange={(value) => value && onFilterChange(value as "GI" | "GH" | "ALL")}
-        >
+        <ToggleGroup type="single" value={currentFilter} onValueChange={(value) => value && onFilterChange(value as 'GI' | 'GH' | 'ALL')}>
             <ToggleGroupItem value="ALL" aria-label="Show all substations">
                 ALL
             </ToggleGroupItem>
@@ -22,7 +18,5 @@ export default function MapFilter({ currentFilter, onFilterChange }: MapFilterPr
                 GH
             </ToggleGroupItem>
         </ToggleGroup>
-    )
+    );
 }
-
-

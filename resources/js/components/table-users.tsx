@@ -1,6 +1,6 @@
+import { router } from '@inertiajs/react';
 import { MoreHorizontal, Plus, Search, Trash, UserCog } from 'lucide-react';
 import { useState } from 'react';
-import { router } from '@inertiajs/react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -37,7 +37,7 @@ export default function TableUsers({ users: initialUsers }: TableUsersProps) {
     const [roleFilter, setRoleFilter] = useState<string>('all');
     const [isAddUserOpen, setIsAddUserOpen] = useState(false);
     const [isEditUserOpen, setIsEditUserOpen] = useState(false);
-    const [newUser, setNewUser] = useState<Partial<User> & { password?: string, password_confirmation?: string }>({
+    const [newUser, setNewUser] = useState<Partial<User> & { password?: string; password_confirmation?: string }>({
         name: '',
         email: '',
         role: 'user',
@@ -70,40 +70,48 @@ export default function TableUsers({ users: initialUsers }: TableUsersProps) {
     const handleAddUser = () => {
         if (!newUser.name || !newUser.email || !newUser.password) return;
 
-        router.post('/settings/manage-users', {
-            name: newUser.name,
-            email: newUser.email,
-            password: newUser.password,
-            password_confirmation: newUser.password_confirmation,
-            role: newUser.role,
-        }, {
-            onSuccess: () => {
-                setIsAddUserOpen(false);
-                setNewUser({
-                    name: '',
-                    email: '',
-                    role: 'user',
-                    password: '',
-                    password_confirmation: '',
-                });
-            }
-        });
+        router.post(
+            '/settings/manage-users',
+            {
+                name: newUser.name,
+                email: newUser.email,
+                password: newUser.password,
+                password_confirmation: newUser.password_confirmation,
+                role: newUser.role,
+            },
+            {
+                onSuccess: () => {
+                    setIsAddUserOpen(false);
+                    setNewUser({
+                        name: '',
+                        email: '',
+                        role: 'user',
+                        password: '',
+                        password_confirmation: '',
+                    });
+                },
+            },
+        );
     };
 
     // Handle editing a user
     const handleEditUser = () => {
         if (!editingUser || !editingUser.name || !editingUser.email) return;
 
-        router.put(`/settings/manage-users/${editingUser.id}`, {
-            name: editingUser.name,
-            email: editingUser.email,
-            role: editingUser.role,
-        }, {
-            onSuccess: () => {
-                setIsEditUserOpen(false);
-                setEditingUser(null);
-            }
-        });
+        router.put(
+            `/settings/manage-users/${editingUser.id}`,
+            {
+                name: editingUser.name,
+                email: editingUser.email,
+                role: editingUser.role,
+            },
+            {
+                onSuccess: () => {
+                    setIsEditUserOpen(false);
+                    setEditingUser(null);
+                },
+            },
+        );
     };
 
     // Open edit dialog for a user
@@ -138,7 +146,7 @@ export default function TableUsers({ users: initialUsers }: TableUsersProps) {
                         <Select value={roleFilter} onValueChange={setRoleFilter}>
                             <SelectTrigger className="w-full sm:w-[150px]">
                                 <SelectValue placeholder="Filter by role" />
-                            </SelectTrigger>
+                    </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All Roles</SelectItem>
                                 <SelectItem value="admin">Admin</SelectItem>
@@ -197,10 +205,7 @@ export default function TableUsers({ users: initialUsers }: TableUsersProps) {
                                     </div>
                                     <div className="grid gap-2">
                                         <Label htmlFor="role">Role</Label>
-                                        <Select
-                                            value={newUser.role}
-                                            onValueChange={(value) => setNewUser({ ...newUser, role: value })}
-                                        >
+                                        <Select value={newUser.role} onValueChange={(value) => setNewUser({ ...newUser, role: value })}>
                                             <SelectTrigger id="role">
                                                 <SelectValue placeholder="Select role" />
                                             </SelectTrigger>
