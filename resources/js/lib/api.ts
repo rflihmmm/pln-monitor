@@ -1,21 +1,21 @@
 // Types for tree data
 export interface TreeNode {
-    id: string
-    label: string
-    status: "active" | "inactive"
-    position: { x: number; y: number }
+    id: string;
+    label: string;
+    status: 'active' | 'inactive';
+    position: { x: number; y: number };
 }
 
 export interface TreeEdge {
-    id: string
-    source: string
-    target: string
-    status: "active" | "inactive"
+    id: string;
+    source: string;
+    target: string;
+    status: 'active' | 'inactive';
 }
 
 export interface TreeData {
-    nodes: TreeNode[]
-    edges: TreeEdge[]
+    nodes: TreeNode[];
+    edges: TreeEdge[];
 }
 
 // Function to fetch tree data from the database
@@ -26,7 +26,7 @@ export async function fetchTreeData(): Promise<TreeData> {
     // return await response.json()
 
     // For demonstration, we'll throw an error to trigger the sample data
-    throw new Error("API not implemented yet")
+    throw new Error('API not implemented yet');
 }
 
 // In a real application, you would implement an API route like this:
@@ -53,5 +53,3 @@ export async function GET() {
   }
 }
 */
-
-
