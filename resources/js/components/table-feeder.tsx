@@ -144,7 +144,7 @@ export default function TableFeeder({ feederList: initialFeeders, garduIndukList
 
   return (
     <div>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 mt-5">
         <div className="flex flex-col justify-between gap-4 sm:flex-row">
           <div className="relative w-full sm:w-64">
             <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
