@@ -2,6 +2,7 @@ import { Breadcrumbs } from '@/components/breadcrumbs';
 import { Icon } from '@/components/icon';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { NavigationMenu, NavigationMenuItem, NavigationMenuList, navigationMenuTriggerStyle } from '@/components/ui/navigation-menu';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -11,11 +12,16 @@ import { useInitials } from '@/hooks/use-initials';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem, type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { Bell, LayoutGrid, Menu, Spline, Table2 } from 'lucide-react';
+import { Bell, ChevronsUpDown, Database, LayoutGrid, Menu, Spline, Table2, User, UtilityPole } from 'lucide-react';
+import { useState } from 'react';
 import AppLogo from './app-logo';
 import AppLogoIcon from './app-logo-icon';
 
-const mainNavItems: NavItem[] = [
+interface ExtendedNavItem extends NavItem {
+    children?: NavItem[];
+}
+
+const mainNavItems: ExtendedNavItem[] = [
     {
         title: 'Dashboard',
         href: '/dashboard',
@@ -36,6 +42,26 @@ const mainNavItems: NavItem[] = [
         href: '/single-line',
         icon: Spline,
     },
+    {
+        title: 'Master',
+        href: '#',
+        icon: Database,
+        canAccess: (roles: string[]) => {
+            return roles.includes('admin');
+        },
+        children: [
+            {
+                title: 'Manage Users',
+                href: '/master/manage-users',
+                icon: User,
+            },
+            {
+                title: 'Gardu Induk',
+                href: '/master/gardu-induk',
+                icon: UtilityPole,
+            },
+        ],
+    },
 ];
 
 const rightNavItems: NavItem[] = [];
@@ -49,7 +75,9 @@ interface AppHeaderProps {
 export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
     const page = usePage<SharedData>();
     const { auth } = page.props;
+    const roles = auth.roles;
     const getInitials = useInitials();
+    const [isOpen, setIsOpen] = useState(false);
     return (
         <>
             <div className="border-sidebar-border/80 border-b">
@@ -70,12 +98,47 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                                 <div className="flex h-full flex-1 flex-col space-y-4 p-4">
                                     <div className="flex h-full flex-col justify-between text-sm">
                                         <div className="flex flex-col space-y-4">
-                                            {mainNavItems.map((item) => (
-                                                <Link key={item.title} href={item.href} className="flex items-center space-x-2 font-medium">
-                                                    {item.icon && <Icon iconNode={item.icon} className="h-5 w-5" />}
-                                                    <span>{item.title}</span>
-                                                </Link>
-                                            ))}
+                                            {mainNavItems.map((item) => {
+ if (item.canAccess && !item.canAccess(roles)) {
+                                return null;
+                            }
+return (
+                                                <div key={item.title}>
+                                                    {item.children ? (
+                                                        <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full">
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex space-x-2">
+                                                                    {item.icon && <Icon iconNode={item.icon} className="h-5 w-5" />}
+                                                                    <h4 className="font-medium">{item.title}</h4>
+                                                                </div>
+                                                                <CollapsibleTrigger>
+                                                                    <Button variant="ghost" size="sm" className="w-9 p-0">
+                                                                        <ChevronsUpDown className="h-4 w-4" />
+                                                                        <span className="sr-only">Toggle</span>
+                                                                    </Button>
+                                                                </CollapsibleTrigger>
+                                                            </div>
+                                                            <CollapsibleContent className="p-3">
+                                                                {item.children.map((child) => (
+                                                                    <Link
+                                                                        key={child.title}
+                                                                        href={child.href}
+                                                                        className="mb-2 flex items-center space-y-2 space-x-2 font-medium"
+                                                                    >
+                                                                        {child.icon && <Icon iconNode={child.icon} className="h-5 w-5" />}
+                                                                        <span>{child.title}</span>
+                                                                    </Link>
+                                                                ))}
+                                                            </CollapsibleContent>
+                                                        </Collapsible>
+                                                    ) : (
+                                                        <Link key={item.title} href={item.href} className="flex items-center space-x-2 font-medium">
+                                                            {item.icon && <Icon iconNode={item.icon} className="h-5 w-5" />}
+                                                            <span>{item.title}</span>
+                                                        </Link>
+                                                    )}
+                                                </div>
+                                                )})}
                                         </div>
 
                                         <div className="flex flex-col space-y-4">
@@ -106,24 +169,62 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                     <div className="ml-6 hidden h-full items-center space-x-6 lg:flex">
                         <NavigationMenu className="flex h-full items-stretch">
                             <NavigationMenuList className="flex h-full items-stretch space-x-2">
-                                {mainNavItems.map((item, index) => (
+                                {mainNavItems.map((item, index) => {
+ if (item.canAccess && !item.canAccess(roles)) {
+                                return null;
+                            }
+return (
                                     <NavigationMenuItem key={index} className="relative flex h-full items-center">
-                                        <Link
-                                            href={item.href}
-                                            className={cn(
-                                                navigationMenuTriggerStyle(),
-                                                page.url === item.href && activeItemStyles,
-                                                'h-9 cursor-pointer px-3',
-                                            )}
-                                        >
-                                            {item.icon && <Icon iconNode={item.icon} className="mr-2 h-4 w-4" />}
-                                            {item.title}
-                                        </Link>
+                                        {item.children ? (
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger>
+                                                    <Link
+                                                        href=""
+                                                            className={cn(
+                                                            navigationMenuTriggerStyle(),
+                                                            page.url === item.children.href && activeItemStyles,
+                                                            'h-9 cursor-pointer px-3',
+                                                        )}
+                                                    >
+                                                        {item.icon && <Icon iconNode={item.icon} className="mr-2 h-4 w-4" />}
+                                                        <span>{item.title}</span>
+                                                    </Link>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent className="flex flex-col py-3">
+                                                    {item.children.map((child) => (
+                                                        <Link
+                                                            href={child.href}
+                                                            className={cn(
+                                                                navigationMenuTriggerStyle(),
+                                                                page.url === child.href && activeItemStyles,
+                                                                'h-9 cursor-pointer px-3',
+                                                            )}
+                                                        >
+                                                            {child.icon && <Icon iconNode={child.icon} className="mr-2 h-4 w-4" />}
+                                                            {child.title}
+                                                        </Link>
+                                                    ))}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        ) : (
+                                            <Link
+                                                href={item.href}
+                                                className={cn(
+                                                    navigationMenuTriggerStyle(),
+                                                    page.url === item.href && activeItemStyles,
+                                                    'h-9 cursor-pointer px-3',
+                                                )}
+                                            >
+                                                {item.icon && <Icon iconNode={item.icon} className="mr-2 h-4 w-4" />}
+                                                {item.title}
+                                            </Link>
+                                        )}
+
                                         {page.url === item.href && (
                                             <div className="absolute bottom-0 left-0 h-0.5 w-full translate-y-px bg-black dark:bg-white"></div>
                                         )}
                                     </NavigationMenuItem>
-                                ))}
+                                    )})}
                             </NavigationMenuList>
                         </NavigationMenu>
                     </div>
