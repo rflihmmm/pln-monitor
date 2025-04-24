@@ -31,7 +31,7 @@ class FeederController extends Controller
 
         Feeder::create($validated);
 
-        return redirect()->route('feeder.index');
+        return redirect()->route('feeder.index')->with('success', 'Berhasil menambah Feeder.');
     }
 
     public function update(Request $request, Feeder $feeder)
@@ -44,12 +44,12 @@ class FeederController extends Controller
 
         $feeder->update($validated);
 
-        return redirect()->route('feeder.index');
+        return redirect()->route('feeder.index')->with('success', 'Berhasil melakukan update Feeder.');
     }
 
     public function destroy(Feeder $feeder)
     {
         $feeder->delete();
-        return redirect()->route('feeder.index');
+        return redirect()->route('feeder.index')->with('success', 'Berhasil menghapus Feeder.');
     }
 }

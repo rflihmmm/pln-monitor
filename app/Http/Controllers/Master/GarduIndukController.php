@@ -27,7 +27,7 @@ class GarduIndukController extends Controller
 
         GarduInduk::create($validated);
 
-        return redirect()->route('gardu-induk.index');
+        return redirect()->route('gardu-induk.index')->with('success', 'Berhasil menambah Gardu Induk.');
     }
 
     public function update(Request $request, GarduInduk $garduInduk)
@@ -39,12 +39,12 @@ class GarduIndukController extends Controller
 
         $garduInduk->update($validated);
 
-        return redirect()->route('gardu-induk.index')->with('success', 'Gardu Induk updated successfully.');
+        return redirect()->route('gardu-induk.index')->with('success', 'Berhasil melakukan update Gardu Induk.');
     }
 
     public function destroy(GarduInduk $garduInduk)
     {
         $garduInduk->delete();
-        return redirect()->route('gardu-induk.index');
+        return redirect()->route('gardu-induk.index')->with('success', 'Berhasil menghapus Gardu Induk.');
     }
 }
