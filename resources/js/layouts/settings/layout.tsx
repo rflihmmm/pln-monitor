@@ -22,14 +22,6 @@ const sidebarNavItems: NavItem[] = [
         href: '/settings/appearance',
         icon: null,
     },
-    {
-        title: 'Manage Users',
-        href: route('manage-users.index'),
-        icon: null,
-        canAccess: (roles: string[]) => {
-            return roles.includes('admin');
-        },
-    },
 ];
 
 export default function SettingsLayout({ children }: PropsWithChildren) {
