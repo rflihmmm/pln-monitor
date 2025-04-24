@@ -39,7 +39,7 @@ class GarduIndukController extends Controller
 
         $garduInduk->update($validated);
 
-        return redirect()->route('gardu-induk.index');
+        return redirect()->route('gardu-induk.index')->with('success', 'Gardu Induk updated successfully.');
     }
 
     public function destroy(GarduInduk $garduInduk)

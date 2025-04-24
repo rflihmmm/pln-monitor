@@ -90,7 +90,7 @@ export default function TableFeeder({ feederList: initialFeeders, garduIndukList
     if (!newFeeder.name || !newFeeder.gardu_induk_id) return
 
     router.post(
-      "/feeder",
+      route('feeder.store'),
       {
         name: newFeeder.name,
         description: newFeeder.description,
@@ -114,7 +114,7 @@ export default function TableFeeder({ feederList: initialFeeders, garduIndukList
     if (!editingFeeder || !editingFeeder.name || !editingFeeder.gardu_induk_id) return
 
     router.put(
-      `/feeder/${editingFeeder.id}`,
+      route('feeder.update', editingFeeder.id),
       {
         name: editingFeeder.name,
         description: editingFeeder.description,
@@ -138,7 +138,7 @@ export default function TableFeeder({ feederList: initialFeeders, garduIndukList
   // Handle deleting a feeder
   const handleDeleteFeeder = (feederId: number) => {
     if (confirm("Are you sure you want to delete this feeder?")) {
-      router.delete(`/feeder/${feederId}`)
+      router.delete(route("feeder.destroy", feederId))
     }
   }
 

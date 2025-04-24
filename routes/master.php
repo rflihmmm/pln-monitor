@@ -1,4 +1,5 @@
 <?php
+
 use App\Http\Controllers\Master\FeederController;
 use App\Http\Controllers\Master\GarduIndukController;
 use App\Http\Controllers\Master\UserController;
@@ -11,7 +12,5 @@ Route::middleware('auth')->group(function () {
         Route::apiResource('manage-users', UserController::class)->middleware(['role:admin']);
         Route::apiResource('gardu-induk', GarduIndukController::class);
         Route::apiResource('feeder', FeederController::class);
-           });
-
-
+    });
 });
