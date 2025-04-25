@@ -1,9 +1,10 @@
 import { router } from '@inertiajs/react';
-import { Edit, MoreHorizontal, Plus, Search, Trash } from 'lucide-react';
+import { Edit, MoreHorizontal, Search, Trash } from 'lucide-react';
 import { useState } from 'react';
 
+import AddGarduIndukButton from '@/components/add-gardu-induk-button';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -31,12 +32,7 @@ interface TableGarduIndukProps {
 
 export default function TableGarduInduk({ garduIndukList: initialGarduInduk }: TableGarduIndukProps) {
     const [searchTerm, setSearchTerm] = useState('');
-    const [isAddGarduOpen, setIsAddGarduOpen] = useState(false);
     const [isEditGarduOpen, setIsEditGarduOpen] = useState(false);
-    const [newGardu, setNewGardu] = useState<Partial<GarduInduk>>({
-        name: '',
-        description: '',
-    });
     const [editingGardu, setEditingGardu] = useState<GarduInduk | null>(null);
 
     // Filter gardu induk based on search term
@@ -55,28 +51,6 @@ export default function TableGarduInduk({ garduIndukList: initialGarduInduk }: T
             month: 'short',
             day: 'numeric',
         }).format(date);
-    };
-
-    // Handle adding a new gardu induk
-    const handleAddGardu = () => {
-        if (!newGardu.name) return;
-
-        router.post(
-            route('gardu-induk.store'),
-            {
-                name: newGardu.name,
-                description: newGardu.description,
-            },
-            {
-                onSuccess: () => {
-                    setIsAddGarduOpen(false);
-                    setNewGardu({
-                        name: '',
-                        description: '',
-                    });
-                },
-            },
-        );
     };
 
     // Handle editing a gardu induk
@@ -125,46 +99,7 @@ export default function TableGarduInduk({ garduIndukList: initialGarduInduk }: T
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <Dialog open={isAddGarduOpen} onOpenChange={setIsAddGarduOpen}>
-                        <DialogTrigger asChild>
-                            <Button className="flex items-center gap-1">
-                                <Plus className="h-4 w-4" />
-                                Add Substation
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Add New Substation</DialogTitle>
-                                <DialogDescription>Fill in the details to add a new substation to the system.</DialogDescription>
-                            </DialogHeader>
-                            <div className="grid gap-4 py-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="name">Name</Label>
-                                    <Input
-                                        id="name"
-                                        value={newGardu.name}
-                                        onChange={(e) => setNewGardu({ ...newGardu, name: e.target.value })}
-                                        placeholder="Substation Name"
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="description">Description</Label>
-                                    <Textarea
-                                        id="description"
-                                        value={newGardu.description || ''}
-                                        onChange={(e) => setNewGardu({ ...newGardu, description: e.target.value })}
-                                        placeholder="Substation description (optional)"
-                                    />
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button variant="outline" onClick={() => setIsAddGarduOpen(false)}>
-                                    Cancel
-                                </Button>
-                                <Button onClick={handleAddGardu}>Add Substation</Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
+                    <AddGarduIndukButton />
                 </div>
 
                 <div className="rounded-md border">

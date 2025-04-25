@@ -1,10 +1,10 @@
 import { router } from '@inertiajs/react';
-import { MoreHorizontal, Plus, Search, Trash, UserCog } from 'lucide-react';
+import { MoreHorizontal, Search, Trash, UserCog } from 'lucide-react';
 import { useState } from 'react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import AddUserButton from './add-user-button';
 
 // Define user type
 interface User {
@@ -35,15 +36,7 @@ interface TableUsersProps {
 export default function TableUsers({ users: initialUsers }: TableUsersProps) {
     const [searchTerm, setSearchTerm] = useState('');
     const [roleFilter, setRoleFilter] = useState<string>('all');
-    const [isAddUserOpen, setIsAddUserOpen] = useState(false);
     const [isEditUserOpen, setIsEditUserOpen] = useState(false);
-    const [newUser, setNewUser] = useState<Partial<User> & { password?: string; password_confirmation?: string }>({
-        name: '',
-        email: '',
-        role: 'user',
-        password: '',
-        password_confirmation: '',
-    });
     const [editingUser, setEditingUser] = useState<User | null>(null);
 
     // Filter users based on search term and filters
@@ -66,40 +59,12 @@ export default function TableUsers({ users: initialUsers }: TableUsersProps) {
         }).format(date);
     };
 
-    // Handle adding a new user
-    const handleAddUser = () => {
-        if (!newUser.name || !newUser.email || !newUser.password) return;
-
-        router.post(
-            '/settings/manage-users',
-            {
-                name: newUser.name,
-                email: newUser.email,
-                password: newUser.password,
-                password_confirmation: newUser.password_confirmation,
-                role: newUser.role,
-            },
-            {
-                onSuccess: () => {
-                    setIsAddUserOpen(false);
-                    setNewUser({
-                        name: '',
-                        email: '',
-                        role: 'user',
-                        password: '',
-                        password_confirmation: '',
-                    });
-                },
-            },
-        );
-    };
-
     // Handle editing a user
     const handleEditUser = () => {
         if (!editingUser || !editingUser.name || !editingUser.email) return;
 
         router.put(
-            `/settings/manage-users/${editingUser.id}`,
+            `/master/manage-users/${editingUser.id}`,
             {
                 name: editingUser.name,
                 email: editingUser.email,
@@ -123,14 +88,13 @@ export default function TableUsers({ users: initialUsers }: TableUsersProps) {
     // Handle deleting a user
     const handleDeleteUser = (userId: string) => {
         if (confirm('Are you sure you want to delete this user?')) {
-            router.delete(`/settings/manage-users/${userId}`);
+            router.delete(`/master/manage-users/${userId}`);
         }
     };
 
     return (
         <div>
             <div className="flex flex-col gap-4 mt-5">
-                {/* Rest of your component remains the same */}
                 <div className="flex flex-col justify-between gap-4 sm:flex-row">
                     <div className="relative w-full sm:w-64">
                         <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
@@ -146,84 +110,14 @@ export default function TableUsers({ users: initialUsers }: TableUsersProps) {
                         <Select value={roleFilter} onValueChange={setRoleFilter}>
                             <SelectTrigger className="w-full sm:w-[150px]">
                                 <SelectValue placeholder="Filter by role" />
-                    </SelectTrigger>
+                            </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All Roles</SelectItem>
                                 <SelectItem value="admin">Admin</SelectItem>
                                 <SelectItem value="user">User</SelectItem>
                             </SelectContent>
                         </Select>
-                        <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
-                            <DialogTrigger asChild>
-                                <Button className="flex items-center gap-1">
-                                    <Plus className="h-4 w-4" />
-                                    Add User
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>Add New User</DialogTitle>
-                                    <DialogDescription>Fill in the details to add a new user to the system.</DialogDescription>
-                                </DialogHeader>
-                                <div className="grid gap-4 py-4">
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="name">Full Name</Label>
-                                        <Input
-                                            id="name"
-                                            value={newUser.name}
-                                            onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                                            placeholder="John Doe"
-                                        />
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="email">Email</Label>
-                                        <Input
-                                            id="email"
-                                            type="email"
-                                            value={newUser.email}
-                                            onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                                            placeholder="john@example.com"
-                                        />
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="password">Password</Label>
-                                        <Input
-                                            id="password"
-                                            type="password"
-                                            value={newUser.password}
-                                            onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="password_confirmation">Confirm Password</Label>
-                                        <Input
-                                            id="password_confirmation"
-                                            type="password"
-                                            value={newUser.password_confirmation}
-                                            onChange={(e) => setNewUser({ ...newUser, password_confirmation: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="role">Role</Label>
-                                        <Select value={newUser.role} onValueChange={(value) => setNewUser({ ...newUser, role: value })}>
-                                            <SelectTrigger id="role">
-                                                <SelectValue placeholder="Select role" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="admin">Admin</SelectItem>
-                                                <SelectItem value="user">User</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-                                <DialogFooter>
-                                    <Button variant="outline" onClick={() => setIsAddUserOpen(false)}>
-                                        Cancel
-                                    </Button>
-                                    <Button onClick={handleAddUser}>Add User</Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
+                        <AddUserButton />
                     </div>
                 </div>
 
