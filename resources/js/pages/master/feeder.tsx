@@ -50,9 +50,12 @@ export default function FeederPage({ feederList, garduIndukList }: FeederPagePro
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
       <Head title="Feeder" />
+            <div className='px-5'>
 
       <TableFeeder feederList={feederList} garduIndukList={garduIndukList} keypointsList={sampleKeypoints}
         statusPointsList={sampleStatusPoints} />
+
+            </div>
     </AppLayout>
   );
 }
