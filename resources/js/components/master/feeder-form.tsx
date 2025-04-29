@@ -81,13 +81,6 @@ export default function FeederForm({
   const [apmStatusOpen, setApmStatusOpen] = useState(false)
   const [mwStatusOpen, setMwStatusOpen] = useState(false)
 
-  // Search state for filtering items
-  const [substationSearch, setSubstationSearch] = useState("")
-  const [keypointSearch, setKeypointSearch] = useState("")
-  const [pmtStatusSearch, setPmtStatusSearch] = useState("")
-  const [apmStatusSearch, setApmStatusSearch] = useState("")
-  const [mwStatusSearch, setMwStatusSearch] = useState("")
-
   useEffect(() => {
     if (feeder && isEdit) {
       setFeederData({
@@ -159,18 +152,6 @@ export default function FeederForm({
     return status ? status.name : "None"
   }
 
-  // Filter functions for comboboxes
-  const filteredSubstations = garduIndukList.filter((gardu) =>
-    gardu.name.toLowerCase().includes(substationSearch.toLowerCase()),
-  )
-
-  const filteredKeypoints = keypointsList.filter((keypoint) =>
-    keypoint.name.toLowerCase().includes(keypointSearch.toLowerCase()),
-  )
-
-  const filteredStatusPoints = (search: string) =>
-    statusPointsList.filter((status) => status.name.toLowerCase().includes(search.toLowerCase()))
-
   const handleSubmit = () => {
     onSubmit(feederData)
   }
@@ -214,22 +195,17 @@ export default function FeederForm({
           </PopoverTrigger>
           <PopoverContent className="w-[300px] p-0">
             <Command>
-              <CommandInput
-                placeholder="Search substations..."
-                value={substationSearch}
-                onValueChange={setSubstationSearch}
-              />
+              <CommandInput placeholder="Search substations..." />
               <CommandList>
                 <CommandEmpty>No substations found.</CommandEmpty>
                 <CommandGroup className="max-h-[200px] overflow-y-auto">
-                  {filteredSubstations.map((gardu) => (
+                  {garduIndukList.map((gardu) => (
                     <CommandItem
                       key={gardu.id}
                       value={gardu.name}
                       onSelect={() => {
                         handleChange("gardu_induk_id", gardu.id)
                         setSubstationOpen(false)
-                        setSubstationSearch("")
                       }}
                     >
                       <Check
@@ -262,23 +238,15 @@ export default function FeederForm({
           </PopoverTrigger>
           <PopoverContent className="w-[300px] p-0">
             <Command>
-              <CommandInput
-                placeholder="Search keypoints..."
-                value={keypointSearch}
-                onValueChange={setKeypointSearch}
-              />
+              <CommandInput placeholder="Search keypoints..." />
               <CommandList>
                 <CommandEmpty>No keypoints found.</CommandEmpty>
                 <CommandGroup className="max-h-[200px] overflow-y-auto">
-                  {filteredKeypoints.map((keypoint) => (
+                  {keypointsList.map((keypoint) => (
                     <CommandItem
                       key={keypoint.id}
                       value={keypoint.name}
-                      onSelect={() => {
-                        handleKeypointSelect(keypoint)
-                        // Don't close the popover to allow multiple selections
-                        // Don't clear search to allow selecting multiple filtered items
-                      }}
+                      onSelect={() => handleKeypointSelect(keypoint)}
                     >
                       <div className="flex items-center space-x-2 w-full">
                         <Check
@@ -300,7 +268,6 @@ export default function FeederForm({
                   className="w-full"
                   onClick={() => {
                     setKeypointsOpen(false)
-                    setKeypointSearch("")
                   }}
                 >
                   Done
@@ -354,11 +321,7 @@ export default function FeederForm({
               </PopoverTrigger>
               <PopoverContent className="w-[200px] p-0">
                 <Command>
-                  <CommandInput
-                    placeholder="Search status..."
-                    value={pmtStatusSearch}
-                    onValueChange={setPmtStatusSearch}
-                  />
+                  <CommandInput placeholder="Search status..." />
                   <CommandList>
                     <CommandEmpty>No status found.</CommandEmpty>
                     <CommandGroup className="max-h-[200px] overflow-y-auto">
@@ -367,7 +330,6 @@ export default function FeederForm({
                         onSelect={() => {
                           handleStatusPointChange("pmt", 0)
                           setPmtStatusOpen(false)
-                          setPmtStatusSearch("")
                         }}
                       >
                         <Check
@@ -378,14 +340,13 @@ export default function FeederForm({
                         />
                         None
                       </CommandItem>
-                      {filteredStatusPoints(pmtStatusSearch).map((status) => (
+                      {statusPointsList.map((status) => (
                         <CommandItem
                           key={status.id}
                           value={status.name}
                           onSelect={() => {
                             handleStatusPointChange("pmt", status.id)
                             setPmtStatusOpen(false)
-                            setPmtStatusSearch("")
                           }}
                         >
                           <Check
@@ -424,11 +385,7 @@ export default function FeederForm({
               </PopoverTrigger>
               <PopoverContent className="w-[200px] p-0">
                 <Command>
-                  <CommandInput
-                    placeholder="Search status..."
-                    value={apmStatusSearch}
-                    onValueChange={setApmStatusSearch}
-                  />
+                  <CommandInput placeholder="Search status..." />
                   <CommandList>
                     <CommandEmpty>No status found.</CommandEmpty>
                     <CommandGroup className="max-h-[200px] overflow-y-auto">
@@ -437,7 +394,6 @@ export default function FeederForm({
                         onSelect={() => {
                           handleStatusPointChange("apm", 0)
                           setApmStatusOpen(false)
-                          setApmStatusSearch("")
                         }}
                       >
                         <Check
@@ -448,14 +404,13 @@ export default function FeederForm({
                         />
                         None
                       </CommandItem>
-                      {filteredStatusPoints(apmStatusSearch).map((status) => (
+                      {statusPointsList.map((status) => (
                         <CommandItem
                           key={status.id}
                           value={status.name}
                           onSelect={() => {
                             handleStatusPointChange("apm", status.id)
                             setApmStatusOpen(false)
-                            setApmStatusSearch("")
                           }}
                         >
                           <Check
@@ -492,11 +447,7 @@ export default function FeederForm({
               </PopoverTrigger>
               <PopoverContent className="w-[200px] p-0">
                 <Command>
-                  <CommandInput
-                    placeholder="Search status..."
-                    value={mwStatusSearch}
-                    onValueChange={setMwStatusSearch}
-                  />
+                  <CommandInput placeholder="Search status..." />
                   <CommandList>
                     <CommandEmpty>No status found.</CommandEmpty>
                     <CommandGroup className="max-h-[200px] overflow-y-auto">
@@ -505,7 +456,6 @@ export default function FeederForm({
                         onSelect={() => {
                           handleStatusPointChange("mw", 0)
                           setMwStatusOpen(false)
-                          setMwStatusSearch("")
                         }}
                       >
                         <Check
@@ -516,14 +466,13 @@ export default function FeederForm({
                         />
                         None
                       </CommandItem>
-                      {filteredStatusPoints(mwStatusSearch).map((status) => (
+                      {statusPointsList.map((status) => (
                         <CommandItem
                           key={status.id}
                           value={status.name}
                           onSelect={() => {
                             handleStatusPointChange("mw", status.id)
                             setMwStatusOpen(false)
-                            setMwStatusSearch("")
                           }}
                         >
                           <Check
