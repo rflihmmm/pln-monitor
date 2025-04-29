@@ -2,7 +2,7 @@ import { Head } from '@inertiajs/react';
 
 import { type BreadcrumbItem } from '@/types';
 
-import TableGarduInduk from '@/components/table-gardu-induk';
+import TableGarduInduk from '@/components/master/table-gardu-induk';
 import AppLayout from '@/layouts/app-layout';
 
 // Define interfaces for the data

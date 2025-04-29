@@ -2,7 +2,7 @@ import { Head } from '@inertiajs/react';
 
 import { type BreadcrumbItem } from '@/types';
 
-import TableUsers from '@/components/table-users';
+import TableUsers from '@/components/master/table-users';
 import AppLayout from '@/layouts/app-layout';
 
 const breadcrumbs: BreadcrumbItem[] = [
