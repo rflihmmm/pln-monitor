@@ -9,11 +9,13 @@ class GarduInduk extends Model
     protected $fillable = [
         'name',
         'description',
-        'gardu_induk_id',
     ];
 
-    public function garduInduk()
+    /**
+     * Get the feeders for this gardu induk.
+     */
+    public function feeders()
     {
-        return $this->belongsTo(GarduInduk::class);
+        return $this->hasMany(Feeder::class);
     }
 }
