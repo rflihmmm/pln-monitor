@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -25,7 +26,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('single-line');
     Route::get('/test-mssql', function () {
         try {
-            DB::connection('sqlsrv')->getPdo();
+            DB::connection('sqlsrv_main')->getPdo();
             return 'Connected to MSSQL!';
         } catch (\Exception $e) {
             return 'Failed: ' . $e->getMessage();
