@@ -300,7 +300,7 @@ export default function FeederForm({
       {/* Status Points */}
       <div className="grid gap-4">
         <Label>Status Points</Label>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           {/* PMT Status */}
           <div className="grid gap-2">
             <Label htmlFor="pmt_status">PMT</Label>
