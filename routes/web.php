@@ -26,8 +26,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('single-line');
     Route::get('/test-mssql', function () {
         try {
-            DB::connection('sqlsrv_main')->getPdo();
-            return 'Connected to MSSQL!';
+            $results = DB::connection('sqlsrv_main')
+                ->table('ALARMS')
+                ->limit(10)
+                ->get();
+            return response()->json($results);
         } catch (\Exception $e) {
             return 'Failed: ' . $e->getMessage();
         }
