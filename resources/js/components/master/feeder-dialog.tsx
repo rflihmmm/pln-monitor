@@ -1,47 +1,25 @@
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import FeederForm from "@/components/master/feeder-form"
+// ─── components/master/feeder-dialog.tsx ─────────────────────────────────────
 
-interface GarduInduk {
-  id: number
-  name: string
-}
-
-interface Keypoint {
-  id: number
-  name: string
-}
-
-interface StatusPoint {
-  id: number
-  name: string
-}
-
-interface StatusPoints {
-  pmt: number
-  apm: number
-  mw: number
-}
-
-interface Feeder {
-  id?: number
-  name: string
-  description: string | null
-  gardu_induk_id: number
-  created_at?: string
-  gardu_induk?: GarduInduk
-  keypoints: number[]
-  status_points: StatusPoints
-}
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import FeederForm from "@/components/master/feeder-form";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { type DropdownBase, GarduInduk, StatusPoint, Feeder } from "@/types";
 
 interface FeederDialogProps {
-  isOpen: boolean
-  onOpenChange: (open: boolean) => void
-  onSubmit: (feederData: any) => void
-  feeder?: Feeder | null
-  garduIndukList: GarduInduk[]
-  keypointsList: Keypoint[]
-  statusPointsList: StatusPoint[]
-  isEdit?: boolean
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (feederData: any) => void;
+  feeder?: Feeder | null;
+  garduIndukList: GarduInduk[];
+  keypointsList: DropdownBase[];
+  statusPointsList: StatusPoint[];
+  isEdit?: boolean;
 }
 
 export default function FeederDialog({
@@ -55,12 +33,12 @@ export default function FeederDialog({
   isEdit = false,
 }: FeederDialogProps) {
   const handleCancel = () => {
-    onOpenChange(false)
-  }
+    onOpenChange(false);
+  };
 
   const handleSubmit = (feederData: any) => {
-    onSubmit(feederData)
-  }
+    onSubmit(feederData);
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -68,20 +46,23 @@ export default function FeederDialog({
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Feeder" : "Add New Feeder"}</DialogTitle>
           <DialogDescription>
-            {isEdit ? "Update feeder information" : "Fill in the details to add a new feeder to the system."}
+            {isEdit
+              ? "Update feeder information"
+              : "Fill in the details to add a new feeder to the system."}
           </DialogDescription>
         </DialogHeader>
-        <FeederForm
-          feeder={feeder}
-          garduIndukList={garduIndukList}
-          keypointsList={keypointsList}
-          statusPointsList={statusPointsList}
-          onSubmit={handleSubmit}
-          onCancel={handleCancel}
-          isEdit={isEdit}
-        />
+        <ScrollArea className="max-h-[70vh] px-5">
+          <FeederForm
+            feeder={feeder}
+            garduIndukList={garduIndukList}
+            keypointsList={keypointsList}
+            statusPointsList={statusPointsList}
+            onSubmit={handleSubmit}
+            onCancel={handleCancel}
+            isEdit={isEdit}
+          />
+        </ScrollArea>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
-

@@ -54,7 +54,7 @@ export default function TableGarduInduk({ garduIndukList: initialGarduInduk }: T
   // Handle adding a new gardu induk
   const handleAddGardu = (garduData: any) => {
     router.post(
-      route("gardu-induk.store"),
+      route("master.gardu-induk.store"),
       {
         name: garduData.name,
         description: garduData.description,
@@ -72,7 +72,7 @@ export default function TableGarduInduk({ garduIndukList: initialGarduInduk }: T
     if (!editingGardu) return
 
     router.put(
-      route("gardu-induk.update", editingGardu.id),
+      route("master.gardu-induk.update", editingGardu.id),
       {
         name: garduData.name,
         description: garduData.description,
@@ -95,7 +95,7 @@ export default function TableGarduInduk({ garduIndukList: initialGarduInduk }: T
   // Handle deleting a gardu induk
   const handleDeleteGardu = (garduId: number) => {
     if (confirm("Are you sure you want to delete this substation?")) {
-      router.delete(route("gardu-induk.destroy", garduId))
+      router.delete(route("master.gardu-induk.destroy", garduId))
     }
   }
 

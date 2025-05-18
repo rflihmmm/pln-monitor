@@ -1,24 +1,9 @@
 import { Head } from '@inertiajs/react';
 
-import { type BreadcrumbItem } from '@/types';
+import { type BreadcrumbItem, GarduInduk, Feeder } from '@/types';
 
 import TableFeeder from '@/components/master/table-feeder';
 import AppLayout from '@/layouts/app-layout';
-
-// Define interfaces for the data
-interface GarduInduk {
-  id: number;
-  name: string;
-}
-
-interface Feeder {
-  id: number;
-  name: string;
-  description: string | null;
-  gardu_induk_id: number;
-  created_at: string;
-  gardu_induk?: GarduInduk;
-}
 
 interface FeederPageProps {
   feederList: Feeder[];

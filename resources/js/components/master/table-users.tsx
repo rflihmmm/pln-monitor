@@ -62,7 +62,7 @@ export default function TableUsers({ users: initialUsers }: TableUsersProps) {
   // Handle adding a new user
   const handleAddUser = (userData: any) => {
     router.post(
-      "/master/manage-users",
+      route("master.manage-users.store"),
       {
         name: userData.name,
         email: userData.email,

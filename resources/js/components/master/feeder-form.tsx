@@ -1,66 +1,54 @@
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { DialogFooter } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Check, ChevronsUpDown, X } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { cn } from "@/lib/utils"
+// ─── components/master/feeder-form.tsx ───────────────────────────────────────
 
-interface GarduInduk {
-  id: number
-  name: string
-}
+import { useState, useEffect } from "react";
+import axios from "axios";
+import { Button } from "@/components/ui/button";
+import { DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Check, ChevronsUpDown, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
-interface Keypoint {
-  id: number
-  name: string
-}
-
-interface StatusPoint {
-  id: number
-  name: string
-}
-
-interface StatusPoints {
-  pmt: number
-  apm: number
-  mw: number
-}
-
-interface Feeder {
-  id?: number
-  name: string
-  description: string | null
-  gardu_induk_id: number
-  created_at?: string
-  gardu_induk?: GarduInduk
-  keypoints: number[]
-  status_points: StatusPoints
-}
+import {
+  type DropdownBase,
+  GarduInduk,
+  Keypoint,
+  StatusPoint,
+  StatusPoints,
+  Feeder,
+} from "@/types";
 
 interface FeederFormProps {
-  feeder?: Feeder | null
-  garduIndukList: GarduInduk[]
-  keypointsList: Keypoint[]
-  statusPointsList: StatusPoint[]
-  onSubmit: (feederData: any) => void
-  onCancel: () => void
-  isEdit?: boolean
+  feeder?: Feeder | null;
+  garduIndukList: GarduInduk[];
+  keypointsList: DropdownBase[];
+  statusPointsList: StatusPoint[];
+  onSubmit: (feederData: any) => void;
+  onCancel: () => void;
+  isEdit?: boolean;
 }
 
 export default function FeederForm({
   feeder,
   garduIndukList,
-  keypointsList,
+  keypointsList: initialKeypointsList,
   statusPointsList,
   onSubmit,
   onCancel,
   isEdit = false,
 }: FeederFormProps) {
+  // State utama untuk form
   const [feederData, setFeederData] = useState<Partial<Feeder>>({
     name: "",
     description: "",
@@ -71,16 +59,21 @@ export default function FeederForm({
       apm: 0,
       mw: 0,
     },
-  })
+  });
 
-  // State for comboboxes
-  const [selectedKeypoints, setSelectedKeypoints] = useState<Keypoint[]>([])
-  const [keypointsOpen, setKeypointsOpen] = useState(false)
-  const [substationOpen, setSubstationOpen] = useState(false)
-  const [pmtStatusOpen, setPmtStatusOpen] = useState(false)
-  const [apmStatusOpen, setApmStatusOpen] = useState(false)
-  const [mwStatusOpen, setMwStatusOpen] = useState(false)
+  // State combobox Keypoints
+  const [selectedKeypoints, setSelectedKeypoints] = useState<Keypoint[]>([]);
+  const [keypointsOpen, setKeypointsOpen] = useState(false);
+  // LIST ini akan berubah‐ubah sesuai hasil pencarian
+  const [keypointsList, setKeypointsList] = useState<DropdownBase[]>(initialKeypointsList);
 
+  // State combobox lain (Substation + Status Points)
+  const [substationOpen, setSubstationOpen] = useState(false);
+  const [pmtStatusOpen, setPmtStatusOpen] = useState(false);
+  const [apmStatusOpen, setApmStatusOpen] = useState(false);
+  const [mwStatusOpen, setMwStatusOpen] = useState(false);
+
+  // Jika sedang edit, populate data awal
   useEffect(() => {
     if (feeder && isEdit) {
       setFeederData({
@@ -89,19 +82,24 @@ export default function FeederForm({
         gardu_induk_id: feeder.gardu_induk_id,
         keypoints: feeder.keypoints || [],
         status_points: feeder.status_points || { pmt: 0, apm: 0, mw: 0 },
-      })
+      });
 
-      // Set selected keypoints based on IDs
+      // Tandai keypoints yang sudah terpilih
       if (feeder.keypoints && feeder.keypoints.length > 0) {
-        const selected = keypointsList.filter((kp) => feeder.keypoints.includes(kp.id))
-        setSelectedKeypoints(selected)
+        const selected = initialKeypointsList.filter((kp) =>
+          feeder.keypoints!.includes(kp.id)
+        );
+        setSelectedKeypoints(
+          selected.map((kp) => ({ id: kp.id, name: kp.name })) as Keypoint[]
+        );
       }
     }
-  }, [feeder, isEdit, keypointsList])
+  }, [feeder, isEdit, initialKeypointsList]);
 
+  // Helpers untuk set state form
   const handleChange = (field: string, value: any) => {
-    setFeederData({ ...feederData, [field]: value })
-  }
+    setFeederData({ ...feederData, [field]: value });
+  };
 
   const handleStatusPointChange = (type: keyof StatusPoints, value: number) => {
     setFeederData({
@@ -110,54 +108,82 @@ export default function FeederForm({
         ...(feederData.status_points as StatusPoints),
         [type]: value,
       },
-    })
-  }
+    });
+  };
 
-  const handleKeypointSelect = (keypoint: Keypoint) => {
-    // Check if already selected
-    const isSelected = selectedKeypoints.some((kp) => kp.id === keypoint.id)
-
+  // Ketika user memilih/menghilangkan satu keypoint
+  const handleKeypointSelect = (keypoint: DropdownBase) => {
+    const isSelected = selectedKeypoints.some((kp) => kp.id === keypoint.id);
     if (isSelected) {
-      // Remove from selection
-      setSelectedKeypoints(selectedKeypoints.filter((kp) => kp.id !== keypoint.id))
+      setSelectedKeypoints((prev) => prev.filter((kp) => kp.id !== keypoint.id));
       setFeederData({
         ...feederData,
         keypoints: (feederData.keypoints || []).filter((id) => id !== keypoint.id),
-      })
+      });
     } else {
-      // Add to selection
-      setSelectedKeypoints([...selectedKeypoints, keypoint])
+      setSelectedKeypoints((prev) => [
+        ...prev,
+        { id: keypoint.id, name: keypoint.name } as Keypoint,
+      ]);
       setFeederData({
         ...feederData,
         keypoints: [...(feederData.keypoints || []), keypoint.id],
-      })
+      });
     }
-  }
+  };
 
+  // Remove satu keypoint ketika icon “X” ditekan
   const removeKeypoint = (id: number) => {
-    setSelectedKeypoints(selectedKeypoints.filter((kp) => kp.id !== id))
+    setSelectedKeypoints((prev) => prev.filter((kp) => kp.id !== id));
     setFeederData({
       ...feederData,
       keypoints: (feederData.keypoints || []).filter((keypointId) => keypointId !== id),
-    })
-  }
+    });
+  };
 
+  // Mendapatkan nama substation (Gardu Induk) berdasarkan id
   const getSubstationName = (id: number) => {
-    const substation = garduIndukList.find((g) => g.id === id)
-    return substation ? substation.name : "Select substation"
-  }
+    const substation = garduIndukList.find((g) => g.id === id);
+    return substation ? substation.name : "Select substation";
+  };
 
+  // Mendapatkan nama Status Points berdasarkan id
   const getStatusPointName = (id: number) => {
-    const status = statusPointsList.find((s) => s.id === id)
-    return status ? status.name : "None"
-  }
+    const status = statusPointsList.find((s) => s.id === id);
+    return status ? status.name : "None";
+  };
 
   const handleSubmit = () => {
-    onSubmit(feederData)
-  }
+    onSubmit(feederData);
+  };
+
+  /**
+   * Ketika user mengetik di combobox Keypoints (minimal 3 karakter),
+   * lakukan pemanggilan ke endpoint Laravel untuk mengambil keypoints yang matching.
+   */
+  const handleOnSearchKeypoint = (search: string) => {
+    if (search.length < 3) {
+      // Jika kurang dari 3 karakter, clear list supaya dropdown kosong
+      setKeypointsList([]);
+      return;
+    }
+
+    // Panggil endpoint yang sudah kita definisikan di Laravel (lihat langkah #1 dan #2)
+    axios
+      .get(route("master.feeder.keypoint-data", { filter: search }))
+      .then((resp) => {
+        // resp.data diasumsikan array of { id, name }
+        setKeypointsList(resp.data as DropdownBase[]);
+      })
+      .catch((err) => {
+        console.error("Error fetching keypoints:", err);
+        setKeypointsList([]);
+      });
+  };
 
   return (
     <div className="grid gap-4 py-4">
+      {/* Name */}
       <div className="grid gap-2">
         <Label htmlFor="name">Name</Label>
         <Input
@@ -167,6 +193,8 @@ export default function FeederForm({
           placeholder="Feeder Name"
         />
       </div>
+
+      {/* Description */}
       <div className="grid gap-2">
         <Label htmlFor="description">Description</Label>
         <Textarea
@@ -177,7 +205,7 @@ export default function FeederForm({
         />
       </div>
 
-      {/* Substation Combobox */}
+      {/* Substation (Gardu Induk) Combobox */}
       <div className="grid gap-2">
         <Label htmlFor="gardu_induk_id">Substation</Label>
         <Popover open={substationOpen} onOpenChange={setSubstationOpen}>
@@ -189,7 +217,9 @@ export default function FeederForm({
               className="justify-between"
               id="gardu_induk_id"
             >
-              {feederData.gardu_induk_id ? getSubstationName(feederData.gardu_induk_id) : "Select substation"}
+              {feederData.gardu_induk_id
+                ? getSubstationName(feederData.gardu_induk_id)
+                : "Select substation"}
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
@@ -204,14 +234,16 @@ export default function FeederForm({
                       key={gardu.id}
                       value={gardu.name}
                       onSelect={() => {
-                        handleChange("gardu_induk_id", gardu.id)
-                        setSubstationOpen(false)
+                        handleChange("gardu_induk_id", gardu.id);
+                        setSubstationOpen(false);
                       }}
                     >
                       <Check
                         className={cn(
                           "mr-2 h-4 w-4",
-                          feederData.gardu_induk_id === gardu.id ? "opacity-100" : "opacity-0",
+                          feederData.gardu_induk_id === gardu.id
+                            ? "opacity-100"
+                            : "opacity-0"
                         )}
                       />
                       {gardu.name}
@@ -224,21 +256,32 @@ export default function FeederForm({
         </Popover>
       </div>
 
-      {/* Keypoints Multi-select */}
+      {/* Keypoints Multi‐select */}
       <div className="grid gap-2">
         <Label htmlFor="keypoints">Keypoints</Label>
         <Popover open={keypointsOpen} onOpenChange={setKeypointsOpen}>
           <PopoverTrigger asChild>
-            <Button variant="outline" role="combobox" aria-expanded={keypointsOpen} className="justify-between">
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={keypointsOpen}
+              className="justify-between"
+            >
               {selectedKeypoints.length > 0
-                ? `${selectedKeypoints.length} keypoint${selectedKeypoints.length > 1 ? "s" : ""} selected`
+                ? `${selectedKeypoints.length} keypoint${
+                    selectedKeypoints.length > 1 ? "s" : ""
+                  } selected`
                 : "Select keypoints..."}
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-[300px] p-0">
             <Command>
-              <CommandInput placeholder="Search keypoints..." />
+              <CommandInput
+                placeholder="Search keypoints..."
+                // Setiap kali user mengubah teks di input, panggil handleOnSearchKeypoint
+                onValueChange={handleOnSearchKeypoint}
+              />
               <CommandList>
                 <CommandEmpty>No keypoints found.</CommandEmpty>
                 <CommandGroup className="max-h-[200px] overflow-y-auto">
@@ -252,7 +295,9 @@ export default function FeederForm({
                         <Check
                           className={cn(
                             "h-4 w-4",
-                            selectedKeypoints.some((kp) => kp.id === keypoint.id) ? "opacity-100" : "opacity-0",
+                            selectedKeypoints.some((kp) => kp.id === keypoint.id)
+                              ? "opacity-100"
+                              : "opacity-0"
                           )}
                         />
                         <span>{keypoint.name}</span>
@@ -266,9 +311,7 @@ export default function FeederForm({
                   variant="outline"
                   size="sm"
                   className="w-full"
-                  onClick={() => {
-                    setKeypointsOpen(false)
-                  }}
+                  onClick={() => setKeypointsOpen(false)}
                 >
                   Done
                 </Button>
@@ -277,7 +320,7 @@ export default function FeederForm({
           </PopoverContent>
         </Popover>
 
-        {/* Selected keypoints display */}
+        {/* Tampilkan “Badge” untuk setiap keypoint yang sudah dipilih */}
         {selectedKeypoints.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
             {selectedKeypoints.map((keypoint) => (
@@ -297,11 +340,11 @@ export default function FeederForm({
         )}
       </div>
 
-      {/* Status Points */}
+      {/* Status Points (PMT, APM, MW) */}
       <div className="grid gap-4">
         <Label>Status Points</Label>
         <div className="grid grid-cols-1 gap-4">
-          {/* PMT Status */}
+          {/* PMT */}
           <div className="grid gap-2">
             <Label htmlFor="pmt_status">PMT</Label>
             <Popover open={pmtStatusOpen} onOpenChange={setPmtStatusOpen}>
@@ -328,14 +371,14 @@ export default function FeederForm({
                       <CommandItem
                         value="none"
                         onSelect={() => {
-                          handleStatusPointChange("pmt", 0)
-                          setPmtStatusOpen(false)
+                          handleStatusPointChange("pmt", 0);
+                          setPmtStatusOpen(false);
                         }}
                       >
                         <Check
                           className={cn(
                             "mr-2 h-4 w-4",
-                            feederData.status_points?.pmt === 0 ? "opacity-100" : "opacity-0",
+                            feederData.status_points?.pmt === 0 ? "opacity-100" : "opacity-0"
                           )}
                         />
                         None
@@ -345,14 +388,16 @@ export default function FeederForm({
                           key={status.id}
                           value={status.name}
                           onSelect={() => {
-                            handleStatusPointChange("pmt", status.id)
-                            setPmtStatusOpen(false)
+                            handleStatusPointChange("pmt", status.id);
+                            setPmtStatusOpen(false);
                           }}
                         >
                           <Check
                             className={cn(
                               "mr-2 h-4 w-4",
-                              feederData.status_points?.pmt === status.id ? "opacity-100" : "opacity-0",
+                              feederData.status_points?.pmt === status.id
+                                ? "opacity-100"
+                                : "opacity-0"
                             )}
                           />
                           {status.name}
@@ -365,7 +410,7 @@ export default function FeederForm({
             </Popover>
           </div>
 
-          {/* APM Status */}
+          {/* APM */}
           <div className="grid gap-2">
             <Label htmlFor="apm_status">APM</Label>
             <Popover open={apmStatusOpen} onOpenChange={setApmStatusOpen}>
@@ -392,14 +437,14 @@ export default function FeederForm({
                       <CommandItem
                         value="none"
                         onSelect={() => {
-                          handleStatusPointChange("apm", 0)
-                          setApmStatusOpen(false)
+                          handleStatusPointChange("apm", 0);
+                          setApmStatusOpen(false);
                         }}
                       >
                         <Check
                           className={cn(
                             "mr-2 h-4 w-4",
-                            feederData.status_points?.apm === 0 ? "opacity-100" : "opacity-0",
+                            feederData.status_points?.apm === 0 ? "opacity-100" : "opacity-0"
                           )}
                         />
                         None
@@ -409,14 +454,16 @@ export default function FeederForm({
                           key={status.id}
                           value={status.name}
                           onSelect={() => {
-                            handleStatusPointChange("apm", status.id)
-                            setApmStatusOpen(false)
+                            handleStatusPointChange("apm", status.id);
+                            setApmStatusOpen(false);
                           }}
                         >
                           <Check
                             className={cn(
                               "mr-2 h-4 w-4",
-                              feederData.status_points?.apm === status.id ? "opacity-100" : "opacity-0",
+                              feederData.status_points?.apm === status.id
+                                ? "opacity-100"
+                                : "opacity-0"
                             )}
                           />
                           {status.name}
@@ -429,7 +476,7 @@ export default function FeederForm({
             </Popover>
           </div>
 
-          {/* MW Status */}
+          {/* MW */}
           <div className="grid gap-2">
             <Label htmlFor="mw_status">MW</Label>
             <Popover open={mwStatusOpen} onOpenChange={setMwStatusOpen}>
@@ -441,7 +488,9 @@ export default function FeederForm({
                   className="justify-between"
                   id="mw_status"
                 >
-                  {feederData.status_points?.mw ? getStatusPointName(feederData.status_points.mw) : "None"}
+                  {feederData.status_points?.mw
+                    ? getStatusPointName(feederData.status_points.mw)
+                    : "None"}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
@@ -454,14 +503,14 @@ export default function FeederForm({
                       <CommandItem
                         value="none"
                         onSelect={() => {
-                          handleStatusPointChange("mw", 0)
-                          setMwStatusOpen(false)
+                          handleStatusPointChange("mw", 0);
+                          setMwStatusOpen(false);
                         }}
                       >
                         <Check
                           className={cn(
                             "mr-2 h-4 w-4",
-                            feederData.status_points?.mw === 0 ? "opacity-100" : "opacity-0",
+                            feederData.status_points?.mw === 0 ? "opacity-100" : "opacity-0"
                           )}
                         />
                         None
@@ -471,14 +520,16 @@ export default function FeederForm({
                           key={status.id}
                           value={status.name}
                           onSelect={() => {
-                            handleStatusPointChange("mw", status.id)
-                            setMwStatusOpen(false)
+                            handleStatusPointChange("mw", status.id);
+                            setMwStatusOpen(false);
                           }}
                         >
                           <Check
                             className={cn(
                               "mr-2 h-4 w-4",
-                              feederData.status_points?.mw === status.id ? "opacity-100" : "opacity-0",
+                              feederData.status_points?.mw === status.id
+                                ? "opacity-100"
+                                : "opacity-0"
                             )}
                           />
                           {status.name}
@@ -493,6 +544,7 @@ export default function FeederForm({
         </div>
       </div>
 
+      {/* Tombol Cancel & Submit */}
       <DialogFooter>
         <Button variant="outline" onClick={onCancel}>
           Cancel
@@ -500,6 +552,5 @@ export default function FeederForm({
         <Button onClick={handleSubmit}>{isEdit ? "Save Changes" : "Add Feeder"}</Button>
       </DialogFooter>
     </div>
-  )
+  );
 }
-

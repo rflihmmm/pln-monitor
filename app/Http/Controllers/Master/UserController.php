@@ -52,7 +52,7 @@ class UserController extends Controller
 
         $user->assignRole($validated['role']);
 
-        return redirect()->route('manage-users.index')->with('success', 'Berhasil menambah User.');
+        return redirect()->route('master.manage-users.index')->with('success', 'Berhasil menambah User.');
     }
 
     public function update(Request $request, User $manage_user)
@@ -72,12 +72,12 @@ class UserController extends Controller
             $manage_user->syncRoles([$validated['role']]);
         }
 
-        return redirect()->route('manage-users.index')->with('success', 'Berhasil melakukan update User.');
+        return redirect()->route('master.manage-users.index')->with('success', 'Berhasil melakukan update User.');
     }
 
     public function destroy(User $manage_user)
     {
         $manage_user->delete();
-        return redirect()->route('manage-users.index')->with('success', 'Berhasil menghapus User.');
+        return redirect()->route('master.manage-users.index')->with('success', 'Berhasil menghapus User.');
     }
 }
