@@ -35,9 +35,9 @@ export default function GarduIndukDialog({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit Substation" : "Add New Substation"}</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit Gardu Induk" : "Add New Gardu Induk"}</DialogTitle>
           <DialogDescription>
-            {isEdit ? "Update substation information" : "Fill in the details to add a new substation to the system."}
+            {isEdit ? "Update Gardu Induk information" : "Fill in the details to add a new Gardu Induk to the system."}
           </DialogDescription>
         </DialogHeader>
         <GarduIndukForm garduInduk={garduInduk} onSubmit={handleSubmit} onCancel={handleCancel} isEdit={isEdit} />

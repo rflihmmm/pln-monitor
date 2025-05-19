@@ -29,7 +29,11 @@ export default function ManageUser({ users }: ManageUserProps) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Manage Users" />
 
+            <div className='px-5 py-5'>
+                <h1 className="text-2xl font-bold">User Management Dashboard</h1>
+                <h3>Add, remove, or edit user profiles</h3>
             <TableUsers users={users} />
+            </div>
         </AppLayout>
     );
 }

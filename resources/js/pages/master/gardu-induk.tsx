@@ -29,7 +29,11 @@ export default function GarduIndukPage({ garduIndukList }: GarduIndukPageProps) 
     <AppLayout breadcrumbs={breadcrumbs}>
       <Head title="Gardu Induk" />
 
+      <div className='px-5 py-5'>
+        <h1 className="text-2xl font-bold">Gardu Induk Management Dashboard</h1>
+        <h3>Add, remove, or edit Gardu Induk Data</h3>
       <TableGarduInduk garduIndukList={garduIndukList} />
+      </div>
     </AppLayout>
   );
 }

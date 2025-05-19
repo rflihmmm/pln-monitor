@@ -35,12 +35,13 @@ export default function FeederPage({ feederList, garduIndukList }: FeederPagePro
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
       <Head title="Feeder" />
-            <div className='px-5'>
-
-      <TableFeeder feederList={feederList} garduIndukList={garduIndukList} keypointsList={sampleKeypoints}
+      <div className='px-5 py-5'>
+        <h1 className="text-2xl font-bold">Feeder Management Dashboard</h1>
+        <h3>Add, remove, or edit Feeders Data</h3>        
+        <TableFeeder feederList={feederList} garduIndukList={garduIndukList} keypointsList={sampleKeypoints}
         statusPointsList={sampleStatusPoints} />
 
-            </div>
+      </div>
     </AppLayout>
   );
 }

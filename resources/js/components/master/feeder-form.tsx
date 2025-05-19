@@ -1,4 +1,3 @@
-// ─── components/master/feeder-form.tsx ───────────────────────────────────────
 
 import { useState, useEffect } from "react";
 import axios from "axios";
@@ -65,7 +64,7 @@ export default function FeederForm({
   const [selectedKeypoints, setSelectedKeypoints] = useState<Keypoint[]>([]);
   const [keypointsOpen, setKeypointsOpen] = useState(false);
   // LIST ini akan berubah‐ubah sesuai hasil pencarian
-  const [keypointsList, setKeypointsList] = useState<DropdownBase[]>(initialKeypointsList);
+  const [keypointsList, setKeypointsList] = useState<DropdownBase[]>([]);
 
   // State combobox lain (Substation + Status Points)
   const [substationOpen, setSubstationOpen] = useState(false);
@@ -144,7 +143,7 @@ export default function FeederForm({
   // Mendapatkan nama substation (Gardu Induk) berdasarkan id
   const getSubstationName = (id: number) => {
     const substation = garduIndukList.find((g) => g.id === id);
-    return substation ? substation.name : "Select substation";
+    return substation ? substation.name : "Select Gardu Induk";
   };
 
   // Mendapatkan nama Status Points berdasarkan id
@@ -161,22 +160,30 @@ export default function FeederForm({
    * Ketika user mengetik di combobox Keypoints (minimal 3 karakter),
    * lakukan pemanggilan ke endpoint Laravel untuk mengambil keypoints yang matching.
    */
-  const handleOnSearchKeypoint = (search: string) => {
+const handleOnSearchKeypoint = (search: string) => {
     if (search.length < 3) {
       // Jika kurang dari 3 karakter, clear list supaya dropdown kosong
       setKeypointsList([]);
       return;
     }
 
-    // Panggil endpoint yang sudah kita definisikan di Laravel (lihat langkah #1 dan #2)
+    // Tambahkan penanganan loading dan error
     axios
-      .get(route("master.feeder.keypoint-data", { filter: search }))
+      .get(route("master.feeder.keypoint-data"), {
+        params: { filter: search }
+      })
       .then((resp) => {
-        // resp.data diasumsikan array of { id, name }
-        setKeypointsList(resp.data as DropdownBase[]);
+        if (resp.data && Array.isArray(resp.data)) {
+          setKeypointsList(resp.data);
+        } else {
+          // Jika data tidak sesuai format yang diharapkan
+          console.warn("Unexpected response format:", resp.data);
+          setKeypointsList([]);
+        }
       })
       .catch((err) => {
         console.error("Error fetching keypoints:", err);
+        // Jika terjadi error, tetap biarkan list kosong
         setKeypointsList([]);
       });
   };
@@ -207,7 +214,7 @@ export default function FeederForm({
 
       {/* Substation (Gardu Induk) Combobox */}
       <div className="grid gap-2">
-        <Label htmlFor="gardu_induk_id">Substation</Label>
+        <Label htmlFor="gardu_induk_id">Gardu Induk</Label>
         <Popover open={substationOpen} onOpenChange={setSubstationOpen}>
           <PopoverTrigger asChild>
             <Button
@@ -219,15 +226,15 @@ export default function FeederForm({
             >
               {feederData.gardu_induk_id
                 ? getSubstationName(feederData.gardu_induk_id)
-                : "Select substation"}
+                : "Select Gardu Induk"}
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-[300px] p-0">
             <Command>
-              <CommandInput placeholder="Search substations..." />
+              <CommandInput placeholder="Search Gardu Induk..." />
               <CommandList>
-                <CommandEmpty>No substations found.</CommandEmpty>
+                <CommandEmpty>No Gardu Induk found.</CommandEmpty>
                 <CommandGroup className="max-h-[200px] overflow-y-auto">
                   {garduIndukList.map((gardu) => (
                     <CommandItem
