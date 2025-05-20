@@ -4,8 +4,11 @@ namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
 use App\Models\Feeder;
+use App\Models\FeederKeypoint;
+use App\Models\FeederStatusPoint;
 use App\Models\GarduInduk;
 use App\Models\StationPointSkada;
+use App\Models\StatusPointSkada;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -15,19 +18,14 @@ class FeederController extends Controller
     {
         $feeders = Feeder::with('garduInduk')->get();
         $garduInduks = GarduInduk::all();
-
-        // $filter_keypoint = request()->query('filter_keypoint', null);
-
-        // $keypoints = StationPointSkada::select("PKEY", "NAME")->get()->map(function($query){
-        //     return [
-        //         'id' => $query->PKEY,
-        //         'name' => $query->NAME
-        //     ];
-        // });
+        $keypoints = FeederKeypoint::all();
+        $statuspoints = FeederStatusPoint::all();
 
         return Inertia::render('master/feeder', [
             'feederList' => $feeders,
-            'garduIndukList' => $garduInduks
+            'garduIndukList' => $garduInduks,
+            'keypointList' => $keypoints,
+            'statusPointList' => $statuspoints
         ]);
     }
 
@@ -42,6 +40,32 @@ class FeederController extends Controller
             }
 
             $keypoints = StationPointSkada::select("PKEY", "NAME")->where('NAME', 'LIKE', '%' . $filter . '%')->get()->map(function ($query) {
+                return [
+                    'id' => $query->PKEY,
+                    'name' => $query->NAME
+                ];
+            });
+
+            return response()->json($keypoints);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => 'Error fetching keypoints',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getStatusPoints(Request $request)
+    {
+        $filter = $request->query('filter', null);
+
+        try {
+
+            if (!$filter || strlen($filter) < 3) {
+                return response()->json([]);
+            }
+
+            $keypoints = StatusPointSkada::select("PKEY", "NAME")->where('NAME', 'LIKE', '%' . $filter . '%')->get()->map(function ($query) {
                 return [
                     'id' => $query->PKEY,
                     'name' => $query->NAME
