@@ -11,7 +11,9 @@ Route::middleware('auth')->group(function () {
     Route::prefix('master')->name('master.')->group(function () {
         Route::apiResource('manage-users', UserController::class)->middleware(['role:admin']);
         Route::apiResource('gardu-induk', GarduIndukController::class);
-        Route::apiResource('feeder', FeederController::class);
+        Route::apiResource('feeder', FeederController::class, [
+            'except' => ['show']
+        ]);
 
         Route::get('feeder/keypoint-data', [FeederController::class, 'getKeypoints'])->name('feeder.keypoint-data');
     });

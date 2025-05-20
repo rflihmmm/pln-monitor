@@ -9,8 +9,11 @@ class FeederStatusPoint extends Model
     public $timestamps = false;
 
     protected $fillable = [
+        'type',
+        'status_id',
         'feeder_id',
         'keypoint_id',
+        'name',
     ];
 
     /**

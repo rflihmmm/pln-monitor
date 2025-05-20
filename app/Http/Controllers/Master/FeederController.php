@@ -17,7 +17,7 @@ class FeederController extends Controller
         $garduInduks = GarduInduk::all();
 
         // $filter_keypoint = request()->query('filter_keypoint', null);
-        
+
         // $keypoints = StationPointSkada::select("PKEY", "NAME")->get()->map(function($query){
         //     return [
         //         'id' => $query->PKEY,
@@ -35,14 +35,26 @@ class FeederController extends Controller
     {
         $filter = $request->query('filter', null);
 
-        $keypoints = StationPointSkada::select("PKEY", "NAME")->where('NAME', 'ILIKE', '%' . $filter . '%')->get()->map(function($query){
-            return [
-                'id' => $query->PKEY,
-                'name' => $query->NAME
-            ];
-        });
+        try {
 
-        return response()->json($keypoints);
+            if (!$filter || strlen($filter) < 3) {
+                return response()->json([]);
+            }
+
+            $keypoints = StationPointSkada::select("PKEY", "NAME")->where('NAME', 'LIKE', '%' . $filter . '%')->get()->map(function ($query) {
+                return [
+                    'id' => $query->PKEY,
+                    'name' => $query->NAME
+                ];
+            });
+
+            return response()->json($keypoints);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => 'Error fetching keypoints',
+                'error' => $th->getMessage()
+            ], 500);
+        }
     }
 
     public function store(Request $request)
