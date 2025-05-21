@@ -87,6 +87,11 @@ class FeederController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'gardu_induk_id' => 'required|exists:gardu_induks,id',
+
+            'keypoint_id' => 'required|exists:station_point_skadas,PKEY',
+            'statuspoint_id' => 'required|exists:status_point_skadas,PKEY',
+            'keypoint_name' => 'required|string|max:255',
+            'statuspoint_name' => 'required|string|max:255',
         ]);
 
         Feeder::create($validated);

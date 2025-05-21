@@ -18,6 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Check, ChevronsUpDown, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useForm } from 'laravel-precognition-react-inertia';
 
 import {
   type DropdownBase,
@@ -42,7 +43,7 @@ export default function FeederForm({
   feeder,
   garduIndukList,
   keypointsList: initialKeypointsList,
-  statusPointsList,
+  statusPointsList : initialStatusPointsList,
   onSubmit,
   onCancel,
   isEdit = false,
@@ -65,6 +66,11 @@ export default function FeederForm({
   const [keypointsOpen, setKeypointsOpen] = useState(false);
   // LIST ini akan berubah‐ubah sesuai hasil pencarian
   const [keypointsList, setKeypointsList] = useState<DropdownBase[]>([]);
+  
+   // State untuk status points list dengan keadaan terpisah untuk setiap type
+  const [pmtStatusList, setPmtStatusList] = useState<DropdownBase[]>([]);
+  const [apmStatusList, setApmStatusList] = useState<DropdownBase[]>([]);
+  const [mwStatusList, setMwStatusList] = useState<DropdownBase[]>([]);
 
   // State combobox lain (Substation + Status Points)
   const [substationOpen, setSubstationOpen] = useState(false);
@@ -147,8 +153,18 @@ export default function FeederForm({
   };
 
   // Mendapatkan nama Status Points berdasarkan id
-  const getStatusPointName = (id: number) => {
-    const status = statusPointsList.find((s) => s.id === id);
+  const getPmtStatusName = (id: number) => {
+    const status = pmtStatusList.find((s) => s.id === id);
+    return status ? status.name : "None";
+  };
+
+   const getApmStatusName = (id: number) => {
+    const status = apmStatusList.find((s) => s.id === id);
+    return status ? status.name : "None";
+  };
+
+   const getMwStatusName = (id: number) => {
+    const status = mwStatusList.find((s) => s.id === id);
     return status ? status.name : "None";
   };
 
@@ -160,7 +176,7 @@ export default function FeederForm({
    * Ketika user mengetik di combobox Keypoints (minimal 3 karakter),
    * lakukan pemanggilan ke endpoint Laravel untuk mengambil keypoints yang matching.
    */
-const handleOnSearchKeypoint = (search: string) => {
+  const handleOnSearchKeypoint = (search: string) => {
     if (search.length < 3) {
       // Jika kurang dari 3 karakter, clear list supaya dropdown kosong
       setKeypointsList([]);
@@ -185,6 +201,89 @@ const handleOnSearchKeypoint = (search: string) => {
         console.error("Error fetching keypoints:", err);
         // Jika terjadi error, tetap biarkan list kosong
         setKeypointsList([]);
+      });
+  };
+  
+  const handleOnSearchStatusPointPmt = (search: string) => {
+    if (search.length < 3) {
+      // Jika kurang dari 3 karakter, clear list supaya dropdown kosong
+      setPmtStatusList([]);
+      return;
+    }
+
+    // Tambahkan penanganan loading dan error
+    axios
+      .get(route("master.feeder.statuspoint-data"), {
+        params: { filter: search }
+      })
+  
+      .then((resp) => {
+        if (resp.data && Array.isArray(resp.data)) {
+          setPmtStatusList(resp.data);
+        } else {
+          // Jika data tidak sesuai format yang diharapkan
+          console.warn("Unexpected response format:", resp.data);
+          setPmtStatusList([]);
+        }
+      })
+      .catch((err) => {
+        console.error("Error fetching status points:", err);
+        // Jika terjadi error, tetap biarkan list kosong
+        setPmtStatusList([]);
+      });
+  };
+
+  const handleOnSearchStatusPointApm = (search: string) => {
+    if (search.length < 3) {
+      // Jika kurang dari 3 karakter, clear list supaya dropdown kosong
+      setApmStatusList([]);
+      return;
+    } 
+    // Tambahkan penanganan loading dan error
+    axios
+      .get(route("master.feeder.statuspoint-data"), {
+        params: { filter: search }
+      })
+      .then((resp) => {
+        if (resp.data && Array.isArray(resp.data)) {
+          setApmStatusList(resp.data);
+        } else {
+          // Jika data tidak sesuai format yang diharapkan
+          console.warn("Unexpected response format:", resp.data);
+          setApmStatusList([]);
+        }
+      })
+      .catch((err) => {
+        console.error("Error fetching status points:", err);
+        // Jika terjadi error, tetap biarkan list kosong
+        setApmStatusList([]);
+      });
+  };
+
+  const handleOnSearchStatusPointMw = (search: string) => {
+    if (search.length < 3) {
+      // Jika kurang dari 3 karakter, clear list supaya dropdown kosong
+      setMwStatusList([]);
+      return;
+    } 
+    // Tambahkan penanganan loading dan error
+    axios
+      .get(route("master.feeder.statuspoint-data"), {
+        params: { filter: search }
+      })
+      .then((resp) => {
+        if (resp.data && Array.isArray(resp.data)) {
+          setMwStatusList(resp.data);
+        } else {
+          // Jika data tidak sesuai format yang diharapkan
+          console.warn("Unexpected response format:", resp.data);
+          setMwStatusList([]);
+        }
+      })
+      .catch((err) => {
+        console.error("Error fetching status points:", err);
+        // Jika terjadi error, tetap biarkan list kosong
+        setMwStatusList([]);
       });
   };
 
@@ -275,9 +374,8 @@ const handleOnSearchKeypoint = (search: string) => {
               className="justify-between"
             >
               {selectedKeypoints.length > 0
-                ? `${selectedKeypoints.length} keypoint${
-                    selectedKeypoints.length > 1 ? "s" : ""
-                  } selected`
+                ? `${selectedKeypoints.length} keypoint${selectedKeypoints.length > 1 ? "s" : ""
+                } selected`
                 : "Select keypoints..."}
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
@@ -364,14 +462,14 @@ const handleOnSearchKeypoint = (search: string) => {
                   id="pmt_status"
                 >
                   {feederData.status_points?.pmt
-                    ? getStatusPointName(feederData.status_points.pmt)
+                    ? getPmtStatusName(feederData.status_points.pmt)
                     : "None"}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[200px] p-0">
                 <Command>
-                  <CommandInput placeholder="Search status..." />
+                  <CommandInput placeholder="Search status..." onValueChange={handleOnSearchStatusPointPmt} />
                   <CommandList>
                     <CommandEmpty>No status found.</CommandEmpty>
                     <CommandGroup className="max-h-[200px] overflow-y-auto">
@@ -390,7 +488,7 @@ const handleOnSearchKeypoint = (search: string) => {
                         />
                         None
                       </CommandItem>
-                      {statusPointsList.map((status) => (
+                      {pmtStatusList.map((status) => (
                         <CommandItem
                           key={status.id}
                           value={status.name}
@@ -430,14 +528,14 @@ const handleOnSearchKeypoint = (search: string) => {
                   id="apm_status"
                 >
                   {feederData.status_points?.apm
-                    ? getStatusPointName(feederData.status_points.apm)
+                    ? getApmStatusName(feederData.status_points.apm)
                     : "None"}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[200px] p-0">
                 <Command>
-                  <CommandInput placeholder="Search status..." />
+                  <CommandInput placeholder="Search status..." onValueChange={handleOnSearchStatusPointApm} />
                   <CommandList>
                     <CommandEmpty>No status found.</CommandEmpty>
                     <CommandGroup className="max-h-[200px] overflow-y-auto">
@@ -456,7 +554,7 @@ const handleOnSearchKeypoint = (search: string) => {
                         />
                         None
                       </CommandItem>
-                      {statusPointsList.map((status) => (
+                      {apmStatusList.map((status) => (
                         <CommandItem
                           key={status.id}
                           value={status.name}
@@ -496,14 +594,14 @@ const handleOnSearchKeypoint = (search: string) => {
                   id="mw_status"
                 >
                   {feederData.status_points?.mw
-                    ? getStatusPointName(feederData.status_points.mw)
+                    ? getMwStatusName(feederData.status_points.mw)
                     : "None"}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[200px] p-0">
                 <Command>
-                  <CommandInput placeholder="Search status..." />
+                  <CommandInput placeholder="Search status..." onValueChange={handleOnSearchStatusPointMw} />
                   <CommandList>
                     <CommandEmpty>No status found.</CommandEmpty>
                     <CommandGroup className="max-h-[200px] overflow-y-auto">
@@ -522,7 +620,7 @@ const handleOnSearchKeypoint = (search: string) => {
                         />
                         None
                       </CommandItem>
-                      {statusPointsList.map((status) => (
+                      {mwStatusList.map((status) => (
                         <CommandItem
                           key={status.id}
                           value={status.name}

@@ -16,5 +16,6 @@ Route::middleware('auth')->group(function () {
         ]);
 
         Route::get('feeder/keypoint-data', [FeederController::class, 'getKeypoints'])->name('feeder.keypoint-data');
+        Route::get('feeder/statuspoint-data', [FeederController::class, 'getStatusPoints'])->name('feeder.statuspoint-data');
     });
 });
