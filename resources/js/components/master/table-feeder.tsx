@@ -29,12 +29,12 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import FeederDialog from "@/components/master/feeder-dialog";
-import { type GarduInduk, DropdownBase, StatusPoint, Feeder } from "@/types";
+import { type GarduInduk, Keypoint, StatusPoint, Feeder } from "@/types";
 
 interface TableFeederProps {
   feederList: Feeder[];
   garduIndukList: GarduInduk[];
-  keypointsList: DropdownBase[];
+  keypointsList: Keypoint[];
   statusPointsList: StatusPoint[];
 }
 
@@ -64,7 +64,7 @@ export default function TableFeeder({
     return matchesSearch && matchesGardu;
   });
 
-  // Format date to “MMM DD, YYYY”
+  // Format date to "MMM DD, YYYY"
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat("en-US", {
@@ -79,17 +79,30 @@ export default function TableFeeder({
     return gardu ? gardu.name : "Unknown";
   };
 
-  // Re-implement getKeypointNames so that the “Keypoints” column actually renders
-  const getKeypointNames = (keypointIds: number[]): string[] => {
-    return keypointsList
-      .filter((kp) => keypointIds.includes(kp.id))
-      .map((kp) => kp.name);
+  // Fixed: Properly get keypoint names based on the feeder's keypoints
+  const getKeypointNames = (feederKeypoints: Keypoint[]): string[] => {
+    if (!feederKeypoints || feederKeypoints.length === 0) {
+      return [];
+    }
+    
+    return feederKeypoints.map(kp => kp.name || "Unknown");
   };
 
-  const getStatusPointName = (statusId: number) => {
-    const status = statusPointsList.find((s) => s.id === statusId);
-    return status ? status.name : "None";
-  };
+  // Fixed: Helper function to get status_id by type with null/undefined check
+  function getStatusIdByType(statusPoints: StatusPoint[] | undefined, type: string): number {
+    if (!statusPoints || !Array.isArray(statusPoints)) {
+      return 0;
+    }
+    return statusPoints.find(sp => sp.type === type)?.status_id ?? 0;
+  }
+
+  // Fixed: Helper function to get name by type with null/undefined check
+  function getStatusNameByType(statusPoints: StatusPoint[] | undefined, type: string): string {
+    if (!statusPoints || !Array.isArray(statusPoints)) {
+      return "-";
+    }
+    return statusPoints.find(sp => sp.type === type)?.name ?? "-";
+  }
 
   // Handle adding a new feeder
   const handleAddFeeder = (feederData: any) => {
@@ -99,8 +112,8 @@ export default function TableFeeder({
         name: feederData.name,
         description: feederData.description,
         gardu_induk_id: feederData.gardu_induk_id,
-        keypoints: feederData.keypoints,
-        status_points: feederData.status_points,
+        keypoints: feederData.keypoints, // Array objek {keypoint_id, name}
+        status_points: feederData.status_points, // Array objek {type, status_id, name}
       },
       {
         onSuccess: () => {
@@ -228,29 +241,30 @@ export default function TableFeeder({
                     </TableCell>
                     <TableCell>
                       <div className="space-y-1">
-                        {feeder.status_points?.pmt > 0 && (
+                        {getStatusIdByType(feeder.status_points, "PMT") > 0 && (
                           <Badge variant="secondary">
-                            PMT: {getStatusPointName(feeder.status_points.pmt)}
+                            PMT: {getStatusNameByType(feeder.status_points, "PMT")}
                           </Badge>
                         )}
-                        {feeder.status_points?.apm > 0 && (
+                        {getStatusIdByType(feeder.status_points, "APM") > 0 && (
                           <Badge variant="secondary">
-                            APM: {getStatusPointName(feeder.status_points.apm)}
+                            APM: {getStatusNameByType(feeder.status_points, "APM")}
                           </Badge>
                         )}
-                        {feeder.status_points?.mw > 0 && (
+                        {getStatusIdByType(feeder.status_points, "MW") > 0 && (
                           <Badge variant="secondary">
-                            MW: {getStatusPointName(feeder.status_points.mw)}
+                            MW: {getStatusNameByType(feeder.status_points, "MW")}
                           </Badge>
                         )}
                         {(!feeder.status_points ||
-                          (feeder.status_points.pmt === 0 &&
-                            feeder.status_points.apm === 0 &&
-                            feeder.status_points.mw === 0)) &&
+                          !Array.isArray(feeder.status_points) ||
+                          (getStatusIdByType(feeder.status_points, "PMT") === 0 &&
+                            getStatusIdByType(feeder.status_points, "APM") === 0 &&
+                            getStatusIdByType(feeder.status_points, "MW") === 0)) &&
                           "-"}
                       </div>
                     </TableCell>
-                    <TableCell>{formatDate(feeder.created_at)}</TableCell>
+                    <TableCell>{formatDate(feeder.created_at ?? "")}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -271,7 +285,7 @@ export default function TableFeeder({
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive cursor-pointer"
-                            onClick={() => handleDeleteFeeder(feeder.id)}
+                            onClick={() => handleDeleteFeeder(feeder.id ?? 0)}
                           >
                             <Trash className="mr-2 h-4 w-4" />
                             Delete Feeder

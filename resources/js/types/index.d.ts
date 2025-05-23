@@ -61,28 +61,27 @@ export interface DropdownBase {
 }
 
 export interface Keypoint {
-  id: number;
-  name: string;
+    id?: number;
+    feeder_id?: number;
+    keypoint_id: number;
+    name: string;
 }
 
 export interface StatusPoint {
-  id: number;
-  name: string;
+    id?: number;
+    type: string;
+    status_id: number;
+    name: string;
 }
 
-export interface StatusPoints {
-  pmt: number;
-  apm: number;
-  mw: number;
-}
 
 export interface Feeder {
-  id?: number;
-  name: string;
-  description: string | null;
-  gardu_induk_id: number;
-  created_at?: string | undefined;
-  gardu_induk?: GarduInduk;
-  keypoints: number[];
-  status_points: StatusPoints;
+    id?: number;
+    name: string;
+    description: string | null;
+    gardu_induk_id: number;
+    created_at?: string | undefined;
+    gardu_induk?: GarduInduk;
+    keypoints: Keypoint[];
+    status_points: StatusPoint[];
 }

@@ -12,12 +12,11 @@ class FeederStatusPoint extends Model
         'type',
         'status_id',
         'feeder_id',
-        'keypoint_id',
         'name',
     ];
 
     /**
-     * Get the feeder that owns this keypoint.
+     * Get the feeder that owns this status point.
      */
     public function feeder()
     {

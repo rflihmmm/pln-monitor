@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import FeederForm from "@/components/master/feeder-form";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { type DropdownBase, GarduInduk, StatusPoint, Feeder } from "@/types";
+import { type Keypoint, GarduInduk, StatusPoint, Feeder } from "@/types";
 
 interface FeederDialogProps {
   isOpen: boolean;
@@ -17,7 +17,7 @@ interface FeederDialogProps {
   onSubmit: (feederData: any) => void;
   feeder?: Feeder | null;
   garduIndukList: GarduInduk[];
-  keypointsList: DropdownBase[];
+  keypointsList: Keypoint[];
   statusPointsList: StatusPoint[];
   isEdit?: boolean;
 }

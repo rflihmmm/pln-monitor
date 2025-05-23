@@ -9,13 +9,13 @@ class FeederKeypoint extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'status_id',
+        'keypoint_id',
         'feeder_id',
         'name',
     ];
 
     /**
-     * Get the feeder that owns this status point.
+     * Get the feeder that owns this keypoint.
      */
     public function feeder()
     {
