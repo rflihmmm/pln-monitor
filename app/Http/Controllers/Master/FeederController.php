@@ -20,7 +20,7 @@ class FeederController extends Controller
     {
         // Load feeders dengan relasi keypoints dan statusPoints
         $feeders = Feeder::with(['garduInduk', 'keypoints', 'statusPoints'])->get();
-        
+
         // Transform data untuk menyesuaikan dengan frontend
         $feedersTransformed = $feeders->map(function ($feeder) {
             return [
@@ -90,19 +90,21 @@ class FeederController extends Controller
     public function getStatusPoints(Request $request)
     {
         $filter = $request->query('filter', null);
-
         try {
             if (!$filter || strlen($filter) < 3) {
                 return response()->json([]);
             }
 
-            $statuspoints = StatusPointSkada::select("PKEY", "NAME")
+            // Menggunakan eager loading dengan relationship
+            $statuspoints = StatusPointSkada::select("PKEY", "NAME", "STATIONPID")
+                ->with(['stationPoint:PKEY,NAME'])
                 ->where('NAME', 'LIKE', '%' . $filter . '%')
                 ->get()
-                ->map(function ($query) {
+                ->map(function ($item) {
                     return [
-                        'id' => $query->PKEY,
-                        'name' => $query->NAME
+                        'id' => $item->PKEY,
+                        'name' => $item->NAME,
+                        'stationname' => $item->stationPoint ? $item->stationPoint->NAME : null
                     ];
                 });
 
@@ -180,7 +182,7 @@ class FeederController extends Controller
             'description' => 'nullable|string',
             'gardu_induk_id' => 'required|exists:gardu_induks,id',
             'keypoints' => 'array',
-            'keypoints.*.keypoint_id' => 'required|exists:station_point_skadas,PKEY',
+            'keypoints.*.keypoint_id' => 'required',
             'keypoints.*.name' => 'required|string',
             'status_points' => 'array',
             'status_points.*.type' => 'required|string|in:PMT,APM,MW',
@@ -216,9 +218,9 @@ class FeederController extends Controller
                 foreach ($request->status_points as $statusPoint) {
                     if ($statusPoint['status_id'] > 0) {
                         FeederStatusPoint::create([
-                            'feeder_id' => $feeder->id,
                             'type' => $statusPoint['type'],
                             'status_id' => $statusPoint['status_id'],
+                            'feeder_id' => $feeder->id,
                             'name' => $statusPoint['name'],
                         ]);
                     }
@@ -238,10 +240,10 @@ class FeederController extends Controller
             // Delete related keypoints and status points first
             $feeder->keypoints()->delete();
             $feeder->statusPoints()->delete();
-            
+
             // Delete the feeder
             $feeder->delete();
-            
+
             return redirect()->route('master.feeder.index')->with('success', 'Berhasil menghapus Feeder.');
         } catch (\Exception $e) {
             Log::error('Error deleting feeder: ' . $e->getMessage());

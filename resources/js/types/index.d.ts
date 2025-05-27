@@ -57,6 +57,7 @@ export interface GarduInduk {
 
 export interface DropdownBase {
     id: number
+    stationname: string
     name: string
 }
 
@@ -72,6 +73,7 @@ export interface StatusPoint {
     type: string;
     status_id: number;
     name: string;
+    stationname: string;
 }
 
 

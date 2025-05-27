@@ -240,7 +240,7 @@ export default function TableFeeder({
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="space-y-1">
+                      <div className="flex flex-wrap gap-1">
                         {getStatusIdByType(feeder.status_points, "PMT") > 0 && (
                           <Badge variant="secondary">
                             PMT: {getStatusNameByType(feeder.status_points, "PMT")}

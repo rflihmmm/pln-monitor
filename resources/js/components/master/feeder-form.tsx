@@ -18,7 +18,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Check, ChevronsUpDown, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-// import { useForm } from 'laravel-precognition-react-inertia';
 
 import {
   type DropdownBase,
@@ -59,7 +58,6 @@ export default function FeederForm({
   // State combobox Keypoints
   const [selectedKeypoints, setSelectedKeypoints] = useState<Keypoint[]>([]);
   const [keypointsOpen, setKeypointsOpen] = useState(false);
-  // LIST ini akan berubah‐ubah sesuai hasil pencarian
   const [keypointsList, setKeypointsList] = useState<DropdownBase[]>([]);
 
   // State untuk status points list dengan keadaan terpisah untuk setiap type
@@ -85,9 +83,16 @@ export default function FeederForm({
   const [debouncedApmSearch] = useDebounce(apmSearchTerm, 500);
   const [debouncedMwSearch] = useDebounce(mwSearchTerm, 500);
 
-  // Jika sedang edit, populate data awal
+  // Helper function untuk mendapatkan status point berdasarkan type dari feeder data
+  const getStatusPointFromFeeder = (statusPoints: any[], type: string) => {
+    if (!statusPoints || !Array.isArray(statusPoints)) return null;
+    return statusPoints.find(sp => sp.type === type);
+  };
+
+  // Inisialisasi data form - PENTING: Hanya sekali saat component mount atau feeder berubah
   useEffect(() => {
     if (feeder && isEdit) {
+      // Populate basic data
       setFeederData({
         name: feeder.name,
         description: feeder.description,
@@ -96,30 +101,31 @@ export default function FeederForm({
         status_points: feeder.status_points || [],
       });
 
-      // Tandai keypoints yang sudah terpilih
+      // Populate keypoints selection
       if (feeder.keypoints && feeder.keypoints.length > 0) {
         const selected = initialKeypointsList.filter((kp) =>
           feeder.keypoints!.some((k: Keypoint) => k.keypoint_id === kp.keypoint_id)
         );
         setSelectedKeypoints(
-          selected.map((kp) => ({ id: kp.id, name: kp.name })) as Keypoint[]
+          selected.map((kp) => ({
+            id: kp.id,
+            keypoint_id: kp.keypoint_id,
+            name: kp.name
+          })) as Keypoint[]
         );
       }
+    } else {
+      // Mode tambah baru - inisialisasi dengan default status points
+      setFeederData(prev => ({
+        ...prev,
+        status_points: [
+          { type: "PMT", status_id: 0, name: "None", stationname: "" },
+          { type: "APM", status_id: 0, name: "None", stationname: "" },
+          { type: "MW", status_id: 0, name: "None", stationname: "" }
+        ]
+      }));
     }
   }, [feeder, isEdit, initialKeypointsList]);
-
-  // Inisialisasi state status points dengan array kosong
-  useEffect(() => {
-    // Inisialisasi status_points dengan struktur array yang berisi 3 objek (PMT, APM, MW)
-    setFeederData(prev => ({
-      ...prev,
-      status_points: [
-        { type: "PMT", status_id: 0, name: "None" },
-        { type: "APM", status_id: 0, name: "None" },
-        { type: "MW", status_id: 0, name: "None" }
-      ]
-    }));
-  }, []);
 
   // Effect untuk search keypoints dengan debounce
   useEffect(() => {
@@ -163,14 +169,29 @@ export default function FeederForm({
   };
 
   const handleStatusPointChange = (type: string, value: number, name: string) => {
-    setFeederData({
-      ...feederData,
-      status_points: (feederData.status_points as any[]).map(item => {
-        if (item.type === type) {
-          return { ...item, status_id: value, name };
-        }
-        return item;
-      })
+    setFeederData(prev => {
+      let statusPoints = prev.status_points as any[] || [];
+
+      // Cari apakah sudah ada status point dengan type ini
+      const existingIndex = statusPoints.findIndex(item => item.type === type);
+
+      if (existingIndex >= 0) {
+        // Update yang sudah ada
+        statusPoints = statusPoints.map((item, index) => {
+          if (index === existingIndex) {
+            return { ...item, status_id: value, name };
+          }
+          return item;
+        });
+      } else {
+        // Tambah baru jika belum ada
+        statusPoints = [...statusPoints, { type, status_id: value, name }];
+      }
+
+      return {
+        ...prev,
+        status_points: statusPoints
+      };
     });
   };
 
@@ -189,7 +210,7 @@ export default function FeederForm({
       // Tambahkan ke selectedKeypoints untuk UI
       setSelectedKeypoints((prev) => [
         ...prev,
-        { id: keypoint.id, name: keypoint.name } as Keypoint,
+        { id: keypoint.id, keypoint_id: keypoint.id, name: keypoint.name } as Keypoint,
       ]);
       // Tambahkan ke feederData.keypoints dengan format yang diinginkan
       setFeederData({
@@ -203,12 +224,11 @@ export default function FeederForm({
   };
 
   // Remove satu keypoint ketika icon "X" ditekan
-  const removeKeypoint = (id: number) => {
-    setSelectedKeypoints((prev) => prev.filter((kp) => kp.id !== id));
+  const removeKeypoint = (keypointId: number) => {
+    setSelectedKeypoints((prev) => prev.filter((kp) => kp.keypoint_id !== keypointId));
     setFeederData({
       ...feederData,
-      keypoints:
-        selectedKeypoints.filter((keypoint) => keypoint.keypoint_id !== id),
+      keypoints: (feederData.keypoints || []).filter((kp: any) => kp.keypoint_id !== keypointId),
     });
   };
 
@@ -219,33 +239,19 @@ export default function FeederForm({
   };
 
   // Helper functions untuk mendapatkan status point berdasarkan type
-  const getPmtStatus = () => {
-    return (feederData.status_points as any[])?.find(point => point.type === "PMT") || { type: "PMT", status_id: 0, name: "None" };
+  const getStatusPoint = (type: string) => {
+    const statusPoints = feederData.status_points as any[] || [];
+    return statusPoints.find(point => point.type === type) || { type, status_id: 0, name: "None" };
   };
 
-  const getApmStatus = () => {
-    return (feederData.status_points as any[])?.find(point => point.type === "APM") || { type: "APM", status_id: 0, name: "None" };
-  };
-
-  const getMwStatus = () => {
-    return (feederData.status_points as any[])?.find(point => point.type === "MW") || { type: "MW", status_id: 0, name: "None" };
-  };
+  const getPmtStatus = () => getStatusPoint("PMT");
+  const getApmStatus = () => getStatusPoint("APM");
+  const getMwStatus = () => getStatusPoint("MW");
 
   // Helper functions untuk nama status point
-  const getPmtStatusName = () => {
-    const status = getPmtStatus();
-    return status?.name || "None";
-  };
-
-  const getApmStatusName = () => {
-    const status = getApmStatus();
-    return status?.name || "None";
-  };
-
-  const getMwStatusName = () => {
-    const status = getMwStatus();
-    return status?.name || "None";
-  };
+  const getPmtStatusName = () => getPmtStatus()?.name || "None";
+  const getApmStatusName = () => getApmStatus()?.name || "None";
+  const getMwStatusName = () => getMwStatus()?.name || "None";
 
   const handleSubmit = () => {
     onSubmit(feederData);
@@ -257,7 +263,7 @@ export default function FeederForm({
       const response = await axios.get(route("master.feeder.keypoint-data"), {
         params: { filter: search }
       });
-      
+
       if (response.data && Array.isArray(response.data)) {
         setKeypointsList(response.data);
       } else {
@@ -275,7 +281,7 @@ export default function FeederForm({
       const response = await axios.get(route("master.feeder.statuspoint-data"), {
         params: { filter: search }
       });
-      
+
       if (response.data && Array.isArray(response.data)) {
         setPmtStatusList(response.data);
       } else {
@@ -293,7 +299,7 @@ export default function FeederForm({
       const response = await axios.get(route("master.feeder.statuspoint-data"), {
         params: { filter: search }
       });
-      
+
       if (response.data && Array.isArray(response.data)) {
         setApmStatusList(response.data);
       } else {
@@ -311,7 +317,7 @@ export default function FeederForm({
       const response = await axios.get(route("master.feeder.statuspoint-data"), {
         params: { filter: search }
       });
-      
+
       if (response.data && Array.isArray(response.data)) {
         setMwStatusList(response.data);
       } else {
@@ -438,7 +444,6 @@ export default function FeederForm({
             <Command>
               <CommandInput
                 placeholder="Search keypoints..."
-                // Setiap kali user mengubah teks di input, panggil handleOnSearchKeypoint
                 onValueChange={handleOnSearchKeypoint}
               />
               <CommandList>
@@ -483,7 +488,7 @@ export default function FeederForm({
         {selectedKeypoints.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
             {selectedKeypoints.map((keypoint) => (
-              <Badge key={keypoint.id} variant="secondary" className="flex items-center gap-1">
+              <Badge key={keypoint.keypoint_id} variant="secondary" className="flex items-center gap-1">
                 {keypoint.name}
                 <button
                   type="button"
@@ -543,7 +548,7 @@ export default function FeederForm({
                       {pmtStatusList.map((status) => (
                         <CommandItem
                           key={status.id}
-                          value={status.name}
+                          value={`${status.stationname} | ${status.name}`}
                           onSelect={() => {
                             handleStatusPointChange("PMT", status.id ?? 0, status.name);
                             setPmtStatusOpen(false);
@@ -557,7 +562,7 @@ export default function FeederForm({
                                 : "opacity-0"
                             )}
                           />
-                          {status.name}
+                          {status.stationname} | {status.name}
                         </CommandItem>
                       ))}
                     </CommandGroup>
@@ -607,7 +612,7 @@ export default function FeederForm({
                       {apmStatusList.map((status) => (
                         <CommandItem
                           key={status.id}
-                          value={status.name}
+                          value={`${status.stationname} | ${status.name}`}
                           onSelect={() => {
                             handleStatusPointChange("APM", status.id ?? 0, status.name);
                             setApmStatusOpen(false);
@@ -621,7 +626,7 @@ export default function FeederForm({
                                 : "opacity-0"
                             )}
                           />
-                          {status.name}
+                          {status.stationname} | {status.name}
                         </CommandItem>
                       ))}
                     </CommandGroup>
@@ -671,7 +676,7 @@ export default function FeederForm({
                       {mwStatusList.map((status) => (
                         <CommandItem
                           key={status.id}
-                          value={status.name}
+                          value={`${status.stationname} | ${status.name}`}
                           onSelect={() => {
                             handleStatusPointChange("MW", status.id ?? 0, status.name);
                             setMwStatusOpen(false);
@@ -685,7 +690,7 @@ export default function FeederForm({
                                 : "opacity-0"
                             )}
                           />
-                          {status.name}
+                          {status.stationname} | {status.name}
                         </CommandItem>
                       ))}
                     </CommandGroup>
@@ -694,8 +699,6 @@ export default function FeederForm({
               </PopoverContent>
             </Popover>
           </div>
-
-          {/* END of STATUS POINT */}
         </div>
       </div>
 
