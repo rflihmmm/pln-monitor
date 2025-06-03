@@ -128,7 +128,7 @@ class FeederController extends Controller
             'keypoints.*.keypoint_id' => 'required',
             'keypoints.*.name' => 'required|string',
             'status_points' => 'array',
-            'status_points.*.type' => 'required|string|in:PMT,APM,MW',
+            'status_points.*.type' => 'required|string|in:PMT,AMP,MW',
             'status_points.*.status_id' => 'required|integer',
             'status_points.*.name' => 'required|string',
         ]);
@@ -185,7 +185,7 @@ class FeederController extends Controller
             'keypoints.*.keypoint_id' => 'required',
             'keypoints.*.name' => 'required|string',
             'status_points' => 'array',
-            'status_points.*.type' => 'required|string|in:PMT,APM,MW',
+            'status_points.*.type' => 'required|string|in:PMT,AMP,MW',
             'status_points.*.status_id' => 'required|integer',
             'status_points.*.name' => 'required|string',
         ]);

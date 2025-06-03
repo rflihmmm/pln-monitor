@@ -246,9 +246,9 @@ export default function TableFeeder({
                             PMT: {getStatusNameByType(feeder.status_points, "PMT")}
                           </Badge>
                         )}
-                        {getStatusIdByType(feeder.status_points, "APM") > 0 && (
+                        {getStatusIdByType(feeder.status_points, "AMP") > 0 && (
                           <Badge variant="secondary">
-                            APM: {getStatusNameByType(feeder.status_points, "APM")}
+                            AMP: {getStatusNameByType(feeder.status_points, "AMP")}
                           </Badge>
                         )}
                         {getStatusIdByType(feeder.status_points, "MW") > 0 && (
@@ -259,7 +259,7 @@ export default function TableFeeder({
                         {(!feeder.status_points ||
                           !Array.isArray(feeder.status_points) ||
                           (getStatusIdByType(feeder.status_points, "PMT") === 0 &&
-                            getStatusIdByType(feeder.status_points, "APM") === 0 &&
+                            getStatusIdByType(feeder.status_points, "AMP") === 0 &&
                             getStatusIdByType(feeder.status_points, "MW") === 0)) &&
                           "-"}
                       </div>

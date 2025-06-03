@@ -4,344 +4,85 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+// Using standard HTML table elements since shadcn table is not available
 import { cn } from '@/lib/utils';
-import { RefreshCw, Search } from 'lucide-react';
+import { RefreshCw, Search, Circle } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 // Define types for our data
-type StatusType = 'ON' | 'OFF' | 'RESET';
-type IndicatorType = 'R' | 'G' | 'M';
-
 interface KeypointData {
     id: string;
     garduInduk: string;
     feeder: string;
-    pmt1: { color: string; indicators: IndicatorType[] };
-    amp: number;
-    mw: number;
+    pmt1: string | null;
+    amp: string | null;
+    mw: string | null;
     keypoint: string;
-    pmt2: { color: string; indicators: IndicatorType[] };
-    hotlineTag: StatusType | null;
-    res: StatusType | null;
-    ir: number;
-    is: number;
-    it: number;
-    ifR: number;
-    ifS: number;
-    ifT: number;
-    ifN: number;
-    kvAB: number;
-    kvBC: number;
-    kvAC: number;
-    cosP: number;
+    pmt2: { CB: string | null; LR: string | null };
+    hotlineTag: string | null;
+    reset: string | null;
+    ir: number | null;
+    is: number | null;
+    it: number | null;
+    ifR: number | null;
+    ifS: number | null;
+    ifT: number | null;
+    ifN: number | null;
+    kvAB: number | null;
+    kvBC: number | null;
+    kvAC: number | null;
+    cosP: number | null;
 }
 
-// Update the generateInitialData function to reflect the correct relationships
-const generateInitialData = (): KeypointData[] => {
-    return [
-        {
-            id: '1',
-            garduInduk: 'PARE',
-            feeder: 'BOJO',
-            pmt1: { color: 'fuchsia', indicators: ['R', 'M'] },
-            amp: 165.87,
-            mw: 8.3,
-            keypoint: 'LBS.TMP PARE',
-            pmt2: { color: 'green', indicators: ['R'] },
-            hotlineTag: 'ON',
-            res: null,
-            ir: 40.8,
-            is: 38.7,
-            it: 49.8,
-            ifR: 0.0,
-            ifS: 0.0,
-            ifT: 0.0,
-            ifN: 0.0,
-            kvAB: 0.0,
-            kvBC: 0.0,
-            kvAC: 0.0,
-            cosP: 0.0,
-        },
-        {
-            id: '2',
-            garduInduk: 'PARE',
-            feeder: 'BOJO',
-            pmt1: { color: '', indicators: [] },
-            amp: 0,
-            mw: 0,
-            keypoint: 'REC.BOJO',
-            pmt2: { color: 'green', indicators: ['R'] },
-            hotlineTag: 'OFF',
-            res: null,
-            ir: 44.0,
-            is: 40.0,
-            it: 43.0,
-            ifR: 0.0,
-            ifS: 0.0,
-            ifT: 0.0,
-            ifN: 0.0,
-            kvAB: 20.47,
-            kvBC: 20.75,
-            kvAC: 20.2,
-            cosP: 0.0,
-        },
-        {
-            id: '3',
-            garduInduk: 'PARE',
-            feeder: 'BOJO',
-            pmt1: { color: '', indicators: [] },
-            amp: 0,
-            mw: 0,
-            keypoint: 'LBS KUPA',
-            pmt2: { color: 'green', indicators: ['R'] },
-            hotlineTag: 'OFF',
-            res: null,
-            ir: 21.0,
-            is: 16.0,
-            it: 21.0,
-            ifR: 0.0,
-            ifS: 0.0,
-            ifT: 0.0,
-            ifN: 0.0,
-            kvAB: 20.65,
-            kvBC: 20.35,
-            kvAC: 20.27,
-            cosP: 0.0,
-        },
-        {
-            id: '4',
-            garduInduk: 'PARE',
-            feeder: 'BOJO',
-            pmt1: { color: '', indicators: [] },
-            amp: 0,
-            mw: 0,
-            keypoint: 'REC TMP SUMPANG',
-            pmt2: { color: 'green', indicators: ['R'] },
-            hotlineTag: 'OFF',
-            res: 'RESET',
-            ir: 89.0,
-            is: 88.0,
-            it: 88.0,
-            ifR: 0.0,
-            ifS: 0.0,
-            ifT: 0.0,
-            ifN: 0.0,
-            kvAB: 12.52,
-            kvBC: 12.68,
-            kvAC: 12.58,
-            cosP: 0.0,
-        },
-        {
-            id: '5',
-            garduInduk: 'PARE',
-            feeder: 'CAPAGALUNG',
-            pmt1: { color: 'green', indicators: ['R'] },
-            amp: 33.7,
-            mw: 1.64,
-            keypoint: 'LBS.GARDU 10',
-            pmt2: { color: 'fuchsia', indicators: ['R'] },
-            hotlineTag: null,
-            res: null,
-            ir: 0.0,
-            is: 0.0,
-            it: 0.0,
-            ifR: 0.0,
-            ifS: 0.0,
-            ifT: 0.0,
-            ifN: 0.0,
-            kvAB: 0.0,
-            kvBC: 0.0,
-            kvAC: 0.0,
-            cosP: 0.0,
-        },
-        {
-            id: '6',
-            garduInduk: 'PARE',
-            feeder: 'CAPAGALUNG',
-            pmt1: { color: '', indicators: [] },
-            amp: 0,
-            mw: 0,
-            keypoint: 'REC BATRA',
-            pmt2: { color: 'green', indicators: ['R'] },
-            hotlineTag: 'OFF',
-            res: 'RESET',
-            ir: 26.0,
-            is: 28.0,
-            it: 27.0,
-            ifR: 0.0,
-            ifS: 0.0,
-            ifT: 0.0,
-            ifN: 0.0,
-            kvAB: 12.87,
-            kvBC: 13.09,
-            kvAC: 13.0,
-            cosP: 0.0,
-        },
-        {
-            id: '7',
-            garduInduk: 'PARE',
-            feeder: 'CAPAGALUNG',
-            pmt1: { color: '', indicators: [] },
-            amp: 0,
-            mw: 0,
-            keypoint: 'REC ANDI MAKKASAU',
-            pmt2: { color: 'green', indicators: ['R'] },
-            hotlineTag: 'OFF',
-            res: 'RESET',
-            ir: 62.0,
-            is: 67.0,
-            it: 64.0,
-            ifR: 0.0,
-            ifS: 0.0,
-            ifT: 0.0,
-            ifN: 0.0,
-            kvAB: 13.03,
-            kvBC: 13.1,
-            kvAC: 13.05,
-            cosP: 0.0,
-        },
-        {
-            id: '8',
-            garduInduk: 'PARE',
-            feeder: 'LAPPADE',
-            pmt1: { color: 'green', indicators: ['R'] },
-            amp: 107.0,
-            mw: -2.6,
-            keypoint: 'REC.RM_3',
-            pmt2: { color: 'green', indicators: ['R'] },
-            hotlineTag: 'OFF',
-            res: null,
-            ir: 88.0,
-            is: 89.0,
-            it: 89.0,
-            ifR: 0.0,
-            ifS: 1.0,
-            ifT: 0.0,
-            ifN: 12217.0,
-            kvAB: 21.31,
-            kvBC: 21.25,
-            kvAC: 21.23,
-            cosP: 0.9,
-        },
-        {
-            id: '9',
-            garduInduk: 'PARE',
-            feeder: 'LAPPADE',
-            pmt1: { color: '', indicators: [] },
-            amp: 0,
-            mw: 0,
-            keypoint: 'LBS RM_7',
-            pmt2: { color: 'green', indicators: ['R'] },
-            hotlineTag: 'OFF',
-            res: null,
-            ir: 0.0,
-            is: 0.0,
-            it: 0.0,
-            ifR: 14.5,
-            ifS: 24.5,
-            ifT: 28.7,
-            ifN: 0.0,
-            kvAB: 0.0,
-            kvBC: 0.0,
-            kvAC: 0.0,
-            cosP: 0.0,
-        },
-        {
-            id: '10',
-            garduInduk: 'PARE',
-            feeder: 'LAPPADE',
-            pmt1: { color: '', indicators: [] },
-            amp: 0,
-            mw: 0,
-            keypoint: 'LBS JAWIJAWI',
-            pmt2: { color: 'green', indicators: ['R'] },
-            hotlineTag: 'OFF',
-            res: null,
-            ir: 0.0,
-            is: 0.0,
-            it: 0.0,
-            ifR: 20814.0,
-            ifS: 674.0,
-            ifT: 0.0,
-            ifN: 0.0,
-            kvAB: 1.14,
-            kvBC: 20.33,
-            kvAC: 21.06,
-            cosP: 0.0,
-        },
-        {
-            id: '11',
-            garduInduk: 'PARE',
-            feeder: 'LAPPADE',
-            pmt1: { color: '', indicators: [] },
-            amp: 0,
-            mw: 0,
-            keypoint: 'LBS SEKTUR',
-            pmt2: { color: 'green', indicators: ['R'] },
-            hotlineTag: 'OFF',
-            res: 'RESET',
-            ir: 17.0,
-            is: 16.1,
-            it: 17.7,
-            ifR: 0.0,
-            ifS: 0.0,
-            ifT: 0.0,
-            ifN: 0.0,
-            kvAB: 20.86,
-            kvBC: 20.62,
-            kvAC: 21.05,
-            cosP: 0.0,
-        },
-    ];
-};
-
 export default function TableHMI() {
-    const [data, setData] = useState<KeypointData[]>(generateInitialData());
-    const [filteredData, setFilteredData] = useState<KeypointData[]>(data);
+    const [data, setData] = useState<KeypointData[]>([]);
+    const [filteredData, setFilteredData] = useState<KeypointData[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
     const [isUpdating, setIsUpdating] = useState(false);
     const [lastUpdated, setLastUpdated] = useState(new Date());
 
-    // Function to update data randomly to simulate real-time updates
-    const updateDataRandomly = useCallback(() => {
-        setData((prevData) =>
-            prevData.map((item) => ({
-                ...item,
-                amp: Number.parseFloat((item.amp + (Math.random() * 0.4 - 0.2)).toFixed(2)),
-                mw: Number.parseFloat((item.mw + (Math.random() * 0.2 - 0.1)).toFixed(2)),
-                ir: Number.parseFloat((item.ir + (Math.random() * 0.5 - 0.25)).toFixed(2)),
-                is: Number.parseFloat((item.is + (Math.random() * 0.5 - 0.25)).toFixed(2)),
-                it: Number.parseFloat((item.it + (Math.random() * 0.5 - 0.25)).toFixed(2)),
-                kvAB: item.kvAB > 0 ? Number.parseFloat((item.kvAB + (Math.random() * 0.1 - 0.05)).toFixed(2)) : item.kvAB,
-                kvBC: item.kvBC > 0 ? Number.parseFloat((item.kvBC + (Math.random() * 0.1 - 0.05)).toFixed(2)) : item.kvBC,
-                kvAC: item.kvAC > 0 ? Number.parseFloat((item.kvAC + (Math.random() * 0.1 - 0.05)).toFixed(2)) : item.kvAC,
-            })),
-        );
-        setLastUpdated(new Date());
-        setIsUpdating(false);
+    // Function to fetch data from API
+    const fetchData = useCallback(async () => {
+        try {
+            const response = await fetch('/api/table-hmi', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch data');
+            }
+
+            const result = await response.json();
+            setData(result);
+            setLastUpdated(new Date());
+        } catch (error) {
+            console.error('Error fetching data:', error);
+        } finally {
+            setIsLoading(false);
+            setIsUpdating(false);
+        }
     }, []);
 
     // Filter data based on search term
     useEffect(() => {
         const filtered = data.filter(
             (item) =>
-                item.keypoint.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                item.garduInduk.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                item.feeder.toLowerCase().includes(searchTerm.toLowerCase()),
+                item.keypoint?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.garduInduk?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.feeder?.toLowerCase().includes(searchTerm.toLowerCase()),
         );
         setFilteredData(filtered);
     }, [searchTerm, data]);
 
-    // Set up real-time data updates
+    // Initial data load
     useEffect(() => {
-        const interval = setInterval(() => {
-            setIsUpdating(true);
-            setTimeout(updateDataRandomly, 500); // Add a small delay to show the updating indicator
-        }, 5000); // Update every 5 seconds
-
-        return () => clearInterval(interval);
-    }, [updateDataRandomly]);
+        fetchData();
+    }, [fetchData]);
 
     // Handle search input change
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -351,7 +92,7 @@ export default function TableHMI() {
     // Force a manual update
     const handleManualUpdate = () => {
         setIsUpdating(true);
-        setTimeout(updateDataRandomly, 500);
+        fetchData();
     };
 
     // Helper function to calculate rowspan for cells that should be merged
@@ -371,6 +112,60 @@ export default function TableHMI() {
     const shouldRenderCell = (data: KeypointData[], rowIndex: number, field: keyof KeypointData): boolean => {
         return rowIndex === 0 || data[rowIndex][field] !== data[rowIndex - 1][field];
     };
+
+    // Helper function to render PMT1 status
+    const renderPmt1Status = (value: string | null) => {
+        if (value === null) return null;
+        
+        return (
+            <div className="flex items-center justify-center">
+                <Circle 
+                    className={cn(
+                        "h-4 w-4",
+                        value === "0" ? "fill-green-500 text-green-500" : "text-green-500"
+                    )}
+                />
+            </div>
+        );
+    };
+
+    // Helper function to render PMT2 status
+    const renderPmt2Status = (pmt2: { CB: string | null; LR: string | null }) => {
+        return (
+            <div className="flex items-center justify-center gap-2">
+                {/* CB Status */}
+                {pmt2.CB !== null && (
+                    <Circle 
+                        className={cn(
+                            "h-4 w-4",
+                            pmt2.CB === "0" ? "fill-green-500 text-green-500" : "text-green-500"
+                        )}
+                    />
+                )}
+                {/* LR Status */}
+                {pmt2.LR === "1" && (
+                    <span className="text-blue-600 font-medium">L</span>
+                )}
+            </div>
+        );
+    };
+
+    // Helper function to format numeric values
+    const formatValue = (value: number | null | string, decimals: number = 2): string => {
+        if (value === null) return '-';
+        return Number(value).toFixed(decimals);
+    };
+
+    if (isLoading) {
+        return (
+            <div className="flex h-full flex-1 items-center justify-center">
+                <div className="text-center">
+                    <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4" />
+                    <p>Loading HMI data...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
@@ -400,9 +195,9 @@ export default function TableHMI() {
             {/* Table Container with horizontal scroll */}
             <Card className="bg-background overflow-x-auto">
                 <CardContent className="min-w-max">
-                    <Table className="w-full border-collapse">
-                        <TableHeader>
-                            <TableRow>
+                    <table className="w-full border-collapse">
+                        <thead>
+                            <tr>
                                 {[
                                     'GARDU INDUK',
                                     'FEEDER',
@@ -425,101 +220,152 @@ export default function TableHMI() {
                                     'KV AC',
                                     'COS Φ',
                                 ].map((header, index) => (
-                                    <TableHead key={index} className="bg-muted/50 border text-center font-bold">
+                                    <th key={index} className="bg-gray-100 border border-gray-300 p-2 text-center font-bold text-sm">
                                         {header}
-                                    </TableHead>
+                                    </th>
                                 ))}
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
+                            </tr>
+                        </thead>
+                        <tbody>
                             {filteredData.map((row, rowIndex) => (
-                                <TableRow key={row.id} className={rowIndex % 2 === 0 ? 'bg-muted/10' : ''}>
+                                <tr key={row.id} className={rowIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                                     {/* GARDU INDUK - Merged cells */}
                                     {shouldRenderCell(filteredData, rowIndex, 'garduInduk') && (
-                                        <TableCell
-                                            className="border text-center align-middle font-medium"
+                                        <td
+                                            className="border border-gray-300 p-2 text-center align-middle font-medium"
                                             rowSpan={calculateRowSpan(filteredData, rowIndex, 'garduInduk')}
                                         >
                                             {row.garduInduk}
-                                        </TableCell>
+                                        </td>
                                     )}
 
                                     {/* FEEDER - Merged cells */}
                                     {shouldRenderCell(filteredData, rowIndex, 'feeder') && (
-                                        <TableCell
-                                            className="border text-center align-middle font-medium"
+                                        <td
+                                            className="border border-gray-300 p-2 text-center align-middle font-medium"
                                             rowSpan={calculateRowSpan(filteredData, rowIndex, 'feeder')}
                                         >
                                             {row.feeder}
-                                        </TableCell>
+                                        </td>
                                     )}
 
-                                    <TableCell className="border text-center">
-                                        {row.pmt1.color && (
-                                            <div className="flex items-center justify-center">
-                                                {row.pmt1.indicators.includes('R') && (
-                                                    <>
-                                                        <div className={`h-4 w-4 bg-${row.pmt1.color}-600 mr-1 rounded-sm`}></div>
-                                                        <span className="mr-1 text-red-500">R</span>
-                                                    </>
-                                                )}
-                                                {row.pmt1.indicators.includes('M') && (
-                                                    <>
-                                                        <div className={`h-4 w-4 bg-${row.pmt1.color}-600 ml-1 rounded-sm`}></div>
-                                                        <span className="ml-1 text-yellow-500">M</span>
-                                                    </>
-                                                )}
-                                            </div>
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="border text-center">{row.amp.toFixed(2)}</TableCell>
-                                    <TableCell className="border text-center">{row.mw.toFixed(2)}</TableCell>
-                                    <TableCell className="border font-medium">{row.keypoint}</TableCell>
-                                    <TableCell className="border text-center">
-                                        {row.pmt2.color && (
-                                            <div className="flex items-center justify-center">
-                                                <div className={`h-4 w-4 bg-${row.pmt2.color}-600 mr-1 rounded-sm`}></div>
-                                                <span className="text-red-500">R</span>
-                                            </div>
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="border text-center">
-                                        {row.hotlineTag === 'ON' && <Badge variant="destructive">ON</Badge>}
-                                        {row.hotlineTag === 'OFF' && (
+                                    {/* PMT1 - Merged cells per feeder */}
+                                    {shouldRenderCell(filteredData, rowIndex, 'feeder') && (
+                                        <td
+                                            className="border border-gray-300 p-2 text-center align-middle"
+                                            rowSpan={calculateRowSpan(filteredData, rowIndex, 'feeder')}
+                                        >
+                                            {renderPmt1Status(row.pmt1)}
+                                        </td>
+                                    )}
+
+                                    {/* AMP - Merged cells per feeder */}
+                                    {shouldRenderCell(filteredData, rowIndex, 'feeder') && (
+                                        <td
+                                            className="border border-gray-300 p-2 text-center align-middle"
+                                            rowSpan={calculateRowSpan(filteredData, rowIndex, 'feeder')}
+                                        >
+                                            {formatValue(row.amp)}
+                                        </td>
+                                    )}
+
+                                    {/* MW - Merged cells per feeder */}
+                                    {shouldRenderCell(filteredData, rowIndex, 'feeder') && (
+                                        <td
+                                            className="border border-gray-300 p-2 text-center align-middle"
+                                            rowSpan={calculateRowSpan(filteredData, rowIndex, 'feeder')}
+                                        >
+                                            {formatValue(row.mw)}
+                                        </td>
+                                    )}
+
+                                    {/* KEYPOINT */}
+                                    <td className="border border-gray-300 p-2 text-center align-middle font-medium">
+                                        {row.keypoint}
+                                    </td>
+
+                                    {/* PMT2 */}
+                                    <td className="border border-gray-300 p-2 text-center align-middle">
+                                        {renderPmt2Status(row.pmt2)}
+                                    </td>
+
+                                    {/* HOTLINE TAG */}
+                                    <td className="border border-gray-300 p-2 text-center align-middle">
+                                        {row.hotlineTag === "1" && <Badge variant="destructive">ON</Badge>}
+                                        {row.hotlineTag === "0" && (
                                             <Badge variant="outline" className="bg-green-100 text-green-800">
                                                 OFF
                                             </Badge>
                                         )}
-                                    </TableCell>
-                                    <TableCell className="border text-center">
-                                        {row.res === 'RESET' && (
+                                    </td>
+
+                                    {/* RES. */}
+                                    <td className="border border-gray-300 p-2 text-center align-middle">
+                                        {row.reset === "0" && (
                                             <Badge variant="outline" className="bg-amber-100 text-amber-800">
                                                 RESET
                                             </Badge>
                                         )}
-                                    </TableCell>
-                                    <TableCell className="border text-center">{row.ir.toFixed(2)}</TableCell>
-                                    <TableCell className="border text-center">{row.is.toFixed(2)}</TableCell>
-                                    <TableCell className="border text-center">{row.it.toFixed(2)}</TableCell>
-                                    <TableCell className="border text-center">{row.ifR.toFixed(2)}</TableCell>
-                                    <TableCell className="border text-center">{row.ifS.toFixed(2)}</TableCell>
-                                    <TableCell className="border text-center">{row.ifT.toFixed(2)}</TableCell>
-                                    <TableCell className="border text-center">{row.ifN.toFixed(2)}</TableCell>
-                                    <TableCell className="border text-center">{row.kvAB.toFixed(2)}</TableCell>
-                                    <TableCell className="border text-center">{row.kvBC.toFixed(2)}</TableCell>
-                                    <TableCell className="border text-center">{row.kvAC.toFixed(2)}</TableCell>
-                                    <TableCell className="border text-center">{row.cosP.toFixed(2)}</TableCell>
-                                </TableRow>
+                                    </td>
+
+                                    {/* IR */}
+                                    <td className="border border-gray-300 p-2 text-center align-middle">
+                                        {formatValue(row.ir)}
+                                    </td>
+
+                                    {/* IS */}
+                                    <td className="border border-gray-300 p-2 text-center align-middle">
+                                        {formatValue(row.is)}
+                                    </td>
+
+                                    {/* IT */}
+                                    <td className="border border-gray-300 p-2 text-center align-middle">
+                                        {formatValue(row.it)}
+                                    </td>
+
+                                    {/* IF-R */}
+                                    <td className="border border-gray-300 p-2 text-center align-middle">
+                                        {formatValue(row.ifR)}
+                                    </td>
+
+                                    {/* IF-S */}
+                                    <td className="border border-gray-300 p-2 text-center align-middle">
+                                        {formatValue(row.ifS)}
+                                    </td>
+
+                                    {/* IF-T */}
+                                    <td className="border border-gray-300 p-2 text-center align-middle">
+                                        {formatValue(row.ifT)}
+                                    </td>
+
+                                    {/* IF-N */}
+                                    <td className="border border-gray-300 p-2 text-center align-middle">
+                                        {formatValue(row.ifN)}
+                                    </td>
+
+                                    {/* KV-AB */}
+                                    <td className="border border-gray-300 p-2 text-center align-middle">
+                                        {formatValue(row.kvAB)}
+                                    </td>
+
+                                    {/* KV BC */}
+                                    <td className="border border-gray-300 p-2 text-center align-middle">
+                                        {formatValue(row.kvBC)}
+                                    </td>
+
+                                    {/* KV AC */}
+                                    <td className="border border-gray-300 p-2 text-center align-middle">
+                                        {formatValue(row.kvAC)}
+                                    </td>
+
+                                    {/* COS Φ */}
+                                    <td className="border border-gray-300 p-2 text-center align-middle">
+                                        {formatValue(row.cosP)}
+                                    </td>
+                                </tr>
                             ))}
-                            {filteredData.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={20} className="py-8 text-center">
-                                        No results found for "{searchTerm}"
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
+                        </tbody>
+                    </table>
                 </CardContent>
             </Card>
         </div>

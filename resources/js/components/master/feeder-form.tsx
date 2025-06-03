@@ -15,7 +15,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Check, ChevronsUpDown, X } from "lucide-react";
+import { Check, ChevronsUpDown, X, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -62,32 +62,37 @@ export default function FeederForm({
 
   // State untuk status points list dengan keadaan terpisah untuk setiap type
   const [pmtStatusList, setPmtStatusList] = useState<StatusPoint[]>([]);
-  const [apmStatusList, setApmStatusList] = useState<StatusPoint[]>([]);
+  const [ampStatusList, setAmpStatusList] = useState<StatusPoint[]>([]);
   const [mwStatusList, setMwStatusList] = useState<StatusPoint[]>([]);
 
   // State combobox lain (Substation + Status Points)
   const [substationOpen, setSubstationOpen] = useState(false);
   const [pmtStatusOpen, setPmtStatusOpen] = useState(false);
-  const [apmStatusOpen, setApmStatusOpen] = useState(false);
+  const [ampStatusOpen, setAmpStatusOpen] = useState(false);
   const [mwStatusOpen, setMwStatusOpen] = useState(false);
 
   // Search terms state
   const [keypointSearchTerm, setKeypointSearchTerm] = useState("");
   const [pmtSearchTerm, setPmtSearchTerm] = useState("");
-  const [apmSearchTerm, setApmSearchTerm] = useState("");
+  const [ampSearchTerm, setAmpSearchTerm] = useState("");
   const [mwSearchTerm, setMwSearchTerm] = useState("");
 
   // Debounced search terms (500ms delay)
   const [debouncedKeypointSearch] = useDebounce(keypointSearchTerm, 500);
   const [debouncedPmtSearch] = useDebounce(pmtSearchTerm, 500);
-  const [debouncedApmSearch] = useDebounce(apmSearchTerm, 500);
+  const [debouncedAmpSearch] = useDebounce(ampSearchTerm, 500);
   const [debouncedMwSearch] = useDebounce(mwSearchTerm, 500);
 
+  // Loading states untuk setiap status point
+  const [isPmtLoading, setIsPmtLoading] = useState(false);
+  const [isAmpLoading, setIsAmpLoading] = useState(false);
+  const [isMwLoading, setIsMwLoading] = useState(false);
+
   // Helper function untuk mendapatkan status point berdasarkan type dari feeder data
-  const getStatusPointFromFeeder = (statusPoints: any[], type: string) => {
-    if (!statusPoints || !Array.isArray(statusPoints)) return null;
-    return statusPoints.find(sp => sp.type === type);
-  };
+  // const getStatusPointFromFeeder = (statusPoints: any[], type: string) => {
+  //   if (!statusPoints || !Array.isArray(statusPoints)) return null;
+  //   return statusPoints.find(sp => sp.type === type);
+  // };
 
   // Inisialisasi data form - PENTING: Hanya sekali saat component mount atau feeder berubah
   useEffect(() => {
@@ -120,7 +125,7 @@ export default function FeederForm({
         ...prev,
         status_points: [
           { type: "PMT", status_id: 0, name: "None", stationname: "" },
-          { type: "APM", status_id: 0, name: "None", stationname: "" },
+          { type: "AMP", status_id: 0, name: "None", stationname: "" },
           { type: "MW", status_id: 0, name: "None", stationname: "" }
         ]
       }));
@@ -145,14 +150,14 @@ export default function FeederForm({
     }
   }, [debouncedPmtSearch]);
 
-  // Effect untuk search APM status dengan debounce
+  // Effect untuk search AMP status dengan debounce
   useEffect(() => {
-    if (debouncedApmSearch.length >= 3) {
-      fetchApmStatus(debouncedApmSearch);
+    if (debouncedAmpSearch.length >= 3) {
+      fetchAmpStatus(debouncedAmpSearch);
     } else {
-      setApmStatusList([]);
+      setAmpStatusList([]);
     }
-  }, [debouncedApmSearch]);
+  }, [debouncedAmpSearch]);
 
   // Effect untuk search MW status dengan debounce
   useEffect(() => {
@@ -245,12 +250,12 @@ export default function FeederForm({
   };
 
   const getPmtStatus = () => getStatusPoint("PMT");
-  const getApmStatus = () => getStatusPoint("APM");
+  const getAmpStatus = () => getStatusPoint("AMP");
   const getMwStatus = () => getStatusPoint("MW");
 
   // Helper functions untuk nama status point
   const getPmtStatusName = () => getPmtStatus()?.name || "None";
-  const getApmStatusName = () => getApmStatus()?.name || "None";
+  const getAmpStatusName = () => getAmpStatus()?.name || "None";
   const getMwStatusName = () => getMwStatus()?.name || "None";
 
   const handleSubmit = () => {
@@ -277,6 +282,7 @@ export default function FeederForm({
   };
 
   const fetchPmtStatus = async (search: string) => {
+    setIsPmtLoading(true);
     try {
       const response = await axios.get(route("master.feeder.statuspoint-data"), {
         params: { filter: search }
@@ -291,28 +297,34 @@ export default function FeederForm({
     } catch (error) {
       console.error("Error fetching PMT status points:", error);
       setPmtStatusList([]);
+    } finally {
+      setIsPmtLoading(false);
     }
   };
 
-  const fetchApmStatus = async (search: string) => {
+  const fetchAmpStatus = async (search: string) => {
+    setIsAmpLoading(true);
     try {
       const response = await axios.get(route("master.feeder.statuspoint-data"), {
         params: { filter: search }
       });
 
       if (response.data && Array.isArray(response.data)) {
-        setApmStatusList(response.data);
+        setAmpStatusList(response.data);
       } else {
         console.warn("Unexpected response format:", response.data);
-        setApmStatusList([]);
+        setAmpStatusList([]);
       }
     } catch (error) {
-      console.error("Error fetching APM status points:", error);
-      setApmStatusList([]);
+      console.error("Error fetching AMP status points:", error);
+      setAmpStatusList([]);
+    } finally {
+      setIsAmpLoading(false);
     }
   };
 
   const fetchMwStatus = async (search: string) => {
+    setIsMwLoading(true);
     try {
       const response = await axios.get(route("master.feeder.statuspoint-data"), {
         params: { filter: search }
@@ -327,6 +339,8 @@ export default function FeederForm({
     } catch (error) {
       console.error("Error fetching MW status points:", error);
       setMwStatusList([]);
+    } finally {
+      setIsMwLoading(false);
     }
   };
 
@@ -339,8 +353,8 @@ export default function FeederForm({
     setPmtSearchTerm(search);
   };
 
-  const handleOnSearchStatusPointApm = (search: string) => {
-    setApmSearchTerm(search);
+  const handleOnSearchStatusPointAmp = (search: string) => {
+    setAmpSearchTerm(search);
   };
 
   const handleOnSearchStatusPointMw = (search: string) => {
@@ -504,7 +518,7 @@ export default function FeederForm({
         )}
       </div>
 
-      {/* Status Points (PMT, APM, MW) */}
+      {/* Status Points (PMT, AMP, MW) */}
       <div className="grid gap-4">
         <Label>Status Points</Label>
         <div className="grid grid-cols-1 gap-4">
@@ -528,7 +542,24 @@ export default function FeederForm({
                 <Command>
                   <CommandInput placeholder="Search status..." onValueChange={handleOnSearchStatusPointPmt} />
                   <CommandList>
-                    <CommandEmpty>No status found.</CommandEmpty>
+                    {pmtSearchTerm === "" ? (
+                        <div className="py-5 text-sm text-muted-foreground text-center">
+                          Type to search...
+                        </div>
+                      ) : (
+                    <CommandEmpty>
+                      {isPmtLoading ? (
+                        <div className="flex items-center justify-center p-2">
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Loading...
+                        </div>
+                      ) : (
+                        <div className="p-2 text-muted-foreground text-center">
+                          No status found
+                        </div>
+                      )}
+                    </CommandEmpty>
+                      )}
                     <CommandGroup className="max-h-[200px] overflow-y-auto">
                       <CommandItem
                         value="none"
@@ -572,56 +603,73 @@ export default function FeederForm({
             </Popover>
           </div>
 
-          {/* APM */}
+          {/* AMP */}
           <div className="grid gap-2">
-            <Label htmlFor="apm_status">APM</Label>
-            <Popover open={apmStatusOpen} onOpenChange={setApmStatusOpen}>
+            <Label htmlFor="amp_status">AMP</Label>
+            <Popover open={ampStatusOpen} onOpenChange={setAmpStatusOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   role="combobox"
-                  aria-expanded={apmStatusOpen}
+                  aria-expanded={ampStatusOpen}
                   className="justify-between"
-                  id="apm_status"
+                  id="amp_status"
                 >
-                  {getApmStatusName()}
+                  {getAmpStatusName()}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[200px] p-0">
                 <Command>
-                  <CommandInput placeholder="Search status..." onValueChange={handleOnSearchStatusPointApm} />
+                  <CommandInput placeholder="Search status..." onValueChange={handleOnSearchStatusPointAmp} />
                   <CommandList>
-                    <CommandEmpty>No status found.</CommandEmpty>
+                    {ampSearchTerm === "" ? (
+                        <div className="py-5 text-sm text-muted-foreground text-center">
+                          Type to search...
+                        </div>
+                      ) : (
+                    <CommandEmpty>
+                      {isAmpLoading ? (
+                        <div className="flex items-center justify-center p-2">
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Loading...
+                        </div>
+                      ) : (
+                        <div className="p-2 text-muted-foreground text-center">
+                          No status found
+                        </div>
+                      )}
+                    </CommandEmpty>
+                      )}
                     <CommandGroup className="max-h-[200px] overflow-y-auto">
                       <CommandItem
                         value="none"
                         onSelect={() => {
-                          handleStatusPointChange("APM", 0, "None");
-                          setApmStatusOpen(false);
+                          handleStatusPointChange("AMP", 0, "None");
+                          setAmpStatusOpen(false);
                         }}
                       >
                         <Check
                           className={cn(
                             "mr-2 h-4 w-4",
-                            getApmStatus()?.status_id === 0 ? "opacity-100" : "opacity-0"
+                            getAmpStatus()?.status_id === 0 ? "opacity-100" : "opacity-0"
                           )}
                         />
                         None
                       </CommandItem>
-                      {apmStatusList.map((status) => (
+                      {ampStatusList.map((status) => (
                         <CommandItem
                           key={status.id}
                           value={`${status.stationname} | ${status.name}`}
                           onSelect={() => {
-                            handleStatusPointChange("APM", status.id ?? 0, status.name);
-                            setApmStatusOpen(false);
+                            handleStatusPointChange("AMP", status.id ?? 0, status.name);
+                            setAmpStatusOpen(false);
                           }}
                         >
                           <Check
                             className={cn(
                               "mr-2 h-4 w-4",
-                              getApmStatus()?.status_id === status.id
+                              getAmpStatus()?.status_id === status.id
                                 ? "opacity-100"
                                 : "opacity-0"
                             )}
@@ -656,7 +704,24 @@ export default function FeederForm({
                 <Command>
                   <CommandInput placeholder="Search status..." onValueChange={handleOnSearchStatusPointMw} />
                   <CommandList>
-                    <CommandEmpty>No status found.</CommandEmpty>
+                    {mwSearchTerm === "" ? (
+                        <div className="py-5 text-sm text-muted-foreground text-center">
+                          Type to search...
+                        </div>
+                      ) : (
+                    <CommandEmpty>
+                      {isMwLoading ? (
+                        <div className="flex items-center justify-center p-2">
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Loading...
+                        </div>
+                      ) : (
+                        <div className="p-2 text-muted-foreground text-center">
+                          No status found
+                        </div>
+                      )}
+                    </CommandEmpty>
+                      )}
                     <CommandGroup className="max-h-[200px] overflow-y-auto">
                       <CommandItem
                         value="none"

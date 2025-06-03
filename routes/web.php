@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\TableHmiController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -35,6 +36,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             return 'Failed: ' . $e->getMessage();
         }
     });
+    Route::get('/api/table-hmi', [TableHmiController::class, 'index']);
 });
 
 require __DIR__ . '/settings.php';
