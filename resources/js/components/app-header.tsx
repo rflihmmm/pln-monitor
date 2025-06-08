@@ -12,7 +12,7 @@ import { useInitials } from '@/hooks/use-initials';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem, type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { Bell, ChevronsUpDown, Database, LayoutGrid, Menu, Spline, Table2, User, UtilityPole, Cable } from 'lucide-react';
+import { Bell, ChevronsUpDown, Database, LayoutGrid, Menu, Spline, Table2, User, UtilityPole, Cable, Map } from 'lucide-react';
 import { useState } from 'react';
 import AppLogo from './app-logo';
 import AppLogoIcon from './app-logo-icon';
@@ -54,6 +54,11 @@ const mainNavItems: ExtendedNavItem[] = [
                 title: 'Manage Users',
                 href: '/master/manage-users',
                 icon: User,
+            },
+            {
+                title: 'Maps',
+                href: '/master/maps',
+                icon: Map,
             },
             {
                 title: 'Gardu Induk',

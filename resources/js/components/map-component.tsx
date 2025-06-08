@@ -73,7 +73,7 @@ const sampleMarkers: SubstationMarker[] = [
         id: 'gh2',
         name: 'GH Tamalanrea',
         type: 'GH',
-        position: [-5.1281, 119.4969],
+        position: [-5.122975, 119.4133917],
         status: 'active',
         data: {
             voltage: '20 kV',
@@ -95,28 +95,6 @@ const sampleMarkers: SubstationMarker[] = [
     },
 ];
 
-// Generate more random markers for demonstration
-for (let i = 0; i < 20; i++) {
-    const type = Math.random() > 0.5 ? 'GI' : 'GH';
-    const status = Math.random() > 0.2 ? 'active' : 'inactive';
-
-    // Random position around Sulawesi
-    const lat = -5.1381 + (Math.random() - 0.5) * 2;
-    const lng = 119.4469 + (Math.random() - 0.5) * 2;
-
-    sampleMarkers.push({
-        id: `${type.toLowerCase()}${i + 4}`,
-        name: `${type} Random ${i + 1}`,
-        type,
-        position: [lat, lng],
-        status,
-        data: {
-            voltage: type === 'GI' ? '150/20 kV' : '20 kV',
-            load: status === 'active' ? `${(Math.random() * 50).toFixed(2)} MW` : '0 MW',
-            lastUpdate: '2025-03-21 15:40:00',
-        },
-    });
-}
 
 interface MapComponentProps {
     filter: 'GI' | 'GH' | 'ALL';

@@ -21,4 +21,9 @@ class FeederKeypoint extends Model
     {
         return $this->belongsTo(Feeder::class);
     }
+
+        public function mapsData()
+    {
+        return $this->belongsTo(MapsData::class, 'keypoint_id', 'keypoint_id'); // atau sesuai dengan relasi yang benar
+    }
 }

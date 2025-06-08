@@ -87,3 +87,13 @@ export interface Feeder {
     keypoints: Keypoint[];
     status_points: StatusPoint[];
 }
+
+export interface MapsData {
+    id?: number;
+    no?: string;
+    keypoint_id: number;
+    ulp?: string;
+    up3?: string;
+    dcc?: string;
+    lokasi?: string;
+}

@@ -25,7 +25,7 @@ export default function Dashboard() {
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                     <div className="space-y-6 lg:col-span-2">
                         <Card className="overflow-hidden">
-                            <CardContent className="p-4 md:p-6">
+                            <CardContent className="px-4 md:px-6">
                                 <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
                                     <StatusIndicator />
                                     <MapFilter currentFilter={mapFilter} onFilterChange={setMapFilter} />
