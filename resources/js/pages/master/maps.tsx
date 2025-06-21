@@ -1,7 +1,7 @@
 import { Head } from '@inertiajs/react';
 
-import { type BreadcrumbItem, MapsData, Keypoint} from '@/types';
-
+import { type BreadcrumbItem, MapsData, Keypoint } from '@/types';
+import Organization from '@/components/master/organization';
 import TableMaps from '@/components/master/table-maps';
 import AppLayout from '@/layouts/app-layout';
 
@@ -12,20 +12,21 @@ interface MapsPageProps {
 
 const breadcrumbs: BreadcrumbItem[] = [
   {
-    title: 'Maps', 
+    title: 'Maps',
     href: 'master/maps',
   },
 ];
 
-export default function MapsPage({ mapsDataList, keypointsList }: MapsPageProps) {
+export default function MapsPage() {
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
       <Head title="Maps" />
-      <div className='px-5 py-5'>
-        <h1 className="text-2xl font-bold">Maps Management Dashboard</h1>
-        <h3>Add, remove, or edit Maps Data</h3>
-        <TableMaps mapsDataList={mapsDataList} keypointsList={keypointsList} />
-
+      <div className='px-5 py-5 space-y-4'>
+        <div>
+          <h1 className="text-2xl font-bold">Maps Management Dashboard</h1>
+          <h3>Add, remove, or edit Maps Data</h3>
+        </div>
+        <Organization />
       </div>
     </AppLayout>
   );

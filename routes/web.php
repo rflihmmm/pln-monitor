@@ -1,9 +1,10 @@
 <?php
 
-use App\Http\Controllers\TableHmiController;
+use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
+use App\Http\Controllers\MapsController;
+use App\Http\Controllers\TableHmiController;
 
 // Route::get('/', function () {
 //     return Inertia::render('welcome');
@@ -37,6 +38,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
         }
     });
     Route::get('/api/table-hmi', [TableHmiController::class, 'index']);
+
+    // Routes untuk mendapatkan daftar DCC yang tersedia
+    Route::get('/maps/dcc', [MapsController::class, 'getAvailableDcc']);
+
+    // Routes untuk keypoints berdasarkan DCC (API pertama)
+    Route::get('/maps/keypoints/selatan', [MapsController::class, 'keypointsSelatan']);
+    Route::get('/maps/keypoints/utara', [MapsController::class, 'keypointsUtara']);
+    Route::get('/maps/keypoints/tenggara', [MapsController::class, 'keypointsTenggara']);
+
+    // Routes untuk summary berdasarkan DCC (API kedua)
+    Route::get('/maps/summary/selatan', [MapsController::class, 'summarySelatan']);
+    Route::get('/maps/summary/utara', [MapsController::class, 'summaryUtara']);
+    Route::get('/maps/summary/tenggara', [MapsController::class, 'summaryTenggara']);
+
+    // Routes dinamis (opsional, jika ingin lebih fleksibel)
+    Route::get('/maps/keypoints/{dcc}', [MapsController::class, 'getKeypointsByDcc']);
+    Route::get('/maps/summary/{dcc}', [MapsController::class, 'getSummaryByDcc']);
 });
 
 require __DIR__ . '/settings.php';

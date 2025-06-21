@@ -11,10 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('feeder_keypoints', function (Blueprint $table) {
+        Schema::create('organization_keypoint', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('feeder_id')->constrained('feeders')->onDelete('cascade');
-            $table->uniqueInteger('keypoint_id');
+            $table->integer('keypoint_id');
+            $table->foreignId('organization_id')->constrained('organization')->onDelete('cascade');
         });
     }
 
@@ -23,6 +23,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('feeder_keypoints');
+        Schema::dropIfExists('organization_keypoint');
     }
 };

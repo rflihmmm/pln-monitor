@@ -1,0 +1,52 @@
+[
+    {
+        "id": 0,
+        "dcc": "TENGGARA",
+        "up3": "KENDARI",
+        "ulp": "KOLAKA",
+        "gardu_induk": "PARE-PARE",
+        "feeder": "WAJO",
+        "keypoint": "REC-WAJO",
+        "coordinate": "-4.000000, 120.000000"
+    },
+    {
+        "id": 1,
+        "dcc": "UTARA",
+        "up3": "KENDARI",
+        "ulp": "KOLAKA",
+        "gardu_induk": "PANKEP",
+        "feeder": "PANGKAJENE",
+        "keypoint": "REC-PANGKEP",
+        "coordinate": "-4.000000, 120.000000"
+    },
+    {
+        "id": 2,
+        "dcc": "TENGGARA",
+        "up3": "KENDARI",
+        "ulp": "KOLAKA",
+        "gardu_induk": "PARE-PARE",
+        "feeder": "WAJO",
+        "keypoint": "REC-WAJO",
+        "coordinate": "-4.000000, 120.000000"
+    },
+    {
+        "id": 3,
+        "dcc": "TENGGARA",
+        "up3": "KENDARI",
+        "ulp": "KOLAKA",
+        "gardu_induk": "PARE-PARE",
+        "feeder": "WAJO",
+        "keypoint": "REC-WAJO",
+        "coordinate": "-4.000000, 120.000000"
+    },
+    {
+        "id": 4,
+        "dcc": "SELATAN",
+        "up3": "KENDARI",
+        "ulp": "KOLAKA",
+        "gardu_induk": "PARE-PARE",
+        "feeder": "WAJO",
+        "keypoint": "REC-WAJO",
+        "coordinate": "-4.000000, 120.000000"
+    }
+]

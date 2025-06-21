@@ -11,10 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('feeder_keypoints', function (Blueprint $table) {
+        Schema::create('organization', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('feeder_id')->constrained('feeders')->onDelete('cascade');
-            $table->uniqueInteger('keypoint_id');
+            $table->string('name');
+            $table->integer('level');
+            $table->integer('parent_id')->nullable();
+            $table->string('address')->nullable();
+            $table->string('coordinate')->nullable();
         });
     }
 
@@ -23,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('feeder_keypoints');
+        Schema::dropIfExists('organization');
     }
 };
