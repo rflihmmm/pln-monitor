@@ -17,50 +17,123 @@ class OrganizationGridController extends Controller
     public function index(Request $request)
     {
         try {
-            // Query dengan join untuk mendapatkan semua data yang diperlukan
+            // Query untuk mendapatkan data dari PostgreSQL (tanpa STATIONPOINTS)
             $data = DB::table('organization_keypoint as ok')
-                ->join('organization as org_dcc', function ($join) {
-                    $join->on('ok.organization_id', '=', 'org_dcc.id')
-                        ->where('org_dcc.level', '=', 1);
-                })
-                ->leftJoin('organization as org_up3', function ($join) {
-                    $join->on('org_dcc.id', '=', 'org_up3.parent_id')
-                        ->where('org_up3.level', '=', 2);
-                })
-                ->leftJoin('organization as org_ulp', function ($join) {
-                    $join->on('org_up3.id', '=', 'org_ulp.parent_id')
-                        ->where('org_ulp.level', '=', 3);
-                })
-                ->leftJoin('STATIONPOINTS as sp', 'ok.keypoint_id', '=', 'sp.PKEY')
+                ->join('organization as org', 'ok.organization_id', '=', 'org.id')
                 ->leftJoin('feeder_keypoints as fk', 'ok.keypoint_id', '=', 'fk.keypoint_id')
                 ->leftJoin('feeders as f', 'fk.feeder_id', '=', 'f.id')
                 ->leftJoin('gardu_induks as gi', 'f.gardu_induk_id', '=', 'gi.id')
+                ->leftJoin('keypoint_ext as ke', 'ok.keypoint_id', '=', 'ke.keypoint_id')
                 ->select([
                     'ok.keypoint_id',
-                    'org_dcc.name as dcc',
-                    'org_up3.name as up3',
-                    'org_ulp.name as ulp',
+                    'ok.organization_id',
+                    'org.name as org_name',
+                    'org.level as org_level',
+                    'org.parent_id',
                     'gi.name as gardu_induk',
                     'f.name as feeder',
-                    'sp.NAME as keypoint',
-                    //'org_dcc.coordinate'
+                    'ke.coordinate'
                 ])
                 ->distinct()
                 ->get();
 
-            // Transform data ke format yang diminta
-            $result = $data->map(function ($item, $index) {
-                return [
-                    'id' => $index,
-                    'dcc' => $item->dcc ?? '',
-                    'up3' => $item->up3 ?? '',
-                    'ulp' => $item->ulp ?? '',
-                    'gardu_induk' => $item->gardu_induk ?? '',
-                    'feeder' => $item->feeder ?? '',
-                    'keypoint' => $item->keypoint ?? '',
-                    //'coordinate' => $item->coordinate ?? ''
+            // Get keypoint IDs untuk query STATIONPOINTS
+            $keypointIds = $data->pluck('keypoint_id')->unique()->toArray();
+
+            // Query STATIONPOINTS dari MSSQL database
+            $stationPoints = [];
+            if (!empty($keypointIds)) {
+                $stationPointsData = DB::connection('sqlsrv_main')
+                    ->table('STATIONPOINTS')
+                    ->whereIn('PKEY', $keypointIds)
+                    ->select('PKEY', 'NAME')
+                    ->get();
+
+                // Convert to associative array for easier lookup
+                foreach ($stationPointsData as $sp) {
+                    $stationPoints[$sp->PKEY] = $sp->NAME;
+                }
+            }
+
+            // Group by keypoint_id untuk menghindari duplikasi
+            $groupedData = $data->groupBy('keypoint_id');
+
+            $result = [];
+            $id = 0;
+
+            foreach ($groupedData as $keypointId => $keypointData) {
+                $dcc = '';
+                $up3 = '';
+                $ulp = '';
+                $coordinate = '';
+                $garduInduk = '';
+                $feeder = '';
+                $keypoint = '';
+
+                // Ambil data pertama sebagai base
+                $baseData = $keypointData->first();
+                $garduInduk = $baseData->gardu_induk ?? '';
+                $feeder = $baseData->feeder ?? '';
+                $keypoint = $stationPoints[$keypointId] ?? '';
+                $coordinate = $baseData->coordinate ?? '';
+
+                // Collect organization IDs untuk mencari hierarchy
+                $organizationIds = $keypointData->pluck('organization_id')->unique()->toArray();
+
+                // Get organization hierarchy
+                $organizations = DB::table('organization')
+                    ->whereIn('id', $organizationIds)
+                    ->orWhereIn('id', function ($query) use ($organizationIds) {
+                        $query->select('parent_id')
+                            ->from('organization')
+                            ->whereIn('id', $organizationIds)
+                            ->whereNotNull('parent_id');
+                    })
+                    ->orWhereIn('id', function ($query) use ($organizationIds) {
+                        $query->select('o2.parent_id')
+                            ->from('organization as o1')
+                            ->join('organization as o2', 'o1.parent_id', '=', 'o2.id')
+                            ->whereIn('o1.id', $organizationIds)
+                            ->whereNotNull('o2.parent_id');
+                    })
+                    ->get();
+
+                // Build organization hierarchy
+                foreach ($organizations as $org) {
+                    switch ($org->level) {
+                        case 1:
+                            $dcc = $org->name;
+                            break;
+                        case 2:
+                            $up3 = $org->name;
+                            break;
+                        case 3:
+                            $ulp = $org->name;
+                            break;
+                    }
+                }
+
+                // If we don't have complete hierarchy, try to build it from relationships
+                if (empty($dcc) || empty($up3) || empty($ulp)) {
+                    foreach ($keypointData as $item) {
+                        $this->buildOrganizationHierarchy($item->organization_id, $dcc, $up3, $ulp);
+                        if (!empty($dcc) && !empty($up3) && !empty($ulp)) {
+                            break;
+                        }
+                    }
+                }
+
+                $result[] = [
+                    'id' => $id++,
+                    'dcc' => $dcc,
+                    'up3' => $up3,
+                    'ulp' => $ulp,
+                    'gardu_induk' => $garduInduk,
+                    'feeder' => $feeder,
+                    'keypoint' => $keypoint,
+                    'coordinate' => $coordinate
                 ];
-            })->values();
+            }
 
             return response()->json($result);
         } catch (\Exception $e) {
@@ -72,26 +145,78 @@ class OrganizationGridController extends Controller
     }
 
     /**
-     * Alternative method using Eloquent relationships
+     * Build organization hierarchy from a given organization ID
+     */
+    private function buildOrganizationHierarchy($organizationId, &$dcc, &$up3, &$ulp)
+    {
+        $organization = DB::table('organization')->where('id', $organizationId)->first();
+
+        if (!$organization) {
+            return;
+        }
+
+        // Set current level
+        switch ($organization->level) {
+            case 1:
+                $dcc = $organization->name;
+                break;
+            case 2:
+                $up3 = $organization->name;
+                break;
+            case 3:
+                $ulp = $organization->name;
+                break;
+        }
+
+        // Get parent if exists
+        if ($organization->parent_id) {
+            $parent = DB::table('organization')->where('id', $organization->parent_id)->first();
+            if ($parent) {
+                switch ($parent->level) {
+                    case 1:
+                        if (empty($dcc)) $dcc = $parent->name;
+                        break;
+                    case 2:
+                        if (empty($up3)) $up3 = $parent->name;
+                        break;
+                }
+
+                // Get grandparent if exists
+                if ($parent->parent_id) {
+                    $grandparent = DB::table('organization')->where('id', $parent->parent_id)->first();
+                    if ($grandparent && $grandparent->level == 1 && empty($dcc)) {
+                        $dcc = $grandparent->name;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Alternative method using Eloquent relationships (updated)
      */
     public function indexWithEloquent(Request $request)
     {
         try {
+            // Get all keypoints with their relationships
             $organizationKeypoints = OrganizationKeypoint::with([
                 'organization' => function ($query) {
                     $query->with(['parent.parent']);
                 }
             ])->get();
 
+            // Group by keypoint_id to handle multiple organizations per keypoint
+            $groupedKeypoints = $organizationKeypoints->groupBy('keypoint_id');
+
             $result = [];
             $id = 0;
 
-            foreach ($organizationKeypoints as $orgKeypoint) {
+            foreach ($groupedKeypoints as $keypointId => $orgKeypoints) {
                 // Get keypoint name from STATIONPOINTS
-                $stationPoint = StationPointSkada::where('PKEY', $orgKeypoint->keypoint_id)->first();
+                $stationPoint = StationPointSkada::where('PKEY', $keypointId)->first();
 
                 // Get feeder information
-                $feederKeypoint = FeederKeypoint::where('keypoint_id', $orgKeypoint->keypoint_id)->first();
+                $feederKeypoint = FeederKeypoint::where('keypoint_id', $keypointId)->first();
                 $feeder = null;
                 $garduInduk = null;
 
@@ -102,28 +227,20 @@ class OrganizationGridController extends Controller
                     }
                 }
 
-                // Get organization hierarchy
-                $organization = $orgKeypoint->organization;
+                // Get coordinate from keypoint_ext
+                $coordinate = DB::table('keypoint_ext')
+                    ->where('keypoint_id', $keypointId)
+                    ->value('coordinate') ?? '';
+
+                // Initialize organization levels
                 $dcc = '';
                 $up3 = '';
                 $ulp = '';
 
-                // Determine organization levels
-                if ($organization->level == 1) {
-                    $dcc = $organization->name;
-                } elseif ($organization->level == 2) {
-                    $up3 = $organization->name;
-                    if ($organization->parent && $organization->parent->level == 1) {
-                        $dcc = $organization->parent->name;
-                    }
-                } elseif ($organization->level == 3) {
-                    $ulp = $organization->name;
-                    if ($organization->parent && $organization->parent->level == 2) {
-                        $up3 = $organization->parent->name;
-                        if ($organization->parent->parent && $organization->parent->parent->level == 1) {
-                            $dcc = $organization->parent->parent->name;
-                        }
-                    }
+                // Process all organizations for this keypoint to build complete hierarchy
+                foreach ($orgKeypoints as $orgKeypoint) {
+                    $organization = $orgKeypoint->organization;
+                    $this->processOrganizationHierarchyEloquent($organization, $dcc, $up3, $ulp);
                 }
 
                 $result[] = [
@@ -134,7 +251,7 @@ class OrganizationGridController extends Controller
                     'gardu_induk' => $garduInduk ? $garduInduk->name : '',
                     'feeder' => $feeder ? $feeder->name : '',
                     'keypoint' => $stationPoint ? $stationPoint->NAME : '',
-                    'coordinate' => $organization->coordinate ?? ''
+                    'coordinate' => $coordinate
                 ];
             }
 
@@ -144,6 +261,34 @@ class OrganizationGridController extends Controller
                 'error' => 'Failed to fetch data',
                 'message' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Process organization hierarchy using Eloquent models
+     */
+    private function processOrganizationHierarchyEloquent($organization, &$dcc, &$up3, &$ulp)
+    {
+        if (!$organization) {
+            return;
+        }
+
+        // Set current level
+        switch ($organization->level) {
+            case 1:
+                if (empty($dcc)) $dcc = $organization->name;
+                break;
+            case 2:
+                if (empty($up3)) $up3 = $organization->name;
+                break;
+            case 3:
+                if (empty($ulp)) $ulp = $organization->name;
+                break;
+        }
+
+        // Process parent hierarchy
+        if ($organization->parent) {
+            $this->processOrganizationHierarchyEloquent($organization->parent, $dcc, $up3, $ulp);
         }
     }
 }
