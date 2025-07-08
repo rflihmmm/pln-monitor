@@ -1,0 +1,18 @@
+menu tambahan 
+
+master/mapping 
+
+- tampilkan kolom parent
+- pengecekan saat menambah keypoint
+
+
+master/keypoint
+
+- tambah keypoint_id
+- tambah coordinate
+- alamat 
+- tambah kolom parent
+
+single-line
+- filter per-up3
+

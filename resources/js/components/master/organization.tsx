@@ -1,62 +1,9 @@
 import KendoGrid from "@/components/ui/kendo-grid";
+import { useEffect, useState } from "react";
 import { popup } from "leaflet";
 
 
 export default function Organization() {
-
-    const datas = [
-        {
-            "id": 0,
-            "dcc": "TENGGARA",
-            "up3": "KENDARI",
-            "ulp": "KOLAKA",
-            "gardu_induk": "PARE-PARE",
-            "feeder": "WAJO",
-            "keypoint": "REC-WAJO",
-            "coordinate": "-4.000000, 120.000000"
-        },
-        {
-            "id": 1,
-            "dcc": "UTARA",
-            "up3": "KENDARI",
-            "ulp": "KOLAKA",
-            "gardu_induk": "PANKEP",
-            "feeder": "PANGKAJENE",
-            "keypoint": "REC-PANGKEP",
-            "coordinate": "-4.000000, 120.000000"
-        },
-        {
-            "id": 2,
-            "dcc": "TENGGARA",
-            "up3": "KENDARI",
-            "ulp": "KOLAKA",
-            "gardu_induk": "PARE-PARE",
-            "feeder": "WAJO",
-            "keypoint": "REC-WAJO",
-            "coordinate": "-4.000000, 120.000000"
-        },
-        {
-            "id": 3,
-            "dcc": "TENGGARA",
-            "up3": "KENDARI",
-            "ulp": "KOLAKA",
-            "gardu_induk": "PARE-PARE",
-            "feeder": "WAJO",
-            "keypoint": "REC-WAJO",
-            "coordinate": "-4.000000, 120.000000"
-        },
-        {
-            "id": 4,
-            "dcc": "SELATAN",
-            "up3": "KENDARI",
-            "ulp": "KOLAKA",
-            "gardu_induk": "PARE-PARE",
-            "feeder": "WAJO",
-            "keypoint": "REC-WAJO",
-            "coordinate": "-4.000000, 120.000000"
-        }
-    ]
-
     const config = {
         columns: [{
             title: "Keypoint",
@@ -73,29 +20,50 @@ export default function Organization() {
         }, {
             title: "ULP",
             width: "100px",
-            field: "ulp"
+            field: "ulp",
+            editor: ulpDropdownEditor
         }, {
             title: "UP3",
             width: "100px",
-            field: "up3"
+            field: "up3",
+            editor: up3DropdownEditor
         }, {
             title: "DCC",
             width: "100px",
-            field: "dcc"
+            field: "dcc",
+            editor: dccDropdownEditor
         }, {
             title: "Coordinate",
             width: "100px",
             field: "coordinate"
+        }, {
+            command: "destroy",
+            title: "&nbsp;",
+            width: "80px"
         }],
         dataSource: {
-            //data: "https://localhost:8000/master/organization-grid",
-            data: datas,
+            transport: {
+                read: {
+                    url: "organization-grid",
+                    dataType: "json",
+                },
+                create: {
+                    url: "organization-grid/post",
+                    type: "POST",
+                    contentType: "application/json",
+                },
+                destroy: {
+                    url: "organization-grid",
+                    type: "DELETE",
+                    contentType: "application/json",
+                }
+            },
             pageSize: 10,
             pageable: true,
             sortable: true,
-            filtertable: true,
-            resizetable: true,
-            editable: "popup",
+            filterable: true,
+            resizable: true,
+            //editable: "popup",
             scrollable: true,
             total: 0,
             group: [{
@@ -104,8 +72,55 @@ export default function Organization() {
                 field: "up3"
             }, {
                 field: "ulp"
-            }]
-        }
+            }
+            ],
+            //batch: true,
+        },
+        editable: true,
+        toolbar: ["create", "save", "cancel"],
+    }
+
+    function dccDropdownEditor(container: HTMLElement, options: any) {
+        window.kendo.jQuery('<input data-bind="value:' + options.field + '" />')
+            .appendTo(container)
+            .kendoDropDownList({
+                dataTextField: "name",
+                dataValueField: "id",
+                filter: "contains",
+                dataSource: {
+                    transport: {
+                        read: "organization-grid/dcc"
+                    }
+                }
+            });
+    }
+    function up3DropdownEditor(container: HTMLElement, options: any) {
+        window.kendo.jQuery('<input data-bind="value:' + options.field + '" />')
+            .appendTo(container)
+            .kendoDropDownList({
+                dataTextField: "name",
+                dataValueField: "id",
+                filter: "contains",
+                dataSource: {
+                    transport: {
+                        read: "organization-grid/up3"
+                    }
+                }
+            });
+    }
+    function ulpDropdownEditor(container: HTMLElement, options: any) {
+        window.kendo.jQuery('<input data-bind="value:' + options.field + '" />')
+            .appendTo(container)
+            .kendoDropDownList({
+                dataTextField: "name",
+                dataValueField: "id",
+                filter: "contains",
+                dataSource: {
+                    transport: {
+                        read: "organization-grid/ulp"
+                    }
+                }
+            });
     }
     return (
         <div className="space-y-4">

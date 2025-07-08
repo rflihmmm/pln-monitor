@@ -32,7 +32,8 @@ class OrganizationGridController extends Controller
                     'org.parent_id',
                     'gi.name as gardu_induk',
                     'f.name as feeder',
-                    'ke.coordinate'
+                    'ke.coordinate',
+                    'ke.parent_stationpoints'
                 ])
                 ->distinct()
                 ->get();
@@ -58,6 +59,21 @@ class OrganizationGridController extends Controller
             // Group by keypoint_id untuk menghindari duplikasi
             $groupedData = $data->groupBy('keypoint_id');
 
+            // Ambil semua parent_stationpoints yang ada
+            $allParentStationpoints = $data->pluck('parent_stationpoints')->filter()->unique()->toArray();
+            $parentStationNames = [];
+            if (!empty($allParentStationpoints)) {
+                // Query ke STATIONPOINTS untuk mapping parent_stationpoints ke NAME
+                $parentStationsData = DB::connection('sqlsrv_main')
+                    ->table('STATIONPOINTS')
+                    ->whereIn('PKEY', $allParentStationpoints)
+                    ->select('PKEY', 'NAME')
+                    ->get();
+                foreach ($parentStationsData as $ps) {
+                    $parentStationNames[$ps->PKEY] = $ps->NAME;
+                }
+            }
+
             $result = [];
             $id = 0;
 
@@ -69,6 +85,7 @@ class OrganizationGridController extends Controller
                 $garduInduk = '';
                 $feeder = '';
                 $keypoint = '';
+                $parent = '';
 
                 // Ambil data pertama sebagai base
                 $baseData = $keypointData->first();
@@ -76,6 +93,12 @@ class OrganizationGridController extends Controller
                 $feeder = $baseData->feeder ?? '';
                 $keypoint = $stationPoints[$keypointId] ?? '';
                 $coordinate = $baseData->coordinate ?? '';
+                $parent = $baseData->parent_stationpoints ?? '';
+
+                // Ubah parent menjadi STATIONPOINTS.NAME jika ada
+                if (!empty($parent) && isset($parentStationNames[$parent])) {
+                    $parent = $parentStationNames[$parent];
+                }
 
                 // Collect organization IDs untuk mencari hierarchy
                 $organizationIds = $keypointData->pluck('organization_id')->unique()->toArray();
@@ -131,7 +154,8 @@ class OrganizationGridController extends Controller
                     'gardu_induk' => $garduInduk,
                     'feeder' => $feeder,
                     'keypoint' => $keypoint,
-                    'coordinate' => $coordinate
+                    'coordinate' => $coordinate,
+                    'parent' => $parent
                 ];
             }
 
@@ -290,5 +314,104 @@ class OrganizationGridController extends Controller
         if ($organization->parent) {
             $this->processOrganizationHierarchyEloquent($organization->parent, $dcc, $up3, $ulp);
         }
+    }
+
+    public function getDccData(Request $request)
+    {
+        try {
+            $dccs = DB::table('organization')
+                ->where('level', 1)
+                ->select('id', 'name')
+                ->get();
+
+            return response()->json($dccs);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to fetch DCC data',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getUp3Data(Request $request)
+    {
+        try {
+            $up3s = DB::table('organization')
+                ->where('level', 2)
+                ->select('id', 'name')
+                ->get();
+
+            return response()->json($up3s);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to fetch UP3 data',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+    public function getUlpData(Request $request)
+    {
+        try {
+            $ulps = DB::table('organization')
+                ->where('level', 3)
+                ->select('id', 'name')
+                ->get();
+
+            return response()->json($ulps);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to fetch ULP data',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'dcc' => 'nullable|string',
+            'up3' => 'nullable|string',
+            'ulp' => 'nullable|string',
+            'gardu_induk' => 'nullable|string',
+            'feeder' => 'nullable|string',
+            'keypoint' => 'required|string',
+            'coordinate' => 'nullable|string',
+        ]);
+
+        // 1. DCC (level 1)
+        $dcc = Organization::firstOrCreate([
+            'name' => $validated['dcc'],
+            'level' => 1,
+        ]);
+
+        // 2. UP3 (level 2, parent DCC)
+        $up3 = Organization::firstOrCreate([
+            'name' => $validated['up3'],
+            'level' => 2,
+            'parent_id' => $dcc->id,
+        ]);
+
+        // 3. ULP (level 3, parent UP3)
+        $ulp = Organization::firstOrCreate([
+            'name' => $validated['ulp'],
+            'level' => 3,
+            'parent_id' => $up3->id,
+        ]);
+
+        // 4. Simpan ke organization_keypoint
+        $orgKeypoint = OrganizationKeypoint::firstOrCreate([
+            'organization_id' => $ulp->id,
+            'keypoint_id' => $validated['keypoint'],
+        ]);
+
+        // 5. (Opsional) Simpan coordinate ke keypoint_ext jika ada
+        if (!empty($validated['coordinate'])) {
+            DB::table('keypoint_ext')->updateOrInsert(
+                ['keypoint_id' => $validated['keypoint']],
+                ['coordinate' => $validated['coordinate']]
+            );
+        }
+
+        return response()->json(['success' => true, 'data' => $orgKeypoint], 201);
     }
 }

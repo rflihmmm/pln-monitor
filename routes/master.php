@@ -6,6 +6,7 @@ use App\Http\Controllers\Master\UserController;
 use App\Http\Controllers\Master\FeederController;
 use App\Http\Controllers\Master\MapsDataController;
 use App\Http\Controllers\Master\GarduIndukController;
+use App\Http\Controllers\Master\KeypointExtController;
 use App\Http\Controllers\Master\OrganizationGridController;
 
 Route::middleware('auth')->group(function () {
@@ -25,8 +26,18 @@ Route::middleware('auth')->group(function () {
             'except' => ['show']
         ]);
 
+        Route::apiResource('keypoint-ext', KeypointExtController::class, [
+            'except' => ['show']
+        ]);
+
         Route::get('feeder/keypoint-data', [FeederController::class, 'getKeypoints'])->name('feeder.keypoint-data');
         Route::get('feeder/statuspoint-data', [FeederController::class, 'getStatusPoints'])->name('feeder.statuspoint-data');
+
         Route::get('organization-grid', [OrganizationGridController::class, 'index']);
+        Route::post('organization-grid/post', [OrganizationGridController::class, 'store']);
+
+        Route::get('organization-grid/dcc', [OrganizationGridController::class, 'getDccData']);
+        Route::get('organization-grid/up3', [OrganizationGridController::class, 'getUp3Data']);
+        Route::get('organization-grid/ulp', [OrganizationGridController::class, 'getUlpData']);
     });
 });
