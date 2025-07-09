@@ -159,12 +159,16 @@ class OrganizationGridController extends Controller
                 ];
             }
 
-            return response()->json($result);
+            return inertia('master/mapping', [
+                'datas' => $result,
+                'success' => session('success')
+            ]);
         } catch (\Exception $e) {
-            return response()->json([
+            return inertia('master/mapping', [
+                'datas' => [],
                 'error' => 'Failed to fetch data',
                 'message' => $e->getMessage()
-            ], 500);
+            ]);
         }
     }
 
@@ -216,104 +220,114 @@ class OrganizationGridController extends Controller
         }
     }
 
-    /**
-     * Alternative method using Eloquent relationships (updated)
-     */
-    public function indexWithEloquent(Request $request)
+    public function store(Request $request)
     {
-        try {
-            // Get all keypoints with their relationships
-            $organizationKeypoints = OrganizationKeypoint::with([
-                'organization' => function ($query) {
-                    $query->with(['parent.parent']);
-                }
-            ])->get();
+        $validated = $request->validate([
+            'dcc' => 'nullable|string',
+            'up3' => 'nullable|string',
+            'ulp' => 'nullable|string',
+            'gardu_induk' => 'nullable|string',
+            'feeder' => 'nullable|string',
+            'keypoint' => 'required|integer',
+            'coordinate' => 'nullable|string',
+        ]);
 
-            // Group by keypoint_id to handle multiple organizations per keypoint
-            $groupedKeypoints = $organizationKeypoints->groupBy('keypoint_id');
+        // 1. DCC (level 1)
+        $dcc = Organization::firstOrCreate([
+            'name' => $validated['dcc'],
+            'level' => 1,
+        ]);
 
-            $result = [];
-            $id = 0;
+        // 2. UP3 (level 2, parent DCC)
+        $up3 = Organization::firstOrCreate([
+            'name' => $validated['up3'],
+            'level' => 2,
+            'parent_id' => $dcc->id,
+        ]);
 
-            foreach ($groupedKeypoints as $keypointId => $orgKeypoints) {
-                // Get keypoint name from STATIONPOINTS
-                $stationPoint = StationPointSkada::where('PKEY', $keypointId)->first();
+        // 3. ULP (level 3, parent UP3)
+        $ulp = Organization::firstOrCreate([
+            'name' => $validated['ulp'],
+            'level' => 3,
+            'parent_id' => $up3->id,
+        ]);
 
-                // Get feeder information
-                $feederKeypoint = FeederKeypoint::where('keypoint_id', $keypointId)->first();
-                $feeder = null;
-                $garduInduk = null;
+        // 4. Simpan ke organization_keypoint untuk DCC, UP3, dan ULP
+        OrganizationKeypoint::firstOrCreate([
+            'organization_id' => $dcc->id,
+            'keypoint_id' => $validated['keypoint'],
+        ]);
+        OrganizationKeypoint::firstOrCreate([
+            'organization_id' => $up3->id,
+            'keypoint_id' => $validated['keypoint'],
+        ]);
+        OrganizationKeypoint::firstOrCreate([
+            'organization_id' => $ulp->id,
+            'keypoint_id' => $validated['keypoint'],
+        ]);
 
-                if ($feederKeypoint) {
-                    $feeder = Feeder::find($feederKeypoint->feeder_id);
-                    if ($feeder) {
-                        $garduInduk = GarduInduk::find($feeder->gardu_induk_id);
-                    }
-                }
-
-                // Get coordinate from keypoint_ext
-                $coordinate = DB::table('keypoint_ext')
-                    ->where('keypoint_id', $keypointId)
-                    ->value('coordinate') ?? '';
-
-                // Initialize organization levels
-                $dcc = '';
-                $up3 = '';
-                $ulp = '';
-
-                // Process all organizations for this keypoint to build complete hierarchy
-                foreach ($orgKeypoints as $orgKeypoint) {
-                    $organization = $orgKeypoint->organization;
-                    $this->processOrganizationHierarchyEloquent($organization, $dcc, $up3, $ulp);
-                }
-
-                $result[] = [
-                    'id' => $id++,
-                    'dcc' => $dcc,
-                    'up3' => $up3,
-                    'ulp' => $ulp,
-                    'gardu_induk' => $garduInduk ? $garduInduk->name : '',
-                    'feeder' => $feeder ? $feeder->name : '',
-                    'keypoint' => $stationPoint ? $stationPoint->NAME : '',
-                    'coordinate' => $coordinate
-                ];
-            }
-
-            return response()->json($result);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'Failed to fetch data',
-                'message' => $e->getMessage()
-            ], 500);
+        // 5. (Opsional) Simpan coordinate ke keypoint_ext jika ada
+        if (!empty($validated['coordinate'])) {
+            DB::table('keypoint_ext')->updateOrInsert(
+                ['keypoint_id' => $validated['keypoint']],
+                ['coordinate' => $validated['coordinate']]
+            );
         }
+
+        return redirect()->back()->with('success', 'Data berhasil disimpan');
     }
 
-    /**
-     * Process organization hierarchy using Eloquent models
-     */
-    private function processOrganizationHierarchyEloquent($organization, &$dcc, &$up3, &$ulp)
+    public function update(Request $request, $id)
     {
-        if (!$organization) {
-            return;
+        $validated = $request->validate([
+            'dcc' => 'nullable|string',
+            'up3' => 'nullable|string',
+            'ulp' => 'nullable|string',
+            'gardu_induk' => 'nullable|string',
+            'feeder' => 'nullable|string',
+            'keypoint' => 'required|integer',
+            'coordinate' => 'nullable|string',
+        ]);
+
+        // Temukan organization_keypoint berdasarkan id
+        $orgKeypoint = OrganizationKeypoint::findOrFail($id);
+
+        // Update relasi organisasi jika ada perubahan
+        $dcc = Organization::firstOrCreate([
+            'name' => $validated['dcc'],
+            'level' => 1,
+        ]);
+        $up3 = Organization::firstOrCreate([
+            'name' => $validated['up3'],
+            'level' => 2,
+            'parent_id' => $dcc->id,
+        ]);
+        $ulp = Organization::firstOrCreate([
+            'name' => $validated['ulp'],
+            'level' => 3,
+            'parent_id' => $up3->id,
+        ]);
+
+        $orgKeypoint->organization_id = $ulp->id;
+        $orgKeypoint->keypoint_id = $validated['keypoint'];
+        $orgKeypoint->save();
+
+        // Update coordinate jika ada
+        if (!empty($validated['coordinate'])) {
+            DB::table('keypoint_ext')->updateOrInsert(
+                ['keypoint_id' => $validated['keypoint']],
+                ['coordinate' => $validated['coordinate']]
+            );
         }
 
-        // Set current level
-        switch ($organization->level) {
-            case 1:
-                if (empty($dcc)) $dcc = $organization->name;
-                break;
-            case 2:
-                if (empty($up3)) $up3 = $organization->name;
-                break;
-            case 3:
-                if (empty($ulp)) $ulp = $organization->name;
-                break;
-        }
+        return redirect()->back()->with('success', 'Data berhasil diupdate');
+    }
 
-        // Process parent hierarchy
-        if ($organization->parent) {
-            $this->processOrganizationHierarchyEloquent($organization->parent, $dcc, $up3, $ulp);
-        }
+    public function destroy($id)
+    {
+        $orgKeypoint = OrganizationKeypoint::findOrFail($id);
+        $orgKeypoint->delete();
+        return redirect()->back()->with('success', 'Data berhasil dihapus');
     }
 
     public function getDccData(Request $request)
@@ -366,52 +380,108 @@ class OrganizationGridController extends Controller
         }
     }
 
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'dcc' => 'nullable|string',
-            'up3' => 'nullable|string',
-            'ulp' => 'nullable|string',
-            'gardu_induk' => 'nullable|string',
-            'feeder' => 'nullable|string',
-            'keypoint' => 'required|string',
-            'coordinate' => 'nullable|string',
-        ]);
 
-        // 1. DCC (level 1)
-        $dcc = Organization::firstOrCreate([
-            'name' => $validated['dcc'],
-            'level' => 1,
-        ]);
+    // /**
+    //  * Alternative method using Eloquent relationships (updated)
+    //  */
+    // public function indexWithEloquent(Request $request)
+    // {
+    //     try {
+    //         // Get all keypoints with their relationships
+    //         $organizationKeypoints = OrganizationKeypoint::with([
+    //             'organization' => function ($query) {
+    //                 $query->with(['parent.parent']);
+    //             }
+    //         ])->get();
 
-        // 2. UP3 (level 2, parent DCC)
-        $up3 = Organization::firstOrCreate([
-            'name' => $validated['up3'],
-            'level' => 2,
-            'parent_id' => $dcc->id,
-        ]);
+    //         // Group by keypoint_id to handle multiple organizations per keypoint
+    //         $groupedKeypoints = $organizationKeypoints->groupBy('keypoint_id');
 
-        // 3. ULP (level 3, parent UP3)
-        $ulp = Organization::firstOrCreate([
-            'name' => $validated['ulp'],
-            'level' => 3,
-            'parent_id' => $up3->id,
-        ]);
+    //         $result = [];
+    //         $id = 0;
 
-        // 4. Simpan ke organization_keypoint
-        $orgKeypoint = OrganizationKeypoint::firstOrCreate([
-            'organization_id' => $ulp->id,
-            'keypoint_id' => $validated['keypoint'],
-        ]);
+    //         foreach ($groupedKeypoints as $keypointId => $orgKeypoints) {
+    //             // Get keypoint name from STATIONPOINTS
+    //             $stationPoint = StationPointSkada::where('PKEY', $keypointId)->first();
 
-        // 5. (Opsional) Simpan coordinate ke keypoint_ext jika ada
-        if (!empty($validated['coordinate'])) {
-            DB::table('keypoint_ext')->updateOrInsert(
-                ['keypoint_id' => $validated['keypoint']],
-                ['coordinate' => $validated['coordinate']]
-            );
-        }
+    //             // Get feeder information
+    //             $feederKeypoint = FeederKeypoint::where('keypoint_id', $keypointId)->first();
+    //             $feeder = null;
+    //             $garduInduk = null;
 
-        return response()->json(['success' => true, 'data' => $orgKeypoint], 201);
-    }
+    //             if ($feederKeypoint) {
+    //                 $feeder = Feeder::find($feederKeypoint->feeder_id);
+    //                 if ($feeder) {
+    //                     $garduInduk = GarduInduk::find($feeder->gardu_induk_id);
+    //                 }
+    //             }
+
+    //             // Get coordinate from keypoint_ext
+    //             $coordinate = DB::table('keypoint_ext')
+    //                 ->where('keypoint_id', $keypointId)
+    //                 ->value('coordinate') ?? '';
+
+    //             // Initialize organization levels
+    //             $dcc = '';
+    //             $up3 = '';
+    //             $ulp = '';
+
+    //             // Process all organizations for this keypoint to build complete hierarchy
+    //             foreach ($orgKeypoints as $orgKeypoint) {
+    //                 $organization = $orgKeypoint->organization;
+    //                 $this->processOrganizationHierarchyEloquent($organization, $dcc, $up3, $ulp);
+    //             }
+
+    //             $result[] = [
+    //                 'id' => $id++,
+    //                 'dcc' => $dcc,
+    //                 'up3' => $up3,
+    //                 'ulp' => $ulp,
+    //                 'gardu_induk' => $garduInduk ? $garduInduk->name : '',
+    //                 'feeder' => $feeder ? $feeder->name : '',
+    //                 'keypoint' => $stationPoint ? $stationPoint->NAME : '',
+    //                 'coordinate' => $coordinate
+    //             ];
+    //         }
+
+    //         return response()->json($result);
+    //     } catch (\Exception $e) {
+    //         return response()->json([
+    //             'error' => 'Failed to fetch data',
+    //             'message' => $e->getMessage()
+    //         ], 500);
+    //     }
+    // }
+
+    // /**
+    //  * Process organization hierarchy using Eloquent models
+    //  */
+    // private function processOrganizationHierarchyEloquent($organization, &$dcc, &$up3, &$ulp)
+    // {
+    //     if (!$organization) {
+    //         return;
+    //     }
+
+    //     // Set current level
+    //     switch ($organization->level) {
+    //         case 1:
+    //             if (empty($dcc)) $dcc = $organization->name;
+    //             break;
+    //         case 2:
+    //             if (empty($up3)) $up3 = $organization->name;
+    //             break;
+    //         case 3:
+    //             if (empty($ulp)) $ulp = $organization->name;
+    //             break;
+    //     }
+
+    //     // Process parent hierarchy
+    //     if ($organization->parent) {
+    //         $this->processOrganizationHierarchyEloquent($organization->parent, $dcc, $up3, $ulp);
+    //     }
+    // }
+
+
+
+
 }

@@ -1,13 +1,13 @@
 import { Head } from '@inertiajs/react';
 
-import { type BreadcrumbItem, MapsData, Keypoint } from '@/types';
-import Organization from '@/components/master/organization';
-import TableMaps from '@/components/master/table-maps';
+import { type BreadcrumbItem, Mapping, Keypoint } from '@/types';
+import TableMapping from '@/components/master/table-mapping';
 import AppLayout from '@/layouts/app-layout';
 
-interface MapsPageProps {
-  mapsDataList: MapsData[];
+interface TableMappingProps {
+  mappingList: Mapping[];
   keypointsList: Keypoint[];
+  datas: any[];
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -17,7 +17,11 @@ const breadcrumbs: BreadcrumbItem[] = [
   },
 ];
 
-export default function MapsPage() {
+export default function MapsPage({
+  mappingList,
+  keypointsList,
+  datas
+}: TableMappingProps) {
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
       <Head title="Maps" />
@@ -26,7 +30,7 @@ export default function MapsPage() {
           <h1 className="text-2xl font-bold">Maps Management Dashboard</h1>
           <h3>Add, remove, or edit Maps Data</h3>
         </div>
-        <Organization />
+        <TableMapping datas={datas} keypointsList={keypointsList} mappingList={mappingList} />
       </div>
     </AppLayout>
   );

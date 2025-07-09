@@ -97,3 +97,14 @@ export interface MapsData {
     dcc?: string;
     lokasi?: string;
 }
+
+export interface Mapping {
+    id?: number;
+    keypoint: string;
+    dcc?: string | null;
+    up3?: string | null;
+    ulp?: string | null;
+    coordinate?: string | null;
+    created_at?: string;
+    updated_at?: string;
+}

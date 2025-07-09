@@ -56,8 +56,8 @@ const mainNavItems: ExtendedNavItem[] = [
                 icon: User,
             },
             {
-                title: 'Maps',
-                href: '/master/maps',
+                title: 'Mapping',
+                href: '/master/mapping',
                 icon: Map,
             },
             {

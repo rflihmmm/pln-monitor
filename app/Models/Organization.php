@@ -10,6 +10,8 @@ class Organization extends Model
 {
     protected $table = 'organization';
 
+    public $timestamps = false;
+
     protected $fillable = [
         'name',
         'level',
