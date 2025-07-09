@@ -133,7 +133,6 @@ export default function AlarmLog() {
 
         const intervalId = setInterval(() => {
             fetchAlarms();
-            console.log('Fallback polling...');
         }, 10000);
 
         return () => clearInterval(intervalId);
