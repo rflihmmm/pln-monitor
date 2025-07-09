@@ -77,8 +77,6 @@ export default function AlarmLog() {
                     },
                     (payload) => {
                         if (!isMounted) return;
-                        console.log('Change received:', payload.eventType, payload.new);
-
                         if (payload.eventType === 'INSERT') {
                             const newAlarm = payload.new as AlarmEntry;
                             setAlarms(prev => {
@@ -106,13 +104,11 @@ export default function AlarmLog() {
                 .subscribe((status, err) => {
                     // PERBAIKAN 5: Tangani status subscribe
                     if (status === 'CHANNEL_ERROR') {
-                        console.error('Realtime subscription error:', err);
                         setRealtimeError(true);
                         setError('Realtime connection failed. Data may not update automatically.');
                     }
                 });
         } catch (err) {
-            console.error('Realtime setup error:', err);
             setRealtimeError(true);
             setError('Failed to setup realtime updates');
         }
@@ -166,12 +162,12 @@ export default function AlarmLog() {
     };
 
     // Tampilkan pesan error khusus jika realtime gagal
-    const renderRealtimeError = () => (
-        <div className="mb-2 p-2 bg-yellow-100 text-yellow-800 text-xs rounded">
-            <AlertTriangle className="inline mr-1 h-4 w-4" />
-            Realtime updates disabled. Using fallback polling.
-        </div>
-    );
+    // const renderRealtimeError = () => (
+    //     <div className="mb-2 p-2 bg-yellow-100 text-yellow-800 text-xs rounded">
+    //         <AlertTriangle className="inline mr-1 h-4 w-4" />
+    //         Realtime updates disabled. Using fallback polling.
+    //     </div>
+    // );
 
     if (loading) {
         return (
@@ -201,12 +197,11 @@ export default function AlarmLog() {
                     <Bell className="h-4 w-4" />
                     Alarm Log
                 </CardTitle>
-                <Badge variant={realtimeError ? "destructive" : "outline"} className="font-normal">
-                    {realtimeError ? "Polling" : "Live"} ({alarms.length})
+                <Badge variant="outline" className="font-normal">
+                    {"Live"} ({alarms.length})
                 </Badge>
             </CardHeader>
             <CardContent>
-                {realtimeError && renderRealtimeError()}
                 <ScrollArea className="h-[70vh] pr-4">
                     {alarms.length === 0 ? (
                         <div className="flex items-center justify-center h-full">
