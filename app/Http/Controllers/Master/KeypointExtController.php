@@ -15,29 +15,40 @@ class KeypointExtController extends Controller
         // 1. Ambil semua data dari tabel keypoint_ext
         $keypointExtData = KeypointExt::all();
 
-        // 2. Ekstrak semua keypoint_id untuk kueri berikutnya
+        // 2. Ekstrak semua keypoint_id dan parent_stationpoints untuk kueri berikutnya
         $keypointIds = $keypointExtData->pluck('keypoint_id')->filter()->unique()->toArray();
+        $parentIds = $keypointExtData->pluck('parent_stationpoints')->filter()->unique()->toArray();
 
-        // 3. Adopsi fungsi Anda: Query STATIONPOINTS dari MSSQL
+        // 3. Query STATIONPOINTS dari MSSQL untuk keypoint_id
         $stationPoints = [];
         if (!empty($keypointIds)) {
             $stationPointsData = DB::connection('sqlsrv_main')
-                ->table('dbo.STATIONPOINTS') // Disarankan menggunakan schema 'dbo.'
+                ->table('dbo.STATIONPOINTS')
                 ->whereIn('PKEY', $keypointIds)
                 ->select('PKEY', 'NAME')
                 ->get();
-
-            // Ubah menjadi array asosiatif untuk pencarian yang lebih mudah
             foreach ($stationPointsData as $sp) {
                 $stationPoints[$sp->PKEY] = $sp->NAME;
             }
         }
 
-        // 4. Gabungkan data nama ke dalam koleksi keypointExtData
-        $data = $keypointExtData->map(function ($item) use ($stationPoints) {
-            // Tambahkan properti 'name' ke setiap objek keypoint
-            // Gunakan null coalescing (??) untuk menangani ID yang tidak ditemukan
+        // 4. Query STATIONPOINTS dari MSSQL untuk parent_stationpoints
+        $parentNames = [];
+        if (!empty($parentIds)) {
+            $parentPointsData = DB::connection('sqlsrv_main')
+                ->table('dbo.STATIONPOINTS')
+                ->whereIn('PKEY', $parentIds)
+                ->select('PKEY', 'NAME')
+                ->get();
+            foreach ($parentPointsData as $pp) {
+                $parentNames[$pp->PKEY] = $pp->NAME;
+            }
+        }
+
+        // 5. Gabungkan data nama ke dalam koleksi keypointExtData
+        $data = $keypointExtData->map(function ($item) use ($stationPoints, $parentNames) {
             $item->name = $stationPoints[$item->keypoint_id] ?? null;
+            $item->parent_name = $parentNames[$item->parent_stationpoints] ?? null;
             return $item;
         });
 

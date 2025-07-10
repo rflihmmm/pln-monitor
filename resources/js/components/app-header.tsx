@@ -12,7 +12,7 @@ import { useInitials } from '@/hooks/use-initials';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem, type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { Bell, ChevronsUpDown, Database, LayoutGrid, Menu, Spline, Table2, User, UtilityPole, Cable, Map } from 'lucide-react';
+import { Bell, ChevronsUpDown, Database, LayoutGrid, Menu, Spline, Table2, User, UtilityPole, Cable, Map, Group } from 'lucide-react';
 import { useState } from 'react';
 import AppLogo from './app-logo';
 import AppLogoIcon from './app-logo-icon';
@@ -55,6 +55,11 @@ const mainNavItems: ExtendedNavItem[] = [
                 href: '/master/manage-users',
                 icon: User,
             },
+            // {
+            //     title: 'Organization',
+            //     href: '/master/organization',
+            //     icon: Group,
+            // },
             {
                 title: 'Mapping',
                 href: '/master/mapping',
@@ -213,7 +218,7 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                                                                 className={cn(
                                                                     navigationMenuTriggerStyle(),
                                                                     page.url === child.href && activeItemStyles,
-                                                                    'h-9 cursor-pointer px-3',
+                                                                    'h-9 cursor-pointer px-3 w-full flex items-start justify-start',
                                                                 )}
                                                             >
                                                                 {child.icon && <Icon iconNode={child.icon} className="mr-2 h-4 w-4" />}

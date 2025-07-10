@@ -222,56 +222,61 @@ class OrganizationGridController extends Controller
 
     public function store(Request $request)
     {
+        // Validasi diubah untuk menerima array of integers untuk keypoints
         $validated = $request->validate([
             'dcc' => 'nullable|string',
             'up3' => 'nullable|string',
             'ulp' => 'nullable|string',
-            'gardu_induk' => 'nullable|string',
-            'feeder' => 'nullable|string',
-            'keypoint' => 'required|integer',
+            'keypoints' => 'required|array',          // Diubah dari 'keypoint' menjadi 'keypoints' dan tipe 'array'
+            'keypoints.*' => 'required|integer',    // Memvalidasi setiap item dalam array
             'coordinate' => 'nullable|string',
         ]);
 
-        // 1. DCC (level 1)
+        // 1. DCC (level 1) - Logic tidak berubah
         $dcc = Organization::firstOrCreate([
             'name' => $validated['dcc'],
             'level' => 1,
         ]);
 
-        // 2. UP3 (level 2, parent DCC)
+        // 2. UP3 (level 2, parent DCC) - Logic tidak berubah
         $up3 = Organization::firstOrCreate([
             'name' => $validated['up3'],
             'level' => 2,
             'parent_id' => $dcc->id,
         ]);
 
-        // 3. ULP (level 3, parent UP3)
+        // 3. ULP (level 3, parent UP3) - Logic tidak berubah
         $ulp = Organization::firstOrCreate([
             'name' => $validated['ulp'],
             'level' => 3,
             'parent_id' => $up3->id,
         ]);
 
-        // 4. Simpan ke organization_keypoint untuk DCC, UP3, dan ULP
-        OrganizationKeypoint::firstOrCreate([
-            'organization_id' => $dcc->id,
-            'keypoint_id' => $validated['keypoint'],
-        ]);
-        OrganizationKeypoint::firstOrCreate([
-            'organization_id' => $up3->id,
-            'keypoint_id' => $validated['keypoint'],
-        ]);
-        OrganizationKeypoint::firstOrCreate([
-            'organization_id' => $ulp->id,
-            'keypoint_id' => $validated['keypoint'],
-        ]);
+        // 4. Looping untuk menyimpan setiap keypoint yang dipilih
+        foreach ($validated['keypoints'] as $keypointId) {
+            // Simpan relasi untuk DCC
+            OrganizationKeypoint::firstOrCreate([
+                'organization_id' => $dcc->id,
+                'keypoint_id' => $keypointId,
+            ]);
+            // Simpan relasi untuk UP3
+            OrganizationKeypoint::firstOrCreate([
+                'organization_id' => $up3->id,
+                'keypoint_id' => $keypointId,
+            ]);
+            // Simpan relasi untuk ULP
+            OrganizationKeypoint::firstOrCreate([
+                'organization_id' => $ulp->id,
+                'keypoint_id' => $keypointId,
+            ]);
 
-        // 5. (Opsional) Simpan coordinate ke keypoint_ext jika ada
-        if (!empty($validated['coordinate'])) {
-            DB::table('keypoint_ext')->updateOrInsert(
-                ['keypoint_id' => $validated['keypoint']],
-                ['coordinate' => $validated['coordinate']]
-            );
+            // 5. (Opsional) Simpan coordinate untuk setiap keypoint jika ada
+            if (!empty($validated['coordinate'])) {
+                DB::table('keypoint_ext')->updateOrInsert(
+                    ['keypoint_id' => $keypointId],
+                    ['coordinate' => $validated['coordinate']]
+                );
+            }
         }
 
         return redirect()->back()->with('success', 'Data berhasil disimpan');

@@ -14,7 +14,8 @@ import {
     CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Check, ChevronsUpDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type DropdownBase, Keypoint, Mapping } from "@/types";
 
@@ -34,18 +35,26 @@ export default function MappingForm({
     isEdit = false,
 }: MappingFormProps) {
     // State utama untuk form
-    const [mappingData, setMappingData] = useState<Partial<Mapping>>({
-        keypoint: "",
+    const [mappingData, setMappingData] = useState({
+        keypoints: [] as number[],
         dcc: "",
         up3: "",
         ulp: "",
         coordinate: "",
     });
 
+    // State untuk validation
+    const [errors, setErrors] = useState({
+        keypoints: "",
+        dcc: "",
+        up3: "",
+        ulp: "",
+    });
+
     // State combobox Keypoints
     const [keypointsOpen, setKeypointsOpen] = useState(false);
     const [keypointsList, setKeypointsList] = useState<DropdownBase[]>([]);
-    const [selectedKeypointName, setSelectedKeypointName] = useState<string>("");
+    const [selectedKeypoints, setSelectedKeypoints] = useState<DropdownBase[]>([]);
 
     // State combobox DCC
     const [dccOpen, setDccOpen] = useState(false);
@@ -77,31 +86,49 @@ export default function MappingForm({
     // Inisialisasi data form
     useEffect(() => {
         if (mapping && isEdit) {
+            // Handle edit mode - convert single keypoint to array
+            const keypointArray = mapping.keypoint ? [Number(mapping.keypoint)] : [];
+
             setMappingData({
-                keypoint: mapping.keypoint,
+                keypoints: keypointArray,
                 dcc: mapping.dcc || "",
                 up3: mapping.up3 || "",
                 ulp: mapping.ulp || "",
                 coordinate: mapping.coordinate || "",
             });
-            setSelectedKeypointName(mapping.keypoint || "");
+
+            // Initialize selected keypoints for UI
+            if (mapping.keypoint) {
+                const initialSelected = initialKeypointsList.find(kp => kp.id === Number(mapping.keypoint));
+                setSelectedKeypoints(initialSelected ? [initialSelected] : []);
+            }
+
             setSelectedDccName(mapping.dcc || "");
             setSelectedUp3Name(mapping.up3 || "");
             setSelectedUlpName(mapping.ulp || "");
         } else {
+            // Reset form for add mode
             setMappingData({
-                keypoint: "",
+                keypoints: [],
                 dcc: "",
                 up3: "",
                 ulp: "",
                 coordinate: "",
             });
-            setSelectedKeypointName("");
+            setSelectedKeypoints([]);
             setSelectedDccName("");
             setSelectedUp3Name("");
             setSelectedUlpName("");
         }
-    }, [mapping, isEdit]);
+
+        // Clear errors
+        setErrors({
+            keypoints: "",
+            dcc: "",
+            up3: "",
+            ulp: "",
+        });
+    }, [mapping, isEdit, initialKeypointsList]);
 
     // Effect untuk search keypoints dengan debounce
     useEffect(() => {
@@ -139,50 +166,141 @@ export default function MappingForm({
         }
     }, [debouncedUlpSearch]);
 
+    // Validation function
+    const validateForm = () => {
+        const newErrors = {
+            keypoints: "",
+            dcc: "",
+            up3: "",
+            ulp: "",
+        };
+
+        if (mappingData.keypoints.length === 0) {
+            newErrors.keypoints = "Please select at least one keypoint";
+        }
+
+        if (!mappingData.dcc.trim()) {
+            newErrors.dcc = "DCC is required";
+        }
+
+        if (!mappingData.up3.trim()) {
+            newErrors.up3 = "UP3 is required";
+        }
+
+        if (!mappingData.ulp.trim()) {
+            newErrors.ulp = "ULP is required";
+        }
+
+        setErrors(newErrors);
+
+        // Return true if no errors
+        return Object.values(newErrors).every(error => error === "");
+    };
+
     // Helpers untuk set state form
     const handleChange = (field: string, value: string) => {
         setMappingData({ ...mappingData, [field]: value });
+
+        // Clear error when user starts typing
+        if (errors[field as keyof typeof errors]) {
+            setErrors({ ...errors, [field]: "" });
+        }
     };
 
     const handleKeypointSelect = (keypoint: DropdownBase) => {
-        setMappingData({ ...mappingData, keypoint: keypoint.id }); // id harus integer
-        setSelectedKeypointName(keypoint.name);
-        setKeypointsOpen(false);
+        const isSelected = selectedKeypoints.some((kp) => kp.id === keypoint.id);
+
+        if (isSelected) {
+            // Remove from selection
+            setSelectedKeypoints((prev) => prev.filter((kp) => kp.id !== keypoint.id));
+            setMappingData(prev => ({
+                ...prev,
+                keypoints: prev.keypoints.filter(id => id !== keypoint.id),
+            }));
+        } else {
+            // Add to selection
+            setSelectedKeypoints((prev) => [...prev, keypoint]);
+            setMappingData(prev => ({
+                ...prev,
+                keypoints: [...prev.keypoints, keypoint.id],
+            }));
+        }
+
+        // Clear keypoints error
+        if (errors.keypoints) {
+            setErrors({ ...errors, keypoints: "" });
+        }
+    };
+
+    const removeKeypoint = (keypointId: number) => {
+        setSelectedKeypoints((prev) => prev.filter((kp) => kp.id !== keypointId));
+        setMappingData(prev => ({
+            ...prev,
+            keypoints: prev.keypoints.filter(id => id !== keypointId),
+        }));
     };
 
     const handleDccSelect = (dcc: DropdownBase) => {
         setMappingData({ ...mappingData, dcc: dcc.name });
         setSelectedDccName(dcc.name);
         setDccOpen(false);
+
+        // Clear DCC error
+        if (errors.dcc) {
+            setErrors({ ...errors, dcc: "" });
+        }
     };
 
     const handleUp3Select = (up3: DropdownBase) => {
         setMappingData({ ...mappingData, up3: up3.name });
         setSelectedUp3Name(up3.name);
         setUp3Open(false);
+
+        // Clear UP3 error
+        if (errors.up3) {
+            setErrors({ ...errors, up3: "" });
+        }
     };
 
     const handleUlpSelect = (ulp: DropdownBase) => {
         setMappingData({ ...mappingData, ulp: ulp.name });
         setSelectedUlpName(ulp.name);
         setUlpOpen(false);
+
+        // Clear ULP error
+        if (errors.ulp) {
+            setErrors({ ...errors, ulp: "" });
+        }
     };
 
     const handleSubmit = () => {
-        onSubmit(mappingData);
+        // console.log("Form submitted with data:", mappingData);
+
+        // if (!validateForm()) {
+        //     console.log("Form validation failed:", errors);
+        //     return;
+        // }
+
+        // Ensure data structure is correct for submission
+        const submitData = {
+            ...mappingData,
+            // For edit mode, backend might expect single keypoint
+            ...(isEdit && mappingData.keypoints.length > 0 && {
+                keypoint: mappingData.keypoints[0] // Use first keypoint for edit
+            })
+        };
+        onSubmit(submitData);
     };
 
-    // Fetch function untuk keypoints
+    // Fetch functions
     const fetchKeypoints = async (search: string) => {
         try {
             const response = await axios.get(route("master.feeder.keypoint-data"), {
                 params: { filter: search }
             });
-
             if (response.data && Array.isArray(response.data)) {
                 setKeypointsList(response.data);
             } else {
-                console.warn("Unexpected response format:", response.data);
                 setKeypointsList([]);
             }
         } catch (error) {
@@ -191,7 +309,6 @@ export default function MappingForm({
         }
     };
 
-    // Fetch function untuk DCC
     const fetchDcc = async (search: string) => {
         try {
             const response = await axios.get(route("master.mapping.dcc"), {
@@ -210,7 +327,6 @@ export default function MappingForm({
         }
     };
 
-    // Fetch function untuk UP3
     const fetchUp3 = async (search: string) => {
         try {
             const response = await axios.get(route("master.mapping.up3"), {
@@ -229,7 +345,6 @@ export default function MappingForm({
         }
     };
 
-    // Fetch function untuk ULP
     const fetchUlp = async (search: string) => {
         try {
             const response = await axios.get(route("master.mapping.ulp"), {
@@ -248,38 +363,33 @@ export default function MappingForm({
         }
     };
 
-    // Handler function untuk mengupdate search terms
-    const handleOnSearchKeypoint = (search: string) => {
-        setKeypointSearchTerm(search);
-    };
-
-    const handleOnSearchDcc = (search: string) => {
-        setDccSearchTerm(search);
-    };
-
-    const handleOnSearchUp3 = (search: string) => {
-        setUp3SearchTerm(search);
-    };
-
-    const handleOnSearchUlp = (search: string) => {
-        setUlpSearchTerm(search);
-    };
+    // Handler functions untuk search terms
+    const handleOnSearchKeypoint = (search: string) => setKeypointSearchTerm(search);
+    const handleOnSearchDcc = (search: string) => setDccSearchTerm(search);
+    const handleOnSearchUp3 = (search: string) => setUp3SearchTerm(search);
+    const handleOnSearchUlp = (search: string) => setUlpSearchTerm(search);
 
     return (
         <div className="grid gap-4 py-4">
-            {/* Keypoint */}
+            {/* Keypoints - Multi-select */}
             <div className="grid gap-2">
-                <Label htmlFor="keypoint">Keypoint</Label>
+                <Label htmlFor="keypoint">
+                    Keypoints <span className="text-red-500">*</span>
+                </Label>
                 <Popover open={keypointsOpen} onOpenChange={setKeypointsOpen}>
                     <PopoverTrigger asChild>
                         <Button
                             variant="outline"
                             role="combobox"
                             aria-expanded={keypointsOpen}
-                            className="justify-between"
-                            id="keypoint"
+                            className={cn(
+                                "justify-between",
+                                errors.keypoints && "border-red-500"
+                            )}
                         >
-                            {selectedKeypointName || "Select keypoint..."}
+                            {selectedKeypoints.length > 0
+                                ? `${selectedKeypoints.length} keypoint${selectedKeypoints.length > 1 ? "s" : ""} selected`
+                                : "Select keypoints..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                     </PopoverTrigger>
@@ -301,7 +411,7 @@ export default function MappingForm({
                                             <Check
                                                 className={cn(
                                                     "mr-2 h-4 w-4",
-                                                    selectedKeypointName === keypoint.name
+                                                    selectedKeypoints.some((kp) => kp.id === keypoint.id)
                                                         ? "opacity-100"
                                                         : "opacity-0"
                                                 )}
@@ -314,18 +424,44 @@ export default function MappingForm({
                         </Command>
                     </PopoverContent>
                 </Popover>
+                {errors.keypoints && (
+                    <p className="text-sm text-red-500">{errors.keypoints}</p>
+                )}
+
+                {selectedKeypoints.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                        {selectedKeypoints.map((keypoint) => (
+                            <Badge key={keypoint.id} variant="secondary" className="flex items-center gap-1">
+                                {keypoint.name}
+                                <button
+                                    type="button"
+                                    onClick={() => removeKeypoint(keypoint.id)}
+                                    className="rounded-full hover:bg-muted"
+                                >
+                                    <X className="h-3 w-3" />
+                                    <span className="sr-only">Remove {keypoint.name}</span>
+                                </button>
+                            </Badge>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* DCC */}
             <div className="grid gap-2">
-                <Label htmlFor="dcc">DCC</Label>
+                <Label htmlFor="dcc">
+                    DCC <span className="text-red-500">*</span>
+                </Label>
                 <Popover open={dccOpen} onOpenChange={setDccOpen}>
                     <PopoverTrigger asChild>
                         <Button
                             variant="outline"
                             role="combobox"
                             aria-expanded={dccOpen}
-                            className="justify-between"
+                            className={cn(
+                                "justify-between",
+                                errors.dcc && "border-red-500"
+                            )}
                             id="dcc"
                         >
                             {selectedDccName || "Select DCC..."}
@@ -363,18 +499,26 @@ export default function MappingForm({
                         </Command>
                     </PopoverContent>
                 </Popover>
+                {errors.dcc && (
+                    <p className="text-sm text-red-500">{errors.dcc}</p>
+                )}
             </div>
 
             {/* UP3 */}
             <div className="grid gap-2">
-                <Label htmlFor="up3">UP3</Label>
+                <Label htmlFor="up3">
+                    UP3 <span className="text-red-500">*</span>
+                </Label>
                 <Popover open={up3Open} onOpenChange={setUp3Open}>
                     <PopoverTrigger asChild>
                         <Button
                             variant="outline"
                             role="combobox"
                             aria-expanded={up3Open}
-                            className="justify-between"
+                            className={cn(
+                                "justify-between",
+                                errors.up3 && "border-red-500"
+                            )}
                             id="up3"
                         >
                             {selectedUp3Name || "Select UP3..."}
@@ -412,18 +556,26 @@ export default function MappingForm({
                         </Command>
                     </PopoverContent>
                 </Popover>
+                {errors.up3 && (
+                    <p className="text-sm text-red-500">{errors.up3}</p>
+                )}
             </div>
 
             {/* ULP */}
             <div className="grid gap-2">
-                <Label htmlFor="ulp">ULP</Label>
+                <Label htmlFor="ulp">
+                    ULP <span className="text-red-500">*</span>
+                </Label>
                 <Popover open={ulpOpen} onOpenChange={setUlpOpen}>
                     <PopoverTrigger asChild>
                         <Button
                             variant="outline"
                             role="combobox"
                             aria-expanded={ulpOpen}
-                            className="justify-between"
+                            className={cn(
+                                "justify-between",
+                                errors.ulp && "border-red-500"
+                            )}
                             id="ulp"
                         >
                             {selectedUlpName || "Select ULP..."}
@@ -461,6 +613,9 @@ export default function MappingForm({
                         </Command>
                     </PopoverContent>
                 </Popover>
+                {errors.ulp && (
+                    <p className="text-sm text-red-500">{errors.ulp}</p>
+                )}
             </div>
 
             {/* Coordinate */}
@@ -474,12 +629,14 @@ export default function MappingForm({
                 />
             </div>
 
-            {/* Tombol Cancel & Submit */}
+            {/* Submit Buttons */}
             <DialogFooter>
                 <Button variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
-                <Button onClick={handleSubmit}>{isEdit ? "Save Changes" : "Add Mapping"}</Button>
+                <Button onClick={handleSubmit}>
+                    {isEdit ? "Save Changes" : "Add Mapping"}
+                </Button>
             </DialogFooter>
         </div>
     );

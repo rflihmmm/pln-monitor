@@ -1,18 +1,23 @@
 <?php
 
 use Inertia\Inertia;
+use App\Models\Organization;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Master\UserController;
 use App\Http\Controllers\Master\FeederController;
 use App\Http\Controllers\Master\GarduIndukController;
 use App\Http\Controllers\Master\KeypointExtController;
+use App\Http\Controllers\Master\OrganizationController;
 use App\Http\Controllers\Master\OrganizationGridController;
-use App\Models\Organization;
 
 Route::middleware('auth')->group(function () {
     Route::redirect('master', 'master/manage-users');
     Route::prefix('master')->name('master.')->group(function () {
         Route::apiResource('manage-users', UserController::class)->middleware(['role:admin']);
+
+        Route::apiResource('organization', OrganizationController::class, [
+            'except' => ['show']
+        ]);
 
         Route::apiResource('mapping', OrganizationGridController::class, [
             'except' => ['show'],

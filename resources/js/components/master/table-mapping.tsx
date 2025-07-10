@@ -32,19 +32,34 @@ export default function TableMapping({
 
     // Handle adding a new mapping
     const handleAddMapping = (mappingData: any) => {
+        console.log("Submitting mapping data:", mappingData);
+
+        // Pastikan data sesuai dengan yang diharapkan backend
+        const submitData = {
+            keypoints: mappingData.keypoints, // Array keypoints
+            dcc: mappingData.dcc,
+            up3: mappingData.up3,
+            ulp: mappingData.ulp,
+            coordinate: mappingData.coordinate,
+        };
+
+        console.log("Final submit data:", submitData);
+
         router.post(
             route("master.mapping.store"),
+            submitData,
             {
-                keypoint: mappingData.keypoint,
-                dcc: mappingData.dcc,
-                up3: mappingData.up3,
-                ulp: mappingData.ulp,
-                coordinate: mappingData.coordinate,
-            },
-            {
-                onSuccess: () => {
+                onSuccess: (page) => {
+                    console.log("Success:", page);
                     setIsAddMappingOpen(false);
                 },
+                onError: (errors) => {
+                    console.error("Validation errors:", errors);
+                    alert("Error: " + JSON.stringify(errors));
+                },
+                onFinish: () => {
+                    console.log("Request finished");
+                }
             }
         );
     };
@@ -53,20 +68,37 @@ export default function TableMapping({
     const handleEditMapping = (mappingData: any) => {
         if (!editingMapping) return;
 
+        console.log("Editing mapping data:", mappingData);
+
+        // Untuk edit, backend expect single keypoint
+        const submitData = {
+            keypoint: mappingData.keypoints && mappingData.keypoints.length > 0
+                ? mappingData.keypoints[0]
+                : mappingData.keypoint,
+            dcc: mappingData.dcc,
+            up3: mappingData.up3,
+            ulp: mappingData.ulp,
+            coordinate: mappingData.coordinate,
+        };
+
+        console.log("Final edit data:", submitData);
+
         router.put(
             route("master.mapping.update", editingMapping.id),
+            submitData,
             {
-                keypoint: mappingData.keypoint,
-                dcc: mappingData.dcc,
-                up3: mappingData.up3,
-                ulp: mappingData.ulp,
-                coordinate: mappingData.coordinate,
-            },
-            {
-                onSuccess: () => {
+                onSuccess: (page) => {
+                    console.log("Edit success:", page);
                     setIsEditMappingOpen(false);
                     setEditingMapping(null);
                 },
+                onError: (errors) => {
+                    console.error("Edit errors:", errors);
+                    alert("Error: " + JSON.stringify(errors));
+                },
+                onFinish: () => {
+                    console.log("Edit request finished");
+                }
             }
         );
     };
@@ -83,6 +115,7 @@ export default function TableMapping({
             router.delete(route("master.mapping.destroy", mappingId));
         }
     };
+
     const config = {
         columns: [{
             title: "Keypoint",
@@ -100,25 +133,35 @@ export default function TableMapping({
             title: "ULP",
             width: "100px",
             field: "ulp",
-            //editor: ulpDropdownEditor
         }, {
             title: "UP3",
             width: "100px",
             field: "up3",
-            //editor: up3DropdownEditor
         }, {
             title: "DCC",
             width: "100px",
             field: "dcc",
-            //editor: dccDropdownEditor
         }, {
             title: "Coordinate",
             width: "100px",
             field: "coordinate"
         }, {
-            command: "destroy",
-            title: "&nbsp;",
-            width: "80px"
+            title: "Actions",
+            width: "100px",
+            template: (dataItem: any) => {
+                return `
+                    <div class="flex gap-2">
+                        <button class="edit-btn text-blue-600 hover:text-blue-800" data-id="${dataItem.id}"
+                        id="edit-btn-${dataItem.id}">
+                            Edit
+                        </button>
+                        <button class="delete-btn text-red-600 hover:text-red-800" data-id="${dataItem.id}"
+                        id="delete-btn-${dataItem.id}">
+                            Delete
+                        </button>
+                    </div>
+                `;
+            }
         }],
         dataSource: {
             data: datas,
@@ -127,66 +170,17 @@ export default function TableMapping({
             sortable: true,
             filterable: true,
             resizable: true,
-            //editable: "popup",
             scrollable: true,
-            total: 0,
+            total: datas.length,
             group: [{
                 field: "dcc"
             }, {
                 field: "up3"
             }, {
                 field: "ulp"
-            }
-            ],
-            //batch: true,
+            }],
         },
-        //editable: true,
-        //toolbar: ["create", "save", "cancel"],
     }
-
-    // function dccDropdownEditor(container: HTMLElement, options: any) {
-    //     window.kendo.jQuery('<input data-bind="value:' + options.field + '" />')
-    //         .appendTo(container)
-    //         .kendoDropDownList({
-    //             dataTextField: "name",
-    //             dataValueField: "id",
-    //             filter: "contains",
-    //             dataSource: {
-    //                 transport: {
-    //                     read: "organization-grid/dcc"
-    //                 }
-    //             }
-    //         });
-    // }
-    // function up3DropdownEditor(container: HTMLElement, options: any) {
-    //     window.kendo.jQuery('<input data-bind="value:' + options.field + '" />')
-    //         .appendTo(container)
-    //         .kendoDropDownList({
-    //             dataTextField: "name",
-    //             dataValueField: "id",
-    //             filter: "contains",
-    //             dataSource: {
-    //                 transport: {
-    //                     read: "organization-grid/up3"
-    //                 }
-    //             }
-    //         });
-    // }
-    // function ulpDropdownEditor(container: HTMLElement, options: any) {
-    //     window.kendo.jQuery('<input data-bind="value:' + options.field + '" />')
-    //         .appendTo(container)
-    //         .kendoDropDownList({
-    //             dataTextField: "name",
-    //             dataValueField: "id",
-    //             filter: "contains",
-    //             dataSource: {
-    //                 transport: {
-    //                     read: "organization-grid/ulp"
-    //                 }
-    //             }
-    //         });
-    // }
-
 
     return (
         <div className="space-y-4">
