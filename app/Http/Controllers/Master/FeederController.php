@@ -10,6 +10,7 @@ use App\Models\FeederKeypoint;
 use App\Models\StatusPointSkada;
 use App\Models\FeederStatusPoint;
 use App\Models\StationPointSkada;
+use App\Models\AnalogPointSkada;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
@@ -26,6 +27,7 @@ class FeederController extends Controller
             return [
                 'id' => $feeder->id,
                 'name' => $feeder->name,
+                'keyword_analogs' => $feeder->keyword_analogs,
                 'description' => $feeder->description,
                 'gardu_induk_id' => $feeder->gardu_induk_id,
                 'created_at' => $feeder->created_at,
@@ -95,10 +97,15 @@ class FeederController extends Controller
                 return response()->json([]);
             }
 
-            // Menggunakan eager loading dengan relationship
+            // Query dengan filter pada kolom NAME sendiri dan relasi stationPoint
             $statuspoints = StatusPointSkada::select("PKEY", "NAME", "STATIONPID")
                 ->with(['stationPoint:PKEY,NAME'])
-                ->where('NAME', 'LIKE', '%' . $filter . '%')
+                ->where(function ($query) use ($filter) {
+                    $query->where('NAME', 'LIKE', '%' . $filter . '%')
+                        ->orWhereHas('stationPoint', function ($q) use ($filter) {
+                            $q->where('NAME', 'LIKE', '%' . $filter . '%');
+                        });
+                })
                 ->get()
                 ->map(function ($item) {
                     return [
@@ -117,11 +124,47 @@ class FeederController extends Controller
         }
     }
 
+    public function getAnalogPoints(Request $request)
+    {
+        $filter = $request->query('filter', null);
+        try {
+            if (!$filter || strlen($filter) < 3) {
+                return response()->json([]);
+            }
+
+            // Query dengan filter pada kolom NAME sendiri dan relasi stationPoint
+            $analogpoints = AnalogPointSkada::select("PKEY", "NAME", "STATIONPID")
+                ->with(['stationPoint:PKEY,NAME'])
+                ->where(function ($query) use ($filter) {
+                    $query->where('NAME', 'LIKE', '%' . $filter . '%')
+                        ->orWhereHas('stationPoint', function ($q) use ($filter) {
+                            $q->where('NAME', 'LIKE', '%' . $filter . '%');
+                        });
+                })
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'id' => $item->PKEY,
+                        'name' => $item->NAME,
+                        'stationname' => $item->stationPoint ? $item->stationPoint->NAME : null
+                    ];
+                });
+
+            return response()->json($analogpoints);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => 'Error fetching analog points',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
     public function store(Request $request)
     {
         // Validasi untuk format data baru
         $request->validate([
             'name' => 'required|string|max:255',
+            'keyword_analogs' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'gardu_induk_id' => 'required|exists:gardu_induks,id',
             'keypoints' => 'array',
@@ -138,6 +181,7 @@ class FeederController extends Controller
             // Buat Feeder baru
             $feeder = Feeder::create([
                 'name' => $request->name,
+                'keyword_analogs' => $request->keyword_analogs,
                 'description' => $request->description,
                 'gardu_induk_id' => $request->gardu_induk_id,
             ]);
@@ -179,6 +223,7 @@ class FeederController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
+            'keyword_analogs' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'gardu_induk_id' => 'required|exists:gardu_induks,id',
             'keypoints' => 'array',
@@ -194,6 +239,7 @@ class FeederController extends Controller
             // Update feeder basic info
             $feeder->update([
                 'name' => $request->name,
+                'keyword_analogs' => $request->keyword_analogs,
                 'description' => $request->description,
                 'gardu_induk_id' => $request->gardu_induk_id,
             ]);

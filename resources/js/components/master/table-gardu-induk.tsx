@@ -1,4 +1,4 @@
-import { router} from "@inertiajs/react"
+import { router } from "@inertiajs/react"
 import { Edit, MoreHorizontal, Plus, Search, Trash } from "lucide-react"
 import { useState } from "react"
 
@@ -19,6 +19,8 @@ import GarduIndukDialog from "@/components/master/gardu-induk-dialog"
 interface GarduInduk {
   id: number
   name: string
+  keypoint_id?: number | null
+  keypoint_name?: string | null
   description: string | null
   created_at: string
 }
@@ -57,6 +59,7 @@ export default function TableGarduInduk({ garduIndukList: initialGarduInduk }: T
       route("master.gardu-induk.store"),
       {
         name: garduData.name,
+        keypoint_id: garduData.keypoint_id,
         description: garduData.description,
       },
       {
@@ -75,6 +78,7 @@ export default function TableGarduInduk({ garduIndukList: initialGarduInduk }: T
       route("master.gardu-induk.update", editingGardu.id),
       {
         name: garduData.name,
+        keypoint_id: garduData.keypoint_id,
         description: garduData.description,
       },
       {
@@ -125,6 +129,7 @@ export default function TableGarduInduk({ garduIndukList: initialGarduInduk }: T
               <TableRow>
                 <TableHead>ID</TableHead>
                 <TableHead>Name</TableHead>
+                <TableHead>Keypoint</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Created At</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -144,6 +149,7 @@ export default function TableGarduInduk({ garduIndukList: initialGarduInduk }: T
                     <TableCell>
                       <div className="font-medium">{gardu.name}</div>
                     </TableCell>
+                    <TableCell>{gardu.keypoint_name ?? "-"}</TableCell>
                     <TableCell>{gardu.description || "-"}</TableCell>
                     <TableCell>{formatDate(gardu.created_at)}</TableCell>
                     <TableCell className="text-right">

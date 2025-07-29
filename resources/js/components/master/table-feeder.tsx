@@ -84,7 +84,7 @@ export default function TableFeeder({
     if (!feederKeypoints || feederKeypoints.length === 0) {
       return [];
     }
-    
+
     return feederKeypoints.map(kp => kp.name || "Unknown");
   };
 
@@ -111,6 +111,7 @@ export default function TableFeeder({
       {
         name: feederData.name,
         description: feederData.description,
+        keyword_analogs: feederData.keyword_analogs, // New field for keyword analogs
         gardu_induk_id: feederData.gardu_induk_id,
         keypoints: feederData.keypoints, // Array objek {keypoint_id, name}
         status_points: feederData.status_points, // Array objek {type, status_id, name}
@@ -132,6 +133,7 @@ export default function TableFeeder({
       {
         name: feederData.name,
         description: feederData.description,
+        keyword_analogs: feederData.keyword_analogs, // New field for keyword analogs
         gardu_induk_id: feederData.gardu_induk_id,
         keypoints: feederData.keypoints,
         status_points: feederData.status_points,
@@ -203,6 +205,7 @@ export default function TableFeeder({
                 <TableHead>ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Description</TableHead>
+                <TableHead>Keyword</TableHead>
                 <TableHead>Substation</TableHead>
                 <TableHead>Keypoints</TableHead>
                 <TableHead>Status Points</TableHead>
@@ -225,6 +228,7 @@ export default function TableFeeder({
                       <div className="font-medium">{feeder.name}</div>
                     </TableCell>
                     <TableCell>{feeder.description || "-"}</TableCell>
+                    <TableCell>{feeder.keyword_analogs || "-"}</TableCell>
                     <TableCell>{getGarduName(feeder.gardu_induk_id)}</TableCell>
                     <TableCell>
                       {feeder.keypoints && feeder.keypoints.length > 0 ? (

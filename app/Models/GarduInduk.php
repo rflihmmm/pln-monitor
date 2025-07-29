@@ -8,6 +8,7 @@ class GarduInduk extends Model
 {
     protected $fillable = [
         'name',
+        'keypoint_id',
         'description',
     ];
 

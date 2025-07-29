@@ -20,7 +20,7 @@ class TableHmiController extends Controller
         $data = Cache::remember('hmi_data', 30, function () {
             return $this->getHmiData();
         });
-        
+
         return response()->json($data);
     }
 
@@ -47,14 +47,23 @@ class TableHmiController extends Controller
         $statusIds = $feedersData->pluck('status_id')->filter()->unique()->values();
         $keypointIds = $feedersData->pluck('keypoint_id')->filter()->unique()->values();
 
-        // 3. Ambil semua data SKADA dalam 3 query paralel menggunakan chunks untuk data besar
+        // 3. Ambil semua data SKADA dalam query paralel
         $statusPointSkadaData = [];
+        $analogPointSkadaData = [];
         $statusKeypointData = [];
         $analogKeypointData = [];
 
-        // Parallel execution untuk query besar
+        // Query untuk StatusPointSkada (hanya untuk PMT)
         if ($statusIds->isNotEmpty()) {
             $statusPointSkadaData = StatusPointSkada::select(['PKEY', 'TAGLEVEL', 'VALUE'])
+                ->whereIn('PKEY', $statusIds->toArray())
+                ->get()
+                ->keyBy('PKEY');
+        }
+
+        // Query untuk AnalogPointSkada (untuk AMP dan MW berdasarkan status_id)
+        if ($statusIds->isNotEmpty()) {
+            $analogPointSkadaData = AnalogPointSkada::select(['PKEY', 'VALUE'])
                 ->whereIn('PKEY', $statusIds->toArray())
                 ->get()
                 ->keyBy('PKEY');
@@ -80,22 +89,22 @@ class TableHmiController extends Controller
 
         // 4. Group data by feeder untuk processing yang lebih efisien
         $groupedFeeders = $feedersData->groupBy('feeder_id');
-        
+
         $result = [];
         $id = 1;
 
         foreach ($groupedFeeders as $feederId => $feederData) {
             $feederInfo = $feederData->first();
-            
+
             // Cache nilai PMT1, AMP, MW per feeder
-            $feederStatusValues = $this->getFeederStatusValues($feederData, $statusPointSkadaData);
-            
+            $feederStatusValues = $this->getFeederStatusValues($feederData, $statusPointSkadaData, $analogPointSkadaData);
+
             // Group keypoints untuk feeder ini
             $keypoints = $feederData->where('keypoint_id', '!=', null)->groupBy('keypoint_id');
-            
+
             foreach ($keypoints as $keypointId => $keypointData) {
                 $keypointInfo = $keypointData->first();
-                
+
                 // Optimized data retrieval dengan null coalescing
                 $rowData = [
                     'id' => (string) $id++,
@@ -112,7 +121,7 @@ class TableHmiController extends Controller
 
                 // Tambahkan analog values dengan batch processing
                 $rowData = array_merge($rowData, $this->getAnalogValues($keypointId, $analogKeypointData));
-                
+
                 $result[] = $rowData;
             }
         }
@@ -120,37 +129,44 @@ class TableHmiController extends Controller
         return $result;
     }
 
-    private function getFeederStatusValues($feederData, $statusPointSkadaData)
+    private function getFeederStatusValues($feederData, $statusPointSkadaData, $analogPointSkadaData)
     {
         $values = ['pmt1' => null, 'amp' => null, 'mw' => null];
-        
+
         foreach ($feederData as $data) {
-            if (!$data->status_id || !isset($statusPointSkadaData[$data->status_id])) {
+            if (!$data->status_id) {
                 continue;
             }
-            
-            $skadaData = $statusPointSkadaData[$data->status_id];
-            
+
             switch ($data->status_type) {
                 case 'PMT':
-                    $values['pmt1'] = $skadaData->TAGLEVEL;
+                    // PMT tetap menggunakan StatusPointSkada
+                    if (isset($statusPointSkadaData[$data->status_id])) {
+                        $values['pmt1'] = $statusPointSkadaData[$data->status_id]->TAGLEVEL;
+                    }
                     break;
                 case 'AMP':
-                    $values['amp'] = $skadaData->TAGLEVEL;
+                    // AMP sekarang menggunakan AnalogPointSkada
+                    if (isset($analogPointSkadaData[$data->status_id])) {
+                        $values['amp'] = $analogPointSkadaData[$data->status_id]->VALUE;
+                    }
                     break;
                 case 'MW':
-                    $values['mw'] = $skadaData->VALUE;
+                    // MW sekarang menggunakan AnalogPointSkada
+                    if (isset($analogPointSkadaData[$data->status_id])) {
+                        $values['mw'] = $analogPointSkadaData[$data->status_id]->VALUE;
+                    }
                     break;
             }
         }
-        
+
         return $values;
     }
 
     private function getPmt2Values($keypointId, $statusKeypointData)
     {
         $keypointData = $statusKeypointData->get($keypointId, collect());
-        
+
         return [
             'CB' => $keypointData->get('CB')?->first()?->VALUE,
             'LR' => $keypointData->get('LR')?->first()?->VALUE,
@@ -160,7 +176,7 @@ class TableHmiController extends Controller
     private function getAnalogValues($keypointId, $analogKeypointData)
     {
         $keypointData = $analogKeypointData->get($keypointId, collect());
-        
+
         return [
             'ir' => $keypointData->get('IR')?->first()?->VALUE,
             'is' => $keypointData->get('IS')?->first()?->VALUE,

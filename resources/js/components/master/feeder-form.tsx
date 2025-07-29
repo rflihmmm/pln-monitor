@@ -50,6 +50,7 @@ export default function FeederForm({
   const [feederData, setFeederData] = useState<Partial<Feeder>>({
     name: "",
     description: "",
+    keyword_analogs: "",
     gardu_induk_id: 0,
     keypoints: [],
     status_points: [],
@@ -101,6 +102,7 @@ export default function FeederForm({
       setFeederData({
         name: feeder.name,
         description: feeder.description,
+        keyword_analogs: feeder.keyword_analogs || "",
         gardu_induk_id: feeder.gardu_induk_id,
         keypoints: feeder.keypoints || [],
         status_points: feeder.status_points || [],
@@ -305,7 +307,7 @@ export default function FeederForm({
   const fetchAmpStatus = async (search: string) => {
     setIsAmpLoading(true);
     try {
-      const response = await axios.get(route("master.feeder.statuspoint-data"), {
+      const response = await axios.get(route("master.feeder.analogpoint-data"), {
         params: { filter: search }
       });
 
@@ -326,7 +328,7 @@ export default function FeederForm({
   const fetchMwStatus = async (search: string) => {
     setIsMwLoading(true);
     try {
-      const response = await axios.get(route("master.feeder.statuspoint-data"), {
+      const response = await axios.get(route("master.feeder.analogpoint-data"), {
         params: { filter: search }
       });
 
@@ -362,6 +364,7 @@ export default function FeederForm({
   };
 
   return (
+
     <div className="grid gap-4 py-4">
       {/* Name */}
       <div className="grid gap-2">
@@ -382,6 +385,17 @@ export default function FeederForm({
           value={feederData.description || ""}
           onChange={(e) => handleChange("description", e.target.value)}
           placeholder="Feeder description (optional)"
+        />
+      </div>
+
+      {/* Keyword */}
+      <div className="grid gap-2">
+        <Label htmlFor="keyword_analogs">Keyword</Label>
+        <Input
+          id="keyword_analogs"
+          value={feederData.keyword_analogs || ""}
+          onChange={(e) => handleChange("keyword_analogs", e.target.value)}
+          placeholder="Keyword (optional)"
         />
       </div>
 
@@ -543,23 +557,23 @@ export default function FeederForm({
                   <CommandInput placeholder="Search status..." onValueChange={handleOnSearchStatusPointPmt} />
                   <CommandList>
                     {pmtSearchTerm === "" ? (
-                        <div className="py-5 text-sm text-muted-foreground text-center">
-                          Type to search...
-                        </div>
-                      ) : (
-                    <CommandEmpty>
-                      {isPmtLoading ? (
-                        <div className="flex items-center justify-center p-2">
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Loading...
-                        </div>
-                      ) : (
-                        <div className="p-2 text-muted-foreground text-center">
-                          No status found
-                        </div>
-                      )}
-                    </CommandEmpty>
-                      )}
+                      <div className="py-5 text-sm text-muted-foreground text-center">
+                        Type to search...
+                      </div>
+                    ) : (
+                      <CommandEmpty>
+                        {isPmtLoading ? (
+                          <div className="flex items-center justify-center p-2">
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Loading...
+                          </div>
+                        ) : (
+                          <div className="p-2 text-muted-foreground text-center">
+                            No status found
+                          </div>
+                        )}
+                      </CommandEmpty>
+                    )}
                     <CommandGroup className="max-h-[200px] overflow-y-auto">
                       <CommandItem
                         value="none"
@@ -624,23 +638,23 @@ export default function FeederForm({
                   <CommandInput placeholder="Search status..." onValueChange={handleOnSearchStatusPointAmp} />
                   <CommandList>
                     {ampSearchTerm === "" ? (
-                        <div className="py-5 text-sm text-muted-foreground text-center">
-                          Type to search...
-                        </div>
-                      ) : (
-                    <CommandEmpty>
-                      {isAmpLoading ? (
-                        <div className="flex items-center justify-center p-2">
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Loading...
-                        </div>
-                      ) : (
-                        <div className="p-2 text-muted-foreground text-center">
-                          No status found
-                        </div>
-                      )}
-                    </CommandEmpty>
-                      )}
+                      <div className="py-5 text-sm text-muted-foreground text-center">
+                        Type to search...
+                      </div>
+                    ) : (
+                      <CommandEmpty>
+                        {isAmpLoading ? (
+                          <div className="flex items-center justify-center p-2">
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Loading...
+                          </div>
+                        ) : (
+                          <div className="p-2 text-muted-foreground text-center">
+                            No status found
+                          </div>
+                        )}
+                      </CommandEmpty>
+                    )}
                     <CommandGroup className="max-h-[200px] overflow-y-auto">
                       <CommandItem
                         value="none"
@@ -705,23 +719,23 @@ export default function FeederForm({
                   <CommandInput placeholder="Search status..." onValueChange={handleOnSearchStatusPointMw} />
                   <CommandList>
                     {mwSearchTerm === "" ? (
-                        <div className="py-5 text-sm text-muted-foreground text-center">
-                          Type to search...
-                        </div>
-                      ) : (
-                    <CommandEmpty>
-                      {isMwLoading ? (
-                        <div className="flex items-center justify-center p-2">
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Loading...
-                        </div>
-                      ) : (
-                        <div className="p-2 text-muted-foreground text-center">
-                          No status found
-                        </div>
-                      )}
-                    </CommandEmpty>
-                      )}
+                      <div className="py-5 text-sm text-muted-foreground text-center">
+                        Type to search...
+                      </div>
+                    ) : (
+                      <CommandEmpty>
+                        {isMwLoading ? (
+                          <div className="flex items-center justify-center p-2">
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Loading...
+                          </div>
+                        ) : (
+                          <div className="p-2 text-muted-foreground text-center">
+                            No status found
+                          </div>
+                        )}
+                      </CommandEmpty>
+                    )}
                     <CommandGroup className="max-h-[200px] overflow-y-auto">
                       <CommandItem
                         value="none"

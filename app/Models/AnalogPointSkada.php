@@ -11,4 +11,11 @@ class AnalogPointSkada extends Model
     protected $table = 'ANALOGPOINTS';
 
     protected $guarded = [];
+    /**
+     * Relasi ke StationPointSkada berdasarkan STATIONPID -> PKEY
+     */
+    public function stationPoint()
+    {
+        return $this->belongsTo(StationPointSkada::class, 'STATIONPID', 'PKEY');
+    }
 }

@@ -81,6 +81,7 @@ export interface Feeder {
     id?: number;
     name: string;
     description: string | null;
+    keyword_analogs: string | null;
     gardu_induk_id: number;
     created_at?: string | undefined;
     gardu_induk?: GarduInduk;
@@ -104,6 +105,7 @@ export interface Mapping {
     dcc?: string | null;
     up3?: string | null;
     ulp?: string | null;
+    parent?: string | null;
     coordinate?: string | null;
     created_at?: string;
     updated_at?: string;

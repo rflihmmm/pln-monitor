@@ -155,7 +155,7 @@ class OrganizationGridController extends Controller
                     'feeder' => $feeder,
                     'keypoint' => $keypoint,
                     'coordinate' => $coordinate,
-                    'parent' => $parent
+                    'parent_keypoint' => $parent
                 ];
             }
 

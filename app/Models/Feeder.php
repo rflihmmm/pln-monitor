@@ -9,6 +9,7 @@ class Feeder extends Model
     protected $fillable = [
         'name',
         'description',
+        'keyword_analogs',
         'gardu_induk_id',
     ];
 

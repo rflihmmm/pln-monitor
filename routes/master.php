@@ -27,7 +27,9 @@ Route::middleware('auth')->group(function () {
             return Inertia::render('master/maps');
         })->name('maps');
 
-        Route::apiResource('gardu-induk', GarduIndukController::class);
+        Route::apiResource('gardu-induk', GarduIndukController::class, [
+            'except' => ['show']
+        ]);
         Route::apiResource('feeder', FeederController::class, [
             'except' => ['show']
         ]);
@@ -36,8 +38,11 @@ Route::middleware('auth')->group(function () {
             'except' => ['show']
         ]);
 
+        Route::get('gardu-induk/keypoint-data', [GarduIndukController::class, 'getKeypoints'])->name('gardu-induk.keypoint-data');
+
         Route::get('feeder/keypoint-data', [FeederController::class, 'getKeypoints'])->name('feeder.keypoint-data');
         Route::get('feeder/statuspoint-data', [FeederController::class, 'getStatusPoints'])->name('feeder.statuspoint-data');
+        Route::get('feeder/analogpoint-data', [FeederController::class, 'getAnalogPoints'])->name('feeder.analogpoint-data');
 
         Route::get('mapping/dcc', [OrganizationGridController::class, 'getDccData'])->name('mapping.dcc');
         Route::get('mapping/up3', [OrganizationGridController::class, 'getUp3Data'])->name('mapping.up3');

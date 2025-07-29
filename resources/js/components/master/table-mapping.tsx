@@ -1,4 +1,5 @@
 import KendoGrid from "@/components/ui/kendo-grid";
+import * as ReactDOM from 'react-dom/client';
 import { router } from "@inertiajs/react";
 import { useState } from "react";
 import { Edit, MoreHorizontal, Plus, Search, Trash } from "lucide-react";
@@ -14,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import MappingDialog from "@/components/master/dialog-mapping";
 import { type Keypoint, Mapping } from "@/types";
+import { on } from "events";
 
 interface TableMappingProps {
     mappingList: Mapping[];
@@ -21,49 +23,20 @@ interface TableMappingProps {
     datas: any[];
 }
 
-export default function TableMapping({
-    mappingList: initialMappings,
-    datas,
-    keypointsList,
-}: TableMappingProps) {
-    const [isAddMappingOpen, setIsAddMappingOpen] = useState(false);
-    const [isEditMappingOpen, setIsEditMappingOpen] = useState(false);
+interface ActionDialogProps {
+    dataItem: Mapping | any;
+    keypointsList: Keypoint[];
+    mappingList: Mapping[];
+}
+
+export function ActionDialog({ dataItem, keypointsList, mappingList }: ActionDialogProps) {
     const [editingMapping, setEditingMapping] = useState<Mapping | null>(null);
-
-    // Handle adding a new mapping
-    const handleAddMapping = (mappingData: any) => {
-        console.log("Submitting mapping data:", mappingData);
-
-        // Pastikan data sesuai dengan yang diharapkan backend
-        const submitData = {
-            keypoints: mappingData.keypoints, // Array keypoints
-            dcc: mappingData.dcc,
-            up3: mappingData.up3,
-            ulp: mappingData.ulp,
-            coordinate: mappingData.coordinate,
-        };
-
-        console.log("Final submit data:", submitData);
-
-        router.post(
-            route("master.mapping.store"),
-            submitData,
-            {
-                onSuccess: (page) => {
-                    console.log("Success:", page);
-                    setIsAddMappingOpen(false);
-                },
-                onError: (errors) => {
-                    console.error("Validation errors:", errors);
-                    alert("Error: " + JSON.stringify(errors));
-                },
-                onFinish: () => {
-                    console.log("Request finished");
-                }
-            }
-        );
+    const [isEditMappingOpen, setIsEditMappingOpen] = useState(false);
+    // Open edit dialog for a mapping
+    const openEditDialog = (mapping: Mapping) => {
+        setEditingMapping({ ...mapping });
+        setIsEditMappingOpen(true);
     };
-
     // Handle editing a mapping
     const handleEditMapping = (mappingData: any) => {
         if (!editingMapping) return;
@@ -103,18 +76,93 @@ export default function TableMapping({
         );
     };
 
-    // Open edit dialog for a mapping
-    const openEditDialog = (mapping: Mapping) => {
-        setEditingMapping({ ...mapping });
-        setIsEditMappingOpen(true);
-    };
-
     // Handle deleting a mapping
     const handleDeleteMapping = (mappingId: number) => {
         if (confirm("Are you sure you want to delete this mapping?")) {
             router.delete(route("master.mapping.destroy", mappingId));
         }
     };
+    return (
+        <>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="h-8 w-8 p-0">
+                        <span className="sr-only">Open menu</span>
+                        <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                    <DropdownMenuItem className="cursor-pointer" onClick={() => openEditDialog(dataItem)}>
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit Keypoint
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                        className="text-destructive focus:text-destructive cursor-pointer" onClick={() => handleDeleteMapping(mappingList.find(m => m.id === dataItem.id)?.id || 0)}
+                    >
+                        <Trash className="mr-2 h-4 w-4" />
+                        Delete Keypoint
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Edit Mapping Dialog */}
+            <MappingDialog
+                isOpen={isEditMappingOpen}
+                onOpenChange={setIsEditMappingOpen}
+                onSubmit={handleEditMapping}
+                mapping={editingMapping}
+                keypointsList={keypointsList}
+                isEdit={true}
+            />
+        </>
+    );
+}
+
+export default function TableMapping({
+    mappingList: initialMappings,
+    datas,
+    keypointsList,
+}: TableMappingProps) {
+    const [isAddMappingOpen, setIsAddMappingOpen] = useState(false);
+
+    // Handle adding a new mapping
+    const handleAddMapping = (mappingData: any) => {
+        console.log("Submitting mapping data:", mappingData);
+
+        // Pastikan data sesuai dengan yang diharapkan backend
+        const submitData = {
+            keypoints: mappingData.keypoints, // Array keypoints
+            dcc: mappingData.dcc,
+            up3: mappingData.up3,
+            ulp: mappingData.ulp,
+            coordinate: mappingData.coordinate,
+        };
+
+        console.log("Final submit data:", submitData);
+
+        router.post(
+            route("master.mapping.store"),
+            submitData,
+            {
+                onSuccess: (page) => {
+                    console.log("Success:", page);
+                    setIsAddMappingOpen(false);
+                },
+                onError: (errors) => {
+                    console.error("Validation errors:", errors);
+                    alert("Error: " + JSON.stringify(errors));
+                },
+                onFinish: () => {
+                    console.log("Request finished");
+                }
+            }
+        );
+    };
+
+
+
 
     const config = {
         columns: [{
@@ -142,26 +190,20 @@ export default function TableMapping({
             width: "100px",
             field: "dcc",
         }, {
+            title: "Parent Keypoint",
+            width: "200px",
+            field: "parent_keypoint",
+        }, {
             title: "Coordinate",
             width: "100px",
             field: "coordinate"
         }, {
             title: "Actions",
-            width: "100px",
-            template: (dataItem: any) => {
-                return `
-                    <div class="flex gap-2">
-                        <button class="edit-btn text-blue-600 hover:text-blue-800" data-id="${dataItem.id}"
-                        id="edit-btn-${dataItem.id}">
-                            Edit
-                        </button>
-                        <button class="delete-btn text-red-600 hover:text-red-800" data-id="${dataItem.id}"
-                        id="delete-btn-${dataItem.id}">
-                            Delete
-                        </button>
-                    </div>
-                `;
-            }
+            width: "80px",
+            template: function (dataItem: any) {
+                return `<div id="aksi-dropdown-${dataItem.id}"></div>`;
+            },
+            filterable: false,
         }],
         dataSource: {
             data: datas,
@@ -180,6 +222,34 @@ export default function TableMapping({
                 field: "ulp"
             }],
         },
+        dataBound: function (e: any) {
+            const grid = e.sender;
+            const data = grid.dataSource.view();
+
+            data.forEach((item: any) => {
+                if (item.hasSubgroups) {
+                    item.items.forEach((subItem: any) => {
+                        if (subItem.hasSubgroups) {
+                            subItem.items.forEach((subSubItem: any) => {
+                                const ulps = subSubItem.items;
+
+                                ulps.forEach((ulp: any) => {
+                                    const container = document.getElementById(`aksi-dropdown-${ulp.id}`);
+
+                                    if (container) {
+                                        const root = ReactDOM.createRoot(container);
+                                        root.render(
+                                            <ActionDialog dataItem={ulp} keypointsList={keypointsList} mappingList={initialMappings} />
+                                        );
+                                    }
+                                });
+
+                            })
+                        }
+                    });
+                }
+            });
+        },
     }
 
     return (
@@ -193,9 +263,7 @@ export default function TableMapping({
                     Add Mapping
                 </Button>
             </div>
-            <KendoGrid
-                config={config}
-            />
+            <KendoGrid config={config} />
             {/* Add Mapping Dialog */}
             <MappingDialog
                 isOpen={isAddMappingOpen}
@@ -205,15 +273,7 @@ export default function TableMapping({
                 isEdit={false}
             />
 
-            {/* Edit Mapping Dialog */}
-            <MappingDialog
-                isOpen={isEditMappingOpen}
-                onOpenChange={setIsEditMappingOpen}
-                onSubmit={handleEditMapping}
-                mapping={editingMapping}
-                keypointsList={keypointsList}
-                isEdit={true}
-            />
+
         </div>
     );
 }
