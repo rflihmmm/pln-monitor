@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Peta Jaringan Gardu-REC-LBS Interaktif</title>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map { height: 600px; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    // ICON WARNA
+    const iconGardu = L.icon({
+      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+      shadowUrl: 'https://unpkg.com/leaflet@1.9.3/dist/images/marker-shadow.png',
+      iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+    });
+
+    const iconREC = L.icon({
+      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+      shadowUrl: 'https://unpkg.com/leaflet@1.9.3/dist/images/marker-shadow.png',
+      iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+    });
+
+    const iconLBS = L.icon({
+      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
+      shadowUrl: 'https://unpkg.com/leaflet@1.9.3/dist/images/marker-shadow.png',
+      iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+    });
+
+    // DATA
+    const jaringan = {
+      garduInduk: {
+        nama: "Gardu Induk",
+        lat: -5.141,
+        lng: 119.412,
+        recs: [
+          {
+            nama: "REC 1",
+            lat: -5.143,
+            lng: 119.410,
+            lbs: [
+              { nama: "LBS 1", lat: -5.145, lng: 119.414 },
+              { nama: "LBS 2", lat: -5.146, lng: 119.417 }
+            ]
+          }
+        ]
+      }
+    };
+
+    const map = L.map('map').setView([jaringan.garduInduk.lat, jaringan.garduInduk.lng], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+    const gi = jaringan.garduInduk;
+    const markerGI = L.marker([gi.lat, gi.lng], { icon: iconGardu }).addTo(map).bindPopup(gi.nama);
+
+    gi.recs.forEach((rec) => {
+      const markerREC = L.marker([rec.lat, rec.lng], { icon: iconREC }).addTo(map).bindPopup(rec.nama);
+
+      // Garis Gardu Induk → REC
+      const garisGI_REC = L.polyline([
+        [gi.lat, gi.lng],
+        [rec.lat, rec.lng]
+      ], { color: 'red', weight: 4 }).addTo(map);
+
+      garisGI_REC.on('click', () => {
+        map.fitBounds(garisGI_REC.getBounds());
+        markerGI.openPopup();
+        setTimeout(() => {
+          markerREC.openPopup();
+        }, 800);
+
+        // Highlight garis
+        garisGI_REC.setStyle({ color: 'yellow', weight: 6 });
+        setTimeout(() => {
+          garisGI_REC.setStyle({ color: 'red', weight: 4 });
+        }, 2000);
+      });
+
+      rec.lbs.forEach((lbs) => {
+        const markerLBS = L.marker([lbs.lat, lbs.lng], { icon: iconLBS }).addTo(map).bindPopup(lbs.nama);
+
+        // Garis REC → LBS
+        const garisREC_LBS = L.polyline([
+          [rec.lat, rec.lng],
+          [lbs.lat, lbs.lng]
+        ], { color: 'blue', weight: 3 }).addTo(map);
+
+        garisREC_LBS.on('click', () => {
+          map.fitBounds(garisREC_LBS.getBounds());
+          markerREC.openPopup();
+          setTimeout(() => {
+            markerLBS.openPopup();
+          }, 800);
+
+          // Highlight garis
+          garisREC_LBS.setStyle({ color: 'yellow', weight: 6 });
+          setTimeout(() => {
+            garisREC_LBS.setStyle({ color: 'blue', weight: 3 });
+          }, 2000);
+        });
+      });
+    });
+  </script>
+</body>
+</html>
