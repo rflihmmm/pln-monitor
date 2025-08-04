@@ -40,6 +40,9 @@ export default function OrganizationForm({
         coordinate: "",
     })
 
+    const [parentSearchTerm, setParentSearchTerm] = useState<string>("")
+    const [isParentSelectOpen, setIsParentSelectOpen] = useState<boolean>(false)
+
     const levelOptions = [
         { value: 1, label: "1 : DCC" },
         { value: 2, label: "2 : UP3" },
@@ -55,6 +58,11 @@ export default function OrganizationForm({
                 address: organization.address,
                 coordinate: organization.coordinate,
             })
+
+            // Set initial search term for parent organization
+            if (organization.parent_id && organization.parent) {
+                setParentSearchTerm(organization.parent.name)
+            }
         }
     }, [organization, isEdit])
 
@@ -73,6 +81,35 @@ export default function OrganizationForm({
         }
         return true
     })
+
+    // Filter parent organizations based on search term
+    const filteredParents = availableParents.filter(org =>
+        org.name.toLowerCase().includes(parentSearchTerm.toLowerCase())
+    )
+
+    const handleParentSelect = (value: string) => {
+        if (value === "none") {
+            handleChange("parent_id", null)
+            setParentSearchTerm("")
+        } else {
+            const selectedOrg = availableParents.find(org => org.id!.toString() === value)
+            if (selectedOrg) {
+                handleChange("parent_id", parseInt(value))
+                setParentSearchTerm(selectedOrg.name)
+            }
+        }
+        setIsParentSelectOpen(false)
+    }
+
+    const clearParentSelection = () => {
+        handleChange("parent_id", null)
+        setParentSearchTerm("")
+    }
+
+    // Get selected parent name for display
+    const selectedParentName = organizationData.parent_id
+        ? availableParents.find(org => org.id === organizationData.parent_id)?.name
+        : null
 
     return (
         <div className="grid gap-4 py-4">
@@ -104,22 +141,63 @@ export default function OrganizationForm({
 
             <div className="grid gap-2">
                 <Label htmlFor="parent_id">Parent Organization</Label>
-                <Select
-                    value={organizationData.parent_id?.toString() || ""}
-                    onValueChange={(value) => handleChange("parent_id", value ? parseInt(value) : null)}
-                >
-                    <SelectTrigger>
-                        <SelectValue placeholder="Select parent organization (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="">None</SelectItem>
-                        {availableParents.map((org) => (
-                            <SelectItem key={org.id} value={org.id!.toString()}>
-                                {org.name}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                <div className="relative">
+                    <Input
+                        id="parent_search"
+                        value={parentSearchTerm}
+                        onChange={(e) => {
+                            setParentSearchTerm(e.target.value)
+                            setIsParentSelectOpen(true)
+                        }}
+                        onFocus={() => setIsParentSelectOpen(true)}
+                        placeholder="Search parent organization (optional)..."
+                        className="pr-20"
+                    />
+                    {selectedParentName && (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-1 top-1 h-8 px-2 text-xs"
+                            onClick={clearParentSelection}
+                        >
+                            Clear
+                        </Button>
+                    )}
+
+                    {isParentSelectOpen && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-40 overflow-y-auto">
+                            <div
+                                className="px-3 py-2 cursor-pointer hover:bg-gray-100 text-sm"
+                                onClick={() => handleParentSelect("none")}
+                            >
+                                None
+                            </div>
+                            {filteredParents.length > 0 ? (
+                                filteredParents.map((org) => (
+                                    <div
+                                        key={org.id}
+                                        className="px-3 py-2 cursor-pointer hover:bg-gray-100 text-sm"
+                                        onClick={() => handleParentSelect(org.id!.toString())}
+                                    >
+                                        {org.name}
+                                    </div>
+                                ))
+                            ) : parentSearchTerm && (
+                                <div className="px-3 py-2 text-sm text-gray-500">
+                                    No organizations found
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* Show selected parent organization */}
+                {selectedParentName && (
+                    <div className="text-sm text-gray-600 mt-1">
+                        Selected: <span className="font-medium">{selectedParentName}</span>
+                    </div>
+                )}
             </div>
 
             <div className="grid gap-2">

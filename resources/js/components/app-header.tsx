@@ -55,11 +55,11 @@ const mainNavItems: ExtendedNavItem[] = [
                 href: '/master/manage-users',
                 icon: User,
             },
-            // {
-            //     title: 'Organization',
-            //     href: '/master/organization',
-            //     icon: Group,
-            // },
+            {
+                title: 'Organization',
+                href: '/master/organization',
+                icon: Group,
+            },
             {
                 title: 'Mapping',
                 href: '/master/mapping',

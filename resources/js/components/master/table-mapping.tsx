@@ -2,255 +2,159 @@ import KendoGrid from "@/components/ui/kendo-grid";
 import * as ReactDOM from 'react-dom/client';
 import { router } from "@inertiajs/react";
 import { useState } from "react";
-import { Edit, MoreHorizontal, Plus, Search, Trash } from "lucide-react";
+import { Edit, Plus, Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import MappingDialog from "@/components/master/dialog-mapping";
 import { type Keypoint, Mapping } from "@/types";
-import { on } from "events";
 
 interface TableMappingProps {
-    mappingList: Mapping[];
-    keypointsList: Keypoint[];
     datas: any[];
-}
-
-interface ActionDialogProps {
-    dataItem: Mapping | any;
     keypointsList: Keypoint[];
-    mappingList: Mapping[];
 }
 
-export function ActionDialog({ dataItem, keypointsList, mappingList }: ActionDialogProps) {
-    const [editingMapping, setEditingMapping] = useState<Mapping | null>(null);
+// [FIX] Komponen ActionDialog sudah tidak diperlukan dan bisa dihapus.
+
+export default function TableMapping({
+    datas,
+    keypointsList,
+}: TableMappingProps) {
+    const [isAddMappingOpen, setIsAddMappingOpen] = useState(false);
     const [isEditMappingOpen, setIsEditMappingOpen] = useState(false);
-    // Open edit dialog for a mapping
+    const [editingMapping, setEditingMapping] = useState<Mapping | null>(null);
+
+    // --- [FIX] Logika dipindahkan ke komponen utama ---
+
+    // Membuka dialog untuk mengedit mapping
     const openEditDialog = (mapping: Mapping) => {
-        setEditingMapping({ ...mapping });
+        setEditingMapping(mapping);
         setIsEditMappingOpen(true);
     };
-    // Handle editing a mapping
+
+    // Menangani penambahan mapping baru
+    const handleAddMapping = (mappingData: any) => {
+        const submitData = {
+            keypoints: mappingData.keypoints,
+            ulp: mappingData.ulp,
+        };
+        router.post(route("master.mapping.store"), submitData, {
+            onSuccess: () => setIsAddMappingOpen(false),
+            onError: (errors) => alert("Error: " + JSON.stringify(errors)),
+        });
+    };
+
+    // Menangani pengeditan mapping
     const handleEditMapping = (mappingData: any) => {
         if (!editingMapping) return;
 
-        console.log("Editing mapping data:", mappingData);
-
-        // Untuk edit, backend expect single keypoint
         const submitData = {
-            keypoint: mappingData.keypoints && mappingData.keypoints.length > 0
-                ? mappingData.keypoints[0]
-                : mappingData.keypoint,
-            dcc: mappingData.dcc,
-            up3: mappingData.up3,
+            keypoint: mappingData.keypoints?.[0] ?? mappingData.keypoint,
             ulp: mappingData.ulp,
-            coordinate: mappingData.coordinate,
         };
 
-        console.log("Final edit data:", submitData);
-
-        router.put(
-            route("master.mapping.update", editingMapping.id),
-            submitData,
-            {
-                onSuccess: (page) => {
-                    console.log("Edit success:", page);
-                    setIsEditMappingOpen(false);
-                    setEditingMapping(null);
-                },
-                onError: (errors) => {
-                    console.error("Edit errors:", errors);
-                    alert("Error: " + JSON.stringify(errors));
-                },
-                onFinish: () => {
-                    console.log("Edit request finished");
-                }
-            }
-        );
+        router.put(route("master.mapping.update", editingMapping.id), submitData, {
+            onSuccess: () => {
+                setIsEditMappingOpen(false);
+                setEditingMapping(null);
+            },
+            onError: (errors) => alert("Error: " + JSON.stringify(errors)),
+        });
     };
 
-    // Handle deleting a mapping
+    // Menangani penghapusan mapping
     const handleDeleteMapping = (mappingId: number) => {
         if (confirm("Are you sure you want to delete this mapping?")) {
             router.delete(route("master.mapping.destroy", mappingId));
         }
     };
-    return (
-        <>
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 p-0">
-                        <span className="sr-only">Open menu</span>
-                        <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                    <DropdownMenuItem className="cursor-pointer" onClick={() => openEditDialog(dataItem)}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit Keypoint
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                        className="text-destructive focus:text-destructive cursor-pointer" onClick={() => handleDeleteMapping(mappingList.find(m => m.id === dataItem.id)?.id || 0)}
-                    >
-                        <Trash className="mr-2 h-4 w-4" />
-                        Delete Keypoint
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
 
-            {/* Edit Mapping Dialog */}
-            <MappingDialog
-                isOpen={isEditMappingOpen}
-                onOpenChange={setIsEditMappingOpen}
-                onSubmit={handleEditMapping}
-                mapping={editingMapping}
-                keypointsList={keypointsList}
-                isEdit={true}
-            />
-        </>
-    );
-}
+    // --- [FIX] Fungsi untuk me-render tombol aksi ---
+    const renderActions = (dataItem: any) => {
+        return (
+            <div className="flex items-center justify-center gap-2">
+                <Button variant="outline" size="icon" onClick={() => openEditDialog(dataItem)}>
+                    <Edit className="h-4 w-4" />
+                </Button>
+                <Button variant="destructive" size="icon" onClick={() => handleDeleteMapping(dataItem.id)}>
+                    <Trash className="h-4 w-4" />
+                </Button>
+            </div>
 
-export default function TableMapping({
-    mappingList: initialMappings,
-    datas,
-    keypointsList,
-}: TableMappingProps) {
-    const [isAddMappingOpen, setIsAddMappingOpen] = useState(false);
-
-    // Handle adding a new mapping
-    const handleAddMapping = (mappingData: any) => {
-        console.log("Submitting mapping data:", mappingData);
-
-        // Pastikan data sesuai dengan yang diharapkan backend
-        const submitData = {
-            keypoints: mappingData.keypoints, // Array keypoints
-            dcc: mappingData.dcc,
-            up3: mappingData.up3,
-            ulp: mappingData.ulp,
-            coordinate: mappingData.coordinate,
-        };
-
-        console.log("Final submit data:", submitData);
-
-        router.post(
-            route("master.mapping.store"),
-            submitData,
-            {
-                onSuccess: (page) => {
-                    console.log("Success:", page);
-                    setIsAddMappingOpen(false);
-                },
-                onError: (errors) => {
-                    console.error("Validation errors:", errors);
-                    alert("Error: " + JSON.stringify(errors));
-                },
-                onFinish: () => {
-                    console.log("Request finished");
-                }
-            }
-        );
+        )
     };
-
-
-
 
     const config = {
         columns: [{
             title: "Keypoint",
-            width: "100px",
             field: "keypoint"
         }, {
             title: "Feeder",
-            width: "100px",
             field: "feeder"
         }, {
             title: "Gardu Induk",
-            width: "100px",
             field: "gardu_induk"
         }, {
             title: "ULP",
-            width: "100px",
             field: "ulp",
         }, {
             title: "UP3",
-            width: "100px",
             field: "up3",
         }, {
             title: "DCC",
-            width: "100px",
             field: "dcc",
         }, {
             title: "Parent Keypoint",
-            width: "200px",
             field: "parent_keypoint",
         }, {
             title: "Coordinate",
-            width: "100px",
             field: "coordinate"
         }, {
             title: "Actions",
-            width: "80px",
-            template: function (dataItem: any) {
-                return `<div id="aksi-dropdown-${dataItem.id}"></div>`;
-            },
+            width: "120px",
+            template: (dataItem: any) => `<div id="aksi-dropdown-${dataItem.id}"></div>`,
             filterable: false,
+            sortable: false,
+            attributes: { style: "text-align: center;" }
         }],
         dataSource: {
             data: datas,
             pageSize: 10,
-            pageable: true,
-            sortable: true,
-            filterable: true,
-            resizable: true,
-            scrollable: true,
-            total: datas.length,
-            group: [{
-                field: "dcc"
-            }, {
-                field: "up3"
-            }, {
-                field: "ulp"
-            }],
+            group: [{ field: "dcc" }, { field: "up3" }, { field: "ulp" }],
+            // ...properti lain seperti pageable, sortable, dll.
         },
-        dataBound: function (e: any) {
+        dataBound: (e: any) => {
             const grid = e.sender;
-            const data = grid.dataSource.view();
+            const view = grid.dataSource.view();
 
-            data.forEach((item: any) => {
+            // Fungsi rekursif untuk menelusuri data yang di-grouping
+            // dcc
+            view.forEach((item: any) => {
                 if (item.hasSubgroups) {
-                    item.items.forEach((subItem: any) => {
-                        if (subItem.hasSubgroups) {
-                            subItem.items.forEach((subSubItem: any) => {
-                                const ulps = subSubItem.items;
+                    // up3
+                    const ups = item.items;
+                    ups.forEach((up: any) => {
+                        up.items.forEach((subItem: any) => {
+                            const ulps = subItem.items;
 
-                                ulps.forEach((ulp: any) => {
-                                    const container = document.getElementById(`aksi-dropdown-${ulp.id}`);
+                            ulps.forEach((ulp: any) => {
+                                const container = document.getElementById(`aksi-dropdown-${ulp.id}`);
 
-                                    if (container) {
-                                        const root = ReactDOM.createRoot(container);
-                                        root.render(
-                                            <ActionDialog dataItem={ulp} keypointsList={keypointsList} mappingList={initialMappings} />
-                                        );
-                                    }
-                                });
+                                if (container) {
+                                    const root = ReactDOM.createRoot(container);
+                                    root.render(
+                                        renderActions(item)
+                                    );
+                                }
+                            });
 
-                            })
-                        }
-                    });
+                        });
+
+                    })
                 }
             });
-        },
-    }
+        }
+    };
+
 
     return (
         <div className="space-y-4">
@@ -264,7 +168,8 @@ export default function TableMapping({
                 </Button>
             </div>
             <KendoGrid config={config} />
-            {/* Add Mapping Dialog */}
+
+            {/* Dialog untuk Tambah Mapping */}
             <MappingDialog
                 isOpen={isAddMappingOpen}
                 onOpenChange={setIsAddMappingOpen}
@@ -273,7 +178,15 @@ export default function TableMapping({
                 isEdit={false}
             />
 
-
+            {/* Dialog untuk Edit Mapping */}
+            <MappingDialog
+                isOpen={isEditMappingOpen}
+                onOpenChange={setIsEditMappingOpen}
+                onSubmit={handleEditMapping}
+                mapping={editingMapping}
+                keypointsList={keypointsList}
+                isEdit={true}
+            />
         </div>
     );
 }

@@ -3,7 +3,6 @@ import axios from "axios";
 import { useDebounce } from "use-debounce";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
     Command,
@@ -34,20 +33,15 @@ export default function MappingForm({
     onCancel,
     isEdit = false,
 }: MappingFormProps) {
-    // State utama untuk form
+    // State utama untuk form (hanya keypoints dan ulp)
     const [mappingData, setMappingData] = useState({
         keypoints: [] as number[],
-        dcc: "",
-        up3: "",
         ulp: "",
-        coordinate: "",
     });
 
-    // State untuk validation
+    // State untuk validation (hanya keypoints dan ulp)
     const [errors, setErrors] = useState({
         keypoints: "",
-        dcc: "",
-        up3: "",
         ulp: "",
     });
 
@@ -56,31 +50,17 @@ export default function MappingForm({
     const [keypointsList, setKeypointsList] = useState<DropdownBase[]>([]);
     const [selectedKeypoints, setSelectedKeypoints] = useState<DropdownBase[]>([]);
 
-    // State combobox DCC
-    const [dccOpen, setDccOpen] = useState(false);
-    const [dccList, setDccList] = useState<DropdownBase[]>([]);
-    const [selectedDccName, setSelectedDccName] = useState<string>("");
-
-    // State combobox UP3
-    const [up3Open, setUp3Open] = useState(false);
-    const [up3List, setUp3List] = useState<DropdownBase[]>([]);
-    const [selectedUp3Name, setSelectedUp3Name] = useState<string>("");
-
     // State combobox ULP
     const [ulpOpen, setUlpOpen] = useState(false);
     const [ulpList, setUlpList] = useState<DropdownBase[]>([]);
     const [selectedUlpName, setSelectedUlpName] = useState<string>("");
 
-    // Search terms state
+    // Search terms state (hanya keypoint dan ulp)
     const [keypointSearchTerm, setKeypointSearchTerm] = useState("");
-    const [dccSearchTerm, setDccSearchTerm] = useState("");
-    const [up3SearchTerm, setUp3SearchTerm] = useState("");
     const [ulpSearchTerm, setUlpSearchTerm] = useState("");
 
     // Debounced search terms (500ms delay)
     const [debouncedKeypointSearch] = useDebounce(keypointSearchTerm, 500);
-    const [debouncedDccSearch] = useDebounce(dccSearchTerm, 500);
-    const [debouncedUp3Search] = useDebounce(up3SearchTerm, 500);
     const [debouncedUlpSearch] = useDebounce(ulpSearchTerm, 500);
 
     // Inisialisasi data form
@@ -91,10 +71,7 @@ export default function MappingForm({
 
             setMappingData({
                 keypoints: keypointArray,
-                dcc: mapping.dcc || "",
-                up3: mapping.up3 || "",
                 ulp: mapping.ulp || "",
-                coordinate: mapping.coordinate || "",
             });
 
             // Initialize selected keypoints for UI
@@ -103,29 +80,20 @@ export default function MappingForm({
                 setSelectedKeypoints(initialSelected ? [initialSelected] : []);
             }
 
-            setSelectedDccName(mapping.dcc || "");
-            setSelectedUp3Name(mapping.up3 || "");
             setSelectedUlpName(mapping.ulp || "");
         } else {
             // Reset form for add mode
             setMappingData({
                 keypoints: [],
-                dcc: "",
-                up3: "",
                 ulp: "",
-                coordinate: "",
             });
             setSelectedKeypoints([]);
-            setSelectedDccName("");
-            setSelectedUp3Name("");
             setSelectedUlpName("");
         }
 
         // Clear errors
         setErrors({
             keypoints: "",
-            dcc: "",
-            up3: "",
             ulp: "",
         });
     }, [mapping, isEdit, initialKeypointsList]);
@@ -138,24 +106,6 @@ export default function MappingForm({
             setKeypointsList([]);
         }
     }, [debouncedKeypointSearch]);
-
-    // Effect untuk search DCC dengan debounce
-    useEffect(() => {
-        if (debouncedDccSearch.length >= 3) {
-            fetchDcc(debouncedDccSearch);
-        } else {
-            setDccList([]);
-        }
-    }, [debouncedDccSearch]);
-
-    // Effect untuk search UP3 dengan debounce
-    useEffect(() => {
-        if (debouncedUp3Search.length >= 3) {
-            fetchUp3(debouncedUp3Search);
-        } else {
-            setUp3List([]);
-        }
-    }, [debouncedUp3Search]);
 
     // Effect untuk search ULP dengan debounce
     useEffect(() => {
@@ -170,21 +120,11 @@ export default function MappingForm({
     const validateForm = () => {
         const newErrors = {
             keypoints: "",
-            dcc: "",
-            up3: "",
             ulp: "",
         };
 
         if (mappingData.keypoints.length === 0) {
             newErrors.keypoints = "Please select at least one keypoint";
-        }
-
-        if (!mappingData.dcc.trim()) {
-            newErrors.dcc = "DCC is required";
-        }
-
-        if (!mappingData.up3.trim()) {
-            newErrors.up3 = "UP3 is required";
         }
 
         if (!mappingData.ulp.trim()) {
@@ -240,28 +180,6 @@ export default function MappingForm({
         }));
     };
 
-    const handleDccSelect = (dcc: DropdownBase) => {
-        setMappingData({ ...mappingData, dcc: dcc.name });
-        setSelectedDccName(dcc.name);
-        setDccOpen(false);
-
-        // Clear DCC error
-        if (errors.dcc) {
-            setErrors({ ...errors, dcc: "" });
-        }
-    };
-
-    const handleUp3Select = (up3: DropdownBase) => {
-        setMappingData({ ...mappingData, up3: up3.name });
-        setSelectedUp3Name(up3.name);
-        setUp3Open(false);
-
-        // Clear UP3 error
-        if (errors.up3) {
-            setErrors({ ...errors, up3: "" });
-        }
-    };
-
     const handleUlpSelect = (ulp: DropdownBase) => {
         setMappingData({ ...mappingData, ulp: ulp.name });
         setSelectedUlpName(ulp.name);
@@ -274,12 +192,10 @@ export default function MappingForm({
     };
 
     const handleSubmit = () => {
-        // console.log("Form submitted with data:", mappingData);
-
-        // if (!validateForm()) {
-        //     console.log("Form validation failed:", errors);
-        //     return;
-        // }
+        if (!validateForm()) {
+            console.log("Form validation failed:", errors);
+            return;
+        }
 
         // Ensure data structure is correct for submission
         const submitData = {
@@ -309,42 +225,6 @@ export default function MappingForm({
         }
     };
 
-    const fetchDcc = async (search: string) => {
-        try {
-            const response = await axios.get(route("master.mapping.dcc"), {
-                params: { filter: search }
-            });
-
-            if (response.data && Array.isArray(response.data)) {
-                setDccList(response.data);
-            } else {
-                console.warn("Unexpected response format:", response.data);
-                setDccList([]);
-            }
-        } catch (error) {
-            console.error("Error fetching DCC:", error);
-            setDccList([]);
-        }
-    };
-
-    const fetchUp3 = async (search: string) => {
-        try {
-            const response = await axios.get(route("master.mapping.up3"), {
-                params: { filter: search }
-            });
-
-            if (response.data && Array.isArray(response.data)) {
-                setUp3List(response.data);
-            } else {
-                console.warn("Unexpected response format:", response.data);
-                setUp3List([]);
-            }
-        } catch (error) {
-            console.error("Error fetching UP3:", error);
-            setUp3List([]);
-        }
-    };
-
     const fetchUlp = async (search: string) => {
         try {
             const response = await axios.get(route("master.mapping.ulp"), {
@@ -365,8 +245,6 @@ export default function MappingForm({
 
     // Handler functions untuk search terms
     const handleOnSearchKeypoint = (search: string) => setKeypointSearchTerm(search);
-    const handleOnSearchDcc = (search: string) => setDccSearchTerm(search);
-    const handleOnSearchUp3 = (search: string) => setUp3SearchTerm(search);
     const handleOnSearchUlp = (search: string) => setUlpSearchTerm(search);
 
     return (
@@ -447,120 +325,6 @@ export default function MappingForm({
                 )}
             </div>
 
-            {/* DCC */}
-            <div className="grid gap-2">
-                <Label htmlFor="dcc">
-                    DCC <span className="text-red-500">*</span>
-                </Label>
-                <Popover open={dccOpen} onOpenChange={setDccOpen}>
-                    <PopoverTrigger asChild>
-                        <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={dccOpen}
-                            className={cn(
-                                "justify-between",
-                                errors.dcc && "border-red-500"
-                            )}
-                            id="dcc"
-                        >
-                            {selectedDccName || "Select DCC..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] p-0">
-                        <Command>
-                            <CommandInput
-                                placeholder="Search DCC..."
-                                onValueChange={handleOnSearchDcc}
-                            />
-                            <CommandList>
-                                <CommandEmpty>No DCC found.</CommandEmpty>
-                                <CommandGroup className="max-h-[200px] overflow-y-auto">
-                                    {dccList.map((dcc) => (
-                                        <CommandItem
-                                            key={dcc.id}
-                                            value={dcc.name}
-                                            onSelect={() => handleDccSelect(dcc)}
-                                        >
-                                            <Check
-                                                className={cn(
-                                                    "mr-2 h-4 w-4",
-                                                    selectedDccName === dcc.name
-                                                        ? "opacity-100"
-                                                        : "opacity-0"
-                                                )}
-                                            />
-                                            {dcc.name}
-                                        </CommandItem>
-                                    ))}
-                                </CommandGroup>
-                            </CommandList>
-                        </Command>
-                    </PopoverContent>
-                </Popover>
-                {errors.dcc && (
-                    <p className="text-sm text-red-500">{errors.dcc}</p>
-                )}
-            </div>
-
-            {/* UP3 */}
-            <div className="grid gap-2">
-                <Label htmlFor="up3">
-                    UP3 <span className="text-red-500">*</span>
-                </Label>
-                <Popover open={up3Open} onOpenChange={setUp3Open}>
-                    <PopoverTrigger asChild>
-                        <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={up3Open}
-                            className={cn(
-                                "justify-between",
-                                errors.up3 && "border-red-500"
-                            )}
-                            id="up3"
-                        >
-                            {selectedUp3Name || "Select UP3..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] p-0">
-                        <Command>
-                            <CommandInput
-                                placeholder="Search UP3..."
-                                onValueChange={handleOnSearchUp3}
-                            />
-                            <CommandList>
-                                <CommandEmpty>No UP3 found.</CommandEmpty>
-                                <CommandGroup className="max-h-[200px] overflow-y-auto">
-                                    {up3List.map((up3) => (
-                                        <CommandItem
-                                            key={up3.id}
-                                            value={up3.name}
-                                            onSelect={() => handleUp3Select(up3)}
-                                        >
-                                            <Check
-                                                className={cn(
-                                                    "mr-2 h-4 w-4",
-                                                    selectedUp3Name === up3.name
-                                                        ? "opacity-100"
-                                                        : "opacity-0"
-                                                )}
-                                            />
-                                            {up3.name}
-                                        </CommandItem>
-                                    ))}
-                                </CommandGroup>
-                            </CommandList>
-                        </Command>
-                    </PopoverContent>
-                </Popover>
-                {errors.up3 && (
-                    <p className="text-sm text-red-500">{errors.up3}</p>
-                )}
-            </div>
-
             {/* ULP */}
             <div className="grid gap-2">
                 <Label htmlFor="ulp">
@@ -616,17 +380,6 @@ export default function MappingForm({
                 {errors.ulp && (
                     <p className="text-sm text-red-500">{errors.ulp}</p>
                 )}
-            </div>
-
-            {/* Coordinate */}
-            <div className="grid gap-2">
-                <Label htmlFor="coordinate">Coordinate</Label>
-                <Input
-                    id="coordinate"
-                    value={mappingData.coordinate}
-                    onChange={(e) => handleChange("coordinate", e.target.value)}
-                    placeholder="Coordinate (optional)"
-                />
             </div>
 
             {/* Submit Buttons */}

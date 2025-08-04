@@ -105,6 +105,7 @@ export interface Mapping {
     dcc?: string | null;
     up3?: string | null;
     ulp?: string | null;
+    ulp_id?: number | null;
     parent?: string | null;
     coordinate?: string | null;
     created_at?: string;

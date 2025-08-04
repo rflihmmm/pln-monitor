@@ -44,8 +44,6 @@ Route::middleware('auth')->group(function () {
         Route::get('feeder/statuspoint-data', [FeederController::class, 'getStatusPoints'])->name('feeder.statuspoint-data');
         Route::get('feeder/analogpoint-data', [FeederController::class, 'getAnalogPoints'])->name('feeder.analogpoint-data');
 
-        Route::get('mapping/dcc', [OrganizationGridController::class, 'getDccData'])->name('mapping.dcc');
-        Route::get('mapping/up3', [OrganizationGridController::class, 'getUp3Data'])->name('mapping.up3');
         Route::get('mapping/ulp', [OrganizationGridController::class, 'getUlpData'])->name('mapping.ulp');
     });
 });

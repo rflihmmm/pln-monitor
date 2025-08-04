@@ -23,7 +23,7 @@ class OrganizationController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'level' => 'required|integer|in:1,2,3',
-            'parent_id' => 'nullable|integer|exists:organizations,id',
+            'parent_id' => 'nullable|integer|exists:organization,id',
             'address' => 'nullable|string',
             'coordinate' => 'nullable|string',
         ]);
@@ -38,7 +38,7 @@ class OrganizationController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'level' => 'required|integer|in:1,2,3',
-            'parent_id' => 'nullable|integer|exists:organizations,id',
+            'parent_id' => 'nullable|integer|exists:organization,id',
             'address' => 'nullable|string',
             'coordinate' => 'nullable|string',
         ]);
