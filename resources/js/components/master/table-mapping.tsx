@@ -208,7 +208,7 @@ export default function TableMapping({ datas, keypointsList }: TableMappingProps
             onError: (errors) => alert("Error: " + JSON.stringify(errors)),
         })
     }
- 
+
     // Handle deleting a mapping
     const handleDeleteMapping = (mappingId: number) => {
         if (confirm("Are you sure you want to delete this mapping?")) {
@@ -217,7 +217,7 @@ export default function TableMapping({ datas, keypointsList }: TableMappingProps
     }
 
     return (
-        <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
+        <div className="w-full max-w-7xl mx-auto space-y-6">
             <Card>
 
                 <CardContent>
@@ -248,7 +248,7 @@ export default function TableMapping({ datas, keypointsList }: TableMappingProps
                                     <TableHead>Type</TableHead>
                                     <TableHead>Gardu Induk</TableHead>
                                     <TableHead>Feeder</TableHead>
-                                    <TableHead>Line Station </TableHead>
+                                    <TableHead>Parent Keypoint</TableHead>
                                     <TableHead>Coordinate</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
@@ -427,6 +427,7 @@ export default function TableMapping({ datas, keypointsList }: TableMappingProps
                         </Table>
                     </div>
 
+                    {/* Enhanced Summary Statistics */}
 
                 </CardContent>
             </Card>

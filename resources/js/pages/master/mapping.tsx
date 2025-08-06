@@ -27,7 +27,7 @@ export default function MapsPage({
       <Head title="Maps" />
       <div className='px-5 py-5 space-y-4'>
         <div>
-          <h1 className="text-2xl font-bold">Maps Management Dashboard</h1>
+          <h1 className="text-2xl font-bold">Mapping Management Dashboard</h1>
           <h3>Add, remove, or edit Maps Data</h3>
         </div>
         <TableMapping datas={datas} keypointsList={keypointsList} mappingList={mappingList} />

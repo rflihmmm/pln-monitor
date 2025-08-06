@@ -110,6 +110,12 @@ class OrganizationGridController extends Controller
                 }
             }
 
+            $allKeypoints = DB::connection('sqlsrv_main')
+                ->table('STATIONPOINTS')
+                ->select('PKEY as id', 'NAME as name')
+                ->orderBy('NAME', 'asc') // Opsional: urutkan agar lebih rapi di dropdown
+                ->get();
+
             $result = [];
             $id = 0;
 
@@ -149,11 +155,13 @@ class OrganizationGridController extends Controller
 
             return inertia('master/mapping', [
                 'datas' => $result,
+                'keypointsList' => $allKeypoints,
                 'success' => session('success')
             ]);
         } catch (\Exception $e) {
             return inertia('master/mapping', [
                 'datas' => [],
+                'keypointsList' => [],
                 'error' => 'Failed to fetch data',
                 'message' => $e->getMessage()
             ]);
