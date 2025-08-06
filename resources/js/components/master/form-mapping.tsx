@@ -65,9 +65,6 @@ export default function MappingForm({
 
     // Inisialisasi data form
     useEffect(() => {
-        if (!initialKeypointsList) {
-            return;
-        }
 
         if (mapping && isEdit) {
             // CARI keypoint object berdasarkan NAMA, bukan konversi ke Number
@@ -75,7 +72,7 @@ export default function MappingForm({
                 (kp) => kp.name === mapping.keypoint
             );
 
-            if (initialSelectedKeypoint && initialSelectedKeypoint.id !== undefined) {
+            if (initialSelectedKeypoint) {
                 // Jika ditemukan, set state dengan ID dan object yang benar
                 setMappingData({
                     keypoints: [initialSelectedKeypoint.id], // Gunakan ID-nya

@@ -208,7 +208,7 @@ export default function TableMapping({ datas, keypointsList }: TableMappingProps
             onError: (errors) => alert("Error: " + JSON.stringify(errors)),
         })
     }
-
+ 
     // Handle deleting a mapping
     const handleDeleteMapping = (mappingId: number) => {
         if (confirm("Are you sure you want to delete this mapping?")) {
