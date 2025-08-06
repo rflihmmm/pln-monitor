@@ -39,21 +39,39 @@ export default function TableKeypointExt({
     keypointExtList: initialKeypointExts,
 }: TableKeypointExtProps) {
     const [searchTerm, setSearchTerm] = useState("");
+    const [activeFilters, setActiveFilters] = useState<string[]>([]); // State baru untuk filter aktif
     const [isAddKeypointExtOpen, setIsAddKeypointExtOpen] = useState(false);
     const [isEditKeypointExtOpen, setIsEditKeypointExtOpen] = useState(false);
     const [editingKeypointExt, setEditingKeypointExt] = useState<KeypointExt | null>(null);
 
-    // Filter keypoint extensions based on search term
-    const filteredKeypointExts = initialKeypointExts.filter((keypointExt) => {
-        if (!searchTerm) return true; // Tampilkan semua jika search kosong
+    const keypointTypes = ["GI", "REC", "LBS", "GH"]; // Opsi filter
 
+    // Fungsi untuk toggle filter
+    const handleFilterToggle = (filter: string) => {
+        setActiveFilters((prevFilters) =>
+            prevFilters.includes(filter)
+                ? prevFilters.filter((f) => f !== filter) // Hapus filter jika sudah ada
+                : [...prevFilters, filter] // Tambahkan filter jika belum ada
+        );
+    };
+
+    // Filter keypoint extensions berdasarkan search term dan filter aktif
+    const filteredKeypointExts = initialKeypointExts.filter((keypointExt) => {
+        // Cek kecocokan dengan filter prefiks yang aktif
+        const matchesFilter =
+            activeFilters.length === 0 || // Tampilkan semua jika tidak ada filter aktif
+            activeFilters.some((filter) => keypointExt.name?.startsWith(filter));
+
+        // Cek kecocokan dengan search term
         const matchesSearch =
+            !searchTerm || // Tampilkan semua jika search kosong
             (keypointExt.name && keypointExt.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
             (keypointExt.coordinate && keypointExt.coordinate.toLowerCase().includes(searchTerm.toLowerCase())) ||
             (keypointExt.alamat && keypointExt.alamat.toLowerCase().includes(searchTerm.toLowerCase())) ||
             (keypointExt.parent_name && keypointExt.parent_name.toLowerCase().includes(searchTerm.toLowerCase()));
 
-        return matchesSearch;
+        // Hasil harus cocok dengan kedua kriteria
+        return matchesFilter && matchesSearch;
     });
 
     // Format date to "MMM DD, YYYY"
@@ -122,20 +140,37 @@ export default function TableKeypointExt({
     return (
         <div>
             <div className="flex flex-col gap-4 mt-5">
-                <div className="flex flex-col justify-between gap-4 sm:flex-row">
-                    <div className="relative w-full sm:w-64">
-                        <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
-                        <Input
-                            type="search"
-                            placeholder="Search keypoint extensions..."
-                            className="w-full pl-8"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
+                <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+                    <div className="flex flex-col w-full gap-4 sm:flex-row sm:items-center">
+                        {/* Search Input */}
+                        <div className="relative w-full sm:w-64">
+                            <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
+                            <Input
+                                type="search"
+                                placeholder="Search keypoint extensions..."
+                                className="w-full pl-8"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                        {/* Tombol Filter Baru */}
+                        <div className="flex items-center gap-2">
+                            {keypointTypes.map((type) => (
+                                <Button
+                                    key={type}
+                                    variant={activeFilters.includes(type) ? "default" : "outline"}
+                                    onClick={() => handleFilterToggle(type)}
+                                    size="sm"
+                                >
+                                    {type}
+                                </Button>
+                            ))}
+                        </div>
                     </div>
+                    {/* Tombol Add Keypoint */}
                     <div className="flex flex-col gap-2 sm:flex-row">
                         <Button
-                            className="flex items-center gap-1"
+                            className="flex items-center w-full gap-1 sm:w-auto"
                             onClick={() => setIsAddKeypointExtOpen(true)}
                         >
                             <Plus className="h-4 w-4" />
@@ -160,7 +195,7 @@ export default function TableKeypointExt({
                             {filteredKeypointExts.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={7} className="text-muted-foreground py-8 text-center">
-                                        No keypoint extensions found matching your search
+                                        No keypoint extensions found matching your search or filter
                                     </TableCell>
                                 </TableRow>
                             ) : (

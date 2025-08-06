@@ -68,6 +68,7 @@ class GarduIndukController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'coordinate' => 'nullable|string',
             'keypoint_id' => 'nullable|integer',
             'description' => 'nullable|string',
         ]);
@@ -81,6 +82,7 @@ class GarduIndukController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'coordinate' => 'nullable|string',
             'keypoint_id' => 'nullable|integer',
             'description' => 'nullable|string',
         ]);

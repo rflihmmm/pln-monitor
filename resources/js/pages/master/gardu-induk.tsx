@@ -9,6 +9,9 @@ import AppLayout from '@/layouts/app-layout';
 interface GarduInduk {
   id: number;
   name: string;
+  coordinate: string | null;
+  keypoint_id?: number | null
+  keypoint_name?: string | null
   description: string | null;
   created_at: string;
 }

@@ -5,96 +5,19 @@ import 'leaflet/dist/leaflet.css';
 import { useEffect, useRef, useState } from 'react';
 import { MapContainer, Marker, Popup, TileLayer, ZoomControl } from 'react-leaflet';
 
-// Define marker types
+// Define marker types based on API response
 interface SubstationMarker {
-    id: string;
+    id: number;
     name: string;
-    type: 'GI' | 'GH';
-    position: [number, number];
+    keypointName: string;
+    coordinate: [number, number];
     status: 'active' | 'inactive';
-    data?: {
-        voltage: string;
-        load: string;
+    data: {
+        'load-is': number;
+        'load-mw': number;
         lastUpdate: string;
     };
 }
-
-// Sample data for demonstration
-const sampleMarkers: SubstationMarker[] = [
-    {
-        id: 'gi1',
-        name: 'GI Panakkukang',
-        type: 'GI',
-        position: [-5.1381, 119.4469],
-        status: 'active',
-        data: {
-            voltage: '150/20 kV',
-            load: '65.28 MW',
-            lastUpdate: '2025-03-21 15:45:31',
-        },
-    },
-    {
-        id: 'gi2',
-        name: 'GI Tello',
-        type: 'GI',
-        position: [-5.1481, 119.4769],
-        status: 'active',
-        data: {
-            voltage: '150/20 kV',
-            load: '58.32 MW',
-            lastUpdate: '2025-03-21 15:44:12',
-        },
-    },
-    {
-        id: 'gi3',
-        name: 'GI Sungguminasa',
-        type: 'GI',
-        position: [-5.2081, 119.4569],
-        status: 'inactive',
-        data: {
-            voltage: '150/20 kV',
-            load: '0 MW',
-            lastUpdate: '2025-03-21 15:30:45',
-        },
-    },
-    {
-        id: 'gh1',
-        name: 'GH Daya',
-        type: 'GH',
-        position: [-5.1181, 119.5269],
-        status: 'active',
-        data: {
-            voltage: '20 kV',
-            load: '12.45 MW',
-            lastUpdate: '2025-03-21 15:42:18',
-        },
-    },
-    {
-        id: 'gh2',
-        name: 'GH Tamalanrea',
-        type: 'GH',
-        position: [-5.122975, 119.4133917],
-        status: 'active',
-        data: {
-            voltage: '20 kV',
-            load: '10.78 MW',
-            lastUpdate: '2025-03-21 15:43:22',
-        },
-    },
-    {
-        id: 'gh3',
-        name: 'GH Antang',
-        type: 'GH',
-        position: [-5.1681, 119.4869],
-        status: 'inactive',
-        data: {
-            voltage: '20 kV',
-            load: '0 MW',
-            lastUpdate: '2025-03-21 15:35:10',
-        },
-    },
-];
-
 
 interface MapComponentProps {
     filter: 'GI' | 'GH' | 'ALL';
@@ -103,6 +26,8 @@ interface MapComponentProps {
 export default function MapComponent({ filter }: MapComponentProps) {
     const mapRef = useRef<L.Map | null>(null);
     const [markers, setMarkers] = useState<SubstationMarker[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     // Custom marker icons
     const activeIcon = new L.Icon({
@@ -121,14 +46,75 @@ export default function MapComponent({ filter }: MapComponentProps) {
         popupAnchor: [0, -12],
     });
 
-    // Filter markers based on selected filter
-    useEffect(() => {
-        if (filter === 'ALL') {
-            setMarkers(sampleMarkers);
-        } else {
-            setMarkers(sampleMarkers.filter((marker) => marker.type === filter));
+    // Fetch data from API
+    const fetchMapData = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+
+            const params = new URLSearchParams();
+            if (filter !== 'ALL') {
+                params.append('filter', filter);
+            }
+
+            const response = await fetch(`/api/mapdata?${params.toString()}`);
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (result.success) {
+                setMarkers(result.data);
+            } else {
+                setError(result.message || 'Failed to fetch data');
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'An error occurred');
+            console.error('Error fetching map data:', err);
+        } finally {
+            setLoading(false);
         }
+    };
+
+    // Fetch data on component mount and when filter changes
+    useEffect(() => {
+        fetchMapData();
     }, [filter]);
+
+    // Auto-refresh data every 30 seconds
+    useEffect(() => {
+        const interval = setInterval(fetchMapData, 30000);
+        return () => clearInterval(interval);
+    }, [filter]);
+
+    if (loading) {
+        return (
+            <div className="flex h-full items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="mt-2 text-gray-600">Loading map data...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex h-full items-center justify-center">
+                <div className="text-center">
+                    <p className="text-red-600 mb-4">Error: {error}</p>
+                    <button
+                        onClick={fetchMapData}
+                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                        Retry
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <MapContainer
@@ -147,40 +133,58 @@ export default function MapComponent({ filter }: MapComponentProps) {
             <ZoomControl position="bottomright" />
 
             {markers.map((marker) => (
-                <Marker key={marker.id} position={marker.position} icon={marker.status === 'active' ? activeIcon : inactiveIcon}>
+                <Marker
+                    key={marker.id}
+                    position={marker.coordinate}
+                    icon={marker.status === 'active' ? activeIcon : inactiveIcon}
+                >
                     <Popup>
                         <Card className="border-0 shadow-none">
                             <div className="p-1">
                                 <div className="mb-2 flex items-center justify-between">
                                     <h3 className="text-base font-bold">{marker.name}</h3>
-                                    <Badge variant={marker.status === 'active' ? 'default' : 'destructive'} className="ml-2">
+                                    <Badge
+                                        variant={marker.status === 'active' ? 'default' : 'destructive'}
+                                        className="ml-2"
+                                    >
                                         {marker.status.charAt(0).toUpperCase() + marker.status.slice(1)}
                                     </Badge>
                                 </div>
                                 <div className="space-y-1 text-sm">
                                     <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Type:</span>
-                                        <span className="font-medium">{marker.type}</span>
+                                        <span className="text-muted-foreground">ID:</span>
+                                        <span className="font-medium">{marker.id}</span>
                                     </div>
-                                    {marker.data && (
-                                        <>
-                                            <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Voltage:</span>
-                                                <span className="font-medium">{marker.data.voltage}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Load:</span>
-                                                <span className="font-medium">{marker.data.load}</span>
-                                            </div>
-                                            <div className="text-muted-foreground mt-2 text-xs">Last update: {marker.data.lastUpdate}</div>
-                                        </>
+                                    {marker.keypointName && (
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Keypoint:</span>
+                                            <span className="font-medium">{marker.keypointName}</span>
+                                        </div>
                                     )}
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Load IS:</span>
+                                        <span className="font-medium">{marker.data['load-is']} A</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Load MW:</span>
+                                        <span className="font-medium">{marker.data['load-mw']} MW</span>
+                                    </div>
+                                    <div className="text-muted-foreground mt-2 text-xs">
+                                        Last update: {new Date(marker.data.lastUpdate).toLocaleString()}
+                                    </div>
                                 </div>
                             </div>
                         </Card>
                     </Popup>
                 </Marker>
             ))}
+
+            {/* Display count of markers */}
+            <div className="absolute top-4 left-4 z-[1000] bg-white px-3 py-2 rounded-md shadow-md">
+                <p className="text-sm font-medium">
+                    {markers.length} {filter === 'ALL' ? 'Total' : filter} Substations
+                </p>
+            </div>
         </MapContainer>
     );
 }

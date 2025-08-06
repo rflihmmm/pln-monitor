@@ -19,6 +19,7 @@ import GarduIndukDialog from "@/components/master/gardu-induk-dialog"
 interface GarduInduk {
   id: number
   name: string
+  coordinate: string | null
   keypoint_id?: number | null
   keypoint_name?: string | null
   description: string | null
@@ -59,6 +60,7 @@ export default function TableGarduInduk({ garduIndukList: initialGarduInduk }: T
       route("master.gardu-induk.store"),
       {
         name: garduData.name,
+        coordinate: garduData.coordinate,
         keypoint_id: garduData.keypoint_id,
         description: garduData.description,
       },
@@ -78,6 +80,7 @@ export default function TableGarduInduk({ garduIndukList: initialGarduInduk }: T
       route("master.gardu-induk.update", editingGardu.id),
       {
         name: garduData.name,
+        coordinate: garduData.coordinate,
         keypoint_id: garduData.keypoint_id,
         description: garduData.description,
       },
@@ -130,6 +133,7 @@ export default function TableGarduInduk({ garduIndukList: initialGarduInduk }: T
                 <TableHead>ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Keypoint</TableHead>
+                <TableHead>Coordinate</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Created At</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -150,6 +154,9 @@ export default function TableGarduInduk({ garduIndukList: initialGarduInduk }: T
                       <div className="font-medium">{gardu.name}</div>
                     </TableCell>
                     <TableCell>{gardu.keypoint_name ?? "-"}</TableCell>
+                    <TableCell><div className="font-mono text-sm">
+                      {gardu.coordinate || "-"}
+                    </div></TableCell>
                     <TableCell>{gardu.description || "-"}</TableCell>
                     <TableCell>{formatDate(gardu.created_at)}</TableCell>
                     <TableCell className="text-right">

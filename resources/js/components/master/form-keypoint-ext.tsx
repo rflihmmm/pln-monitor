@@ -62,6 +62,9 @@ export default function KeypointExtForm({
     const [keypointSearchTerm, setKeypointSearchTerm] = useState("");
     const [parentStationSearchTerm, setParentStationSearchTerm] = useState("");
 
+    //State untuk validasi coordinate
+    const [coordinateError, setCoordinateError] = useState<string | null>(null);
+
     // Debounced search terms
     const [debouncedKeypointSearch] = useDebounce(keypointSearchTerm, 500);
     const [debouncedParentStationSearch] = useDebounce(parentStationSearchTerm, 500);
@@ -107,8 +110,25 @@ export default function KeypointExtForm({
         }
     }, [debouncedParentStationSearch]);
 
+    //fungsi valisasi coordinate
+    const validateCoordinate = (input: string) => {
+        // Regex untuk format: -angka.desimal, spasi opsional angka.desimal
+        const regex = /^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/;
+        return regex.test(input);
+    };
+
     // Helper untuk update form data
     const handleChange = (field: string, value: any) => {
+        // Khusus untuk input coordinate
+        if (field === 'coordinate') {
+            const isValid = validateCoordinate(value);
+            if (!isValid && value.length > 0) {
+                setCoordinateError("Format koordinat salah. Gunakan 'latitude, longitude'.");
+            } else {
+                setCoordinateError(null);
+            }
+        }
+
         setKeypointExtData({ ...keypointExtData, [field]: value });
     };
 
@@ -168,9 +188,9 @@ export default function KeypointExtForm({
     };
 
     const getParentStationName = (id: number) => {
-        if (id === 0) return "Select Parent Station";
+        if (id === 0) return "Select Line Station";
         const parent = parentStationsList.find((p) => p.id === id);
-        return parent ? parent.name : keypointExt?.parent_name || "Select Parent Station";
+        return parent ? parent.name : keypointExt?.parent_name || "Select Line Station";
     };
 
     // Handler functions untuk search
@@ -261,7 +281,11 @@ export default function KeypointExtForm({
                     value={keypointExtData.coordinate || ""}
                     onChange={(e) => handleChange("coordinate", e.target.value)}
                     placeholder="e.g., -6.2088, 106.8456"
+                    className={coordinateError ? "border-red-500" : ""}
                 />
+                {coordinateError && (
+                    <p className="text-sm text-red-500 mt-1">{coordinateError}</p>
+                )}
             </div>
 
             {/* Alamat */}
@@ -278,7 +302,7 @@ export default function KeypointExtForm({
 
             {/* Parent Station Points */}
             <div className="grid gap-2">
-                <Label htmlFor="parent_stationpoints">Parent Station Points</Label>
+                <Label htmlFor="parent_stationpoints">Line Station</Label>
                 <Popover open={parentStationOpen} onOpenChange={setParentStationOpen}>
                     <PopoverTrigger asChild>
                         <Button
@@ -295,7 +319,7 @@ export default function KeypointExtForm({
                     <PopoverContent className="w-[300px] p-0">
                         <Command>
                             <CommandInput
-                                placeholder="Search parent station..."
+                                placeholder="Search line station..."
                                 onValueChange={handleOnSearchParentStation}
                             />
                             <CommandList>
@@ -312,7 +336,7 @@ export default function KeypointExtForm({
                                             </div>
                                         ) : (
                                             <div className="p-2 text-muted-foreground text-center">
-                                                No parent station found
+                                                No line station found
                                             </div>
                                         )}
                                     </CommandEmpty>

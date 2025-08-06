@@ -142,7 +142,7 @@ class TableHmiController extends Controller
                 case 'PMT':
                     // PMT tetap menggunakan StatusPointSkada
                     if (isset($statusPointSkadaData[$data->status_id])) {
-                        $values['pmt1'] = $statusPointSkadaData[$data->status_id]->TAGLEVEL;
+                        $values['pmt1'] = $statusPointSkadaData[$data->status_id]->VALUE;
                     }
                     break;
                 case 'AMP':
@@ -188,7 +188,6 @@ class TableHmiController extends Controller
             'kvAB' => $keypointData->get('KV-AB')?->first()?->VALUE,
             'kvBC' => $keypointData->get('KV-BC')?->first()?->VALUE,
             'kvAC' => $keypointData->get('KV-AC')?->first()?->VALUE,
-            'cosP' => $keypointData->get('COS-P')?->first()?->VALUE,
         ];
     }
 }

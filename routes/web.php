@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\MapsController;
 use App\Http\Controllers\TableHmiController;
+use App\Http\Controllers\DashboardController;
 
 // Route::get('/', function () {
 //     return Inertia::render('welcome');
@@ -39,18 +40,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     Route::get('/api/table-hmi', [TableHmiController::class, 'index']);
 
-    // Routes untuk mendapatkan daftar DCC yang tersedia
-    Route::get('/maps/dcc', [MapsController::class, 'getAvailableDcc']);
+    // Routes untuk maps
+    Route::get('/api/mapdata', [DashboardController::class, 'getMapData']);
 
-    // Routes untuk keypoints berdasarkan DCC (API pertama)
-    Route::get('/maps/keypoints/selatan', [MapsController::class, 'keypointsSelatan']);
-    Route::get('/maps/keypoints/utara', [MapsController::class, 'keypointsUtara']);
-    Route::get('/maps/keypoints/tenggara', [MapsController::class, 'keypointsTenggara']);
+    // // Routes untuk mendapatkan daftar DCC yang tersedia
+    // Route::get('/maps/dcc', [MapsController::class, 'getAvailableDcc']);
 
-    // Routes untuk summary berdasarkan DCC (API kedua)
-    Route::get('/maps/summary/selatan', [MapsController::class, 'summarySelatan']);
-    Route::get('/maps/summary/utara', [MapsController::class, 'summaryUtara']);
-    Route::get('/maps/summary/tenggara', [MapsController::class, 'summaryTenggara']);
+    // // Routes untuk keypoints berdasarkan DCC (API pertama)
+    // Route::get('/maps/keypoints/selatan', [MapsController::class, 'keypointsSelatan']);
+    // Route::get('/maps/keypoints/utara', [MapsController::class, 'keypointsUtara']);
+    // Route::get('/maps/keypoints/tenggara', [MapsController::class, 'keypointsTenggara']);
+
+    // // Routes untuk summary berdasarkan DCC (API kedua)
+    // Route::get('/maps/summary/selatan', [MapsController::class, 'summarySelatan']);
+    // Route::get('/maps/summary/utara', [MapsController::class, 'summaryUtara']);
+    // Route::get('/maps/summary/tenggara', [MapsController::class, 'summaryTenggara']);
 
     // Routes dinamis (opsional, jika ingin lebih fleksibel)
     Route::get('/maps/keypoints/{dcc}', [MapsController::class, 'getKeypointsByDcc']);

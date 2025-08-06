@@ -20,7 +20,6 @@ interface KeypointData {
     keypoint: string;
     pmt2: { CB: string | null; LR: string | null };
     hotlineTag: string | null;
-    reset: string | null;
     ir: number | null;
     is: number | null;
     it: number | null;
@@ -31,7 +30,6 @@ interface KeypointData {
     kvAB: number | null;
     kvBC: number | null;
     kvAC: number | null;
-    cosP: number | null;
 }
 
 export default function TableHMI() {
@@ -116,13 +114,13 @@ export default function TableHMI() {
     // Helper function to render PMT1 status
     const renderPmt1Status = (value: string | null) => {
         if (value === null) return null;
-        
+
         return (
             <div className="flex items-center justify-center">
-                <Circle 
+                <Circle
                     className={cn(
                         "h-4 w-4",
-                        value === "0" ? "fill-green-500 text-green-500" : "text-green-500"
+                        value === "1" ? "fill-red-500 text-green-500" : "text-green-500"
                     )}
                 />
             </div>
@@ -135,17 +133,20 @@ export default function TableHMI() {
             <div className="flex items-center justify-center gap-2">
                 {/* CB Status */}
                 {pmt2.CB !== null && (
-                    <Circle 
+                    <Circle
                         className={cn(
                             "h-4 w-4",
-                            pmt2.CB === "0" ? "fill-green-500 text-green-500" : "text-green-500"
+                            pmt2.CB === "1" ? "fill-red-500 text-green-500" : "text-green-500"
                         )}
                     />
                 )}
                 {/* LR Status */}
-                {pmt2.LR === "1" && (
+                {pmt2.LR === "0" ? (
                     <span className="text-blue-600 font-medium">L</span>
+                ) : (
+                    <span className="text-blue-600 font-medium">R</span>
                 )}
+
             </div>
         );
     };
@@ -207,7 +208,6 @@ export default function TableHMI() {
                                     'KEYPOINT',
                                     'PMT',
                                     'HOTLINE TAG',
-                                    'RES.',
                                     'IR',
                                     'IS',
                                     'IT',
@@ -218,7 +218,6 @@ export default function TableHMI() {
                                     'KV-AB',
                                     'KV BC',
                                     'KV AC',
-                                    'COS Φ',
                                 ].map((header, index) => (
                                     <th key={index} className="bg-gray-100 border border-gray-300 p-2 text-center font-bold text-sm">
                                         {header}
@@ -291,22 +290,14 @@ export default function TableHMI() {
 
                                     {/* HOTLINE TAG */}
                                     <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {row.hotlineTag === "1" && <Badge variant="destructive">ON</Badge>}
-                                        {row.hotlineTag === "0" && (
+                                        {row.hotlineTag === "0" && <Badge variant="destructive">ON</Badge>}
+                                        {row.hotlineTag === "1" && (
                                             <Badge variant="outline" className="bg-green-100 text-green-800">
                                                 OFF
                                             </Badge>
                                         )}
                                     </td>
 
-                                    {/* RES. */}
-                                    <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {row.reset === "0" && (
-                                            <Badge variant="outline" className="bg-amber-100 text-amber-800">
-                                                RESET
-                                            </Badge>
-                                        )}
-                                    </td>
 
                                     {/* IR */}
                                     <td className="border border-gray-300 p-2 text-center align-middle">
@@ -358,10 +349,6 @@ export default function TableHMI() {
                                         {formatValue(row.kvAC)}
                                     </td>
 
-                                    {/* COS Φ */}
-                                    <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {formatValue(row.cosP)}
-                                    </td>
                                 </tr>
                             ))}
                         </tbody>

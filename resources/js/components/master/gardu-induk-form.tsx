@@ -14,6 +14,7 @@ import { useDebounce } from "use-debounce"
 interface GarduInduk {
   id?: number
   name: string
+  coordinate: string | null,
   description: string | null
   created_at?: string
 }
@@ -28,6 +29,7 @@ interface GarduIndukFormProps {
 export default function GarduIndukForm({ garduInduk, onSubmit, onCancel, isEdit = false }: GarduIndukFormProps) {
   const [garduData, setGarduData] = useState<Partial<GarduInduk>>({
     name: "",
+    coordinate: "",
     description: "",
   })
 
@@ -37,6 +39,9 @@ export default function GarduIndukForm({ garduInduk, onSubmit, onCancel, isEdit 
   const [selectedKeypoint, setSelectedKeypoint] = useState<{ id: number; name: string } | null>(null)
   const [keypointSearchTerm, setKeypointSearchTerm] = useState("")
   const [debouncedKeypointSearch] = useDebounce(keypointSearchTerm, 500)
+
+  //State untuk validasi coordinate
+  const [coordinateError, setCoordinateError] = useState<string | null>(null);
 
   useEffect(() => {
     if (garduInduk && isEdit) {
@@ -78,7 +83,22 @@ export default function GarduIndukForm({ garduInduk, onSubmit, onCancel, isEdit 
     setKeypointOpen(false)
   }
 
+  const validateCoordinate = (input: string) => {
+    // Regex untuk format: -angka.desimal, spasi opsional angka.desimal
+    const regex = /^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/;
+    return regex.test(input);
+  };
+
   const handleChange = (field: string, value: string) => {
+    if (field === 'coordinate') {
+      const isValid = validateCoordinate(value);
+      if (!isValid && value.length > 0) {
+        setCoordinateError("Format koordinat salah. Gunakan 'latitude, longitude'.");
+      } else {
+        setCoordinateError(null);
+      }
+    }
+
     setGarduData({ ...garduData, [field]: value })
   }
 
@@ -150,6 +170,22 @@ export default function GarduIndukForm({ garduInduk, onSubmit, onCancel, isEdit 
           placeholder="Gardu Induk Name"
         />
       </div>
+
+      {/* Coordinate */}
+      <div className="grid gap-2">
+        <Label htmlFor="coordinate">Coordinate</Label>
+        <Input
+          id="coordinate"
+          value={garduData.coordinate || ""}
+          onChange={(e) => handleChange("coordinate", e.target.value)}
+          placeholder="e.g., -6.2088, 106.8456"
+          className={coordinateError ? "border-red-500" : ""}
+        />
+        {coordinateError && (
+          <p className="text-sm text-red-500 mt-1">{coordinateError}</p>
+        )}
+      </div>
+
       <div className="grid gap-2">
         <Label htmlFor="description">Description</Label>
         <Textarea
