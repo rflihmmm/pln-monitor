@@ -83,9 +83,9 @@ export default function MapComponent({ filter }: MapComponentProps) {
         fetchMapData();
     }, [filter]);
 
-    // Auto-refresh data every 30 seconds
+    // Auto-refresh data every 300 seconds
     useEffect(() => {
-        const interval = setInterval(fetchMapData, 30000);
+        const interval = setInterval(fetchMapData, 300000);
         return () => clearInterval(interval);
     }, [filter]);
 

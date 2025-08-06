@@ -65,24 +65,35 @@ export default function MappingForm({
 
     // Inisialisasi data form
     useEffect(() => {
+        if (!initialKeypointsList) {
+            return;
+        }
+
         if (mapping && isEdit) {
-            // Handle edit mode - convert single keypoint to array
-            const keypointArray = mapping.keypoint ? [Number(mapping.keypoint)] : [];
+            // CARI keypoint object berdasarkan NAMA, bukan konversi ke Number
+            const initialSelectedKeypoint = initialKeypointsList.find(
+                (kp) => kp.name === mapping.keypoint
+            );
 
-            setMappingData({
-                keypoints: keypointArray,
-                ulp: mapping.ulp || "",
-            });
-
-            // Initialize selected keypoints for UI
-            if (mapping.keypoint) {
-                const initialSelected = initialKeypointsList.find(kp => kp.id === Number(mapping.keypoint));
-                setSelectedKeypoints(initialSelected ? [initialSelected] : []);
+            if (initialSelectedKeypoint && initialSelectedKeypoint.id !== undefined) {
+                // Jika ditemukan, set state dengan ID dan object yang benar
+                setMappingData({
+                    keypoints: [initialSelectedKeypoint.id], // Gunakan ID-nya
+                    ulp: mapping.ulp || "",
+                });
+                setSelectedKeypoints([initialSelectedKeypoint]); // Set object untuk UI
+            } else {
+                // Fallback jika tidak ditemukan (seharusnya jarang terjadi)
+                setMappingData({
+                    keypoints: [],
+                    ulp: mapping.ulp || "",
+                });
+                setSelectedKeypoints([]);
             }
 
             setSelectedUlpName(mapping.ulp || "");
         } else {
-            // Reset form for add mode
+            // Reset form for add mode (ini sudah benar)
             setMappingData({
                 keypoints: [],
                 ulp: "",
@@ -148,22 +159,33 @@ export default function MappingForm({
     };
 
     const handleKeypointSelect = (keypoint: DropdownBase) => {
-        const isSelected = selectedKeypoints.some((kp) => kp.id === keypoint.id);
-
-        if (isSelected) {
-            // Remove from selection
-            setSelectedKeypoints((prev) => prev.filter((kp) => kp.id !== keypoint.id));
-            setMappingData(prev => ({
+        // TAMBAHKAN LOGIKA INI
+        if (isEdit) {
+            // Dalam mode edit, selalu GANTI keypoint yang sudah ada
+            setSelectedKeypoints([keypoint]);
+            setMappingData((prev) => ({
                 ...prev,
-                keypoints: prev.keypoints.filter(id => id !== keypoint.id),
+                keypoints: [keypoint.id],
             }));
         } else {
-            // Add to selection
-            setSelectedKeypoints((prev) => [...prev, keypoint]);
-            setMappingData(prev => ({
-                ...prev,
-                keypoints: [...prev.keypoints, keypoint.id],
-            }));
+            // Dalam mode tambah, gunakan logika toggle (tambah/hapus) yang sudah ada
+            const isSelected = selectedKeypoints.some((kp) => kp.id === keypoint.id);
+
+            if (isSelected) {
+                // Remove from selection
+                setSelectedKeypoints((prev) => prev.filter((kp) => kp.id !== keypoint.id));
+                setMappingData((prev) => ({
+                    ...prev,
+                    keypoints: prev.keypoints.filter((id) => id !== keypoint.id),
+                }));
+            } else {
+                // Add to selection
+                setSelectedKeypoints((prev) => [...prev, keypoint]);
+                setMappingData((prev) => ({
+                    ...prev,
+                    keypoints: [...prev.keypoints, keypoint.id],
+                }));
+            }
         }
 
         // Clear keypoints error
