@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\MapsController;
 use App\Http\Controllers\TableHmiController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\SingleLineController;
 
 // Route::get('/', function () {
 //     return Inertia::render('welcome');
@@ -42,6 +43,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Routes untuk maps
     Route::get('/api/mapdata', [DashboardController::class, 'getMapData']);
+
+    // Routes untuk mendapatkan data single line
+    Route::get('/api/single-line', [SingleLineController::class, 'getSingleLineData']);
 
     // // Routes untuk mendapatkan daftar DCC yang tersedia
     // Route::get('/maps/dcc', [MapsController::class, 'getAvailableDcc']);

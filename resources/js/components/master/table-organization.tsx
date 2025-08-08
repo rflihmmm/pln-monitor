@@ -23,7 +23,6 @@ interface Organization {
     parent_id: number | null
     address: string | null
     coordinate: string | null
-    created_at: string
     parent?: Organization
 }
 
@@ -181,7 +180,6 @@ export default function TableOrganization({ organizationList: initialOrganizatio
                                 <TableHead>Parent</TableHead>
                                 <TableHead>Address</TableHead>
                                 <TableHead>Coordinate</TableHead>
-                                <TableHead>Created At</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -208,7 +206,6 @@ export default function TableOrganization({ organizationList: initialOrganizatio
                                         <TableCell>{org.parent?.name || "-"}</TableCell>
                                         <TableCell>{org.address || "-"}</TableCell>
                                         <TableCell>{org.coordinate || "-"}</TableCell>
-                                        <TableCell>{formatDate(org.created_at)}</TableCell>
                                         <TableCell className="text-right">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
