@@ -30,14 +30,14 @@ interface TableGarduIndukProps {
   garduIndukList: GarduInduk[]
 }
 
-export default function TableGarduInduk({ garduIndukList: initialGarduInduk }: TableGarduIndukProps) {
+export default function TableGarduInduk({ garduIndukList }: TableGarduIndukProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [isAddGarduOpen, setIsAddGarduOpen] = useState(false)
   const [isEditGarduOpen, setIsEditGarduOpen] = useState(false)
   const [editingGardu, setEditingGardu] = useState<GarduInduk | null>(null)
 
   // Filter gardu induk based on search term
-  const filteredGarduInduk = initialGarduInduk.filter((gardu) => {
+  const filteredGarduInduk = garduIndukList.filter((gardu) => {
     return (
       gardu.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (gardu.description && gardu.description.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -193,7 +193,7 @@ export default function TableGarduInduk({ garduIndukList: initialGarduInduk }: T
 
         <div className="flex items-center justify-between">
           <div className="text-muted-foreground text-sm">
-            Showing <strong>{filteredGarduInduk.length}</strong> of <strong>{initialGarduInduk.length}</strong>{" "}
+            Showing <strong>{filteredGarduInduk.length}</strong> of <strong>{garduIndukList.length}</strong>{" "}
             substations
           </div>
         </div>
@@ -212,7 +212,7 @@ export default function TableGarduInduk({ garduIndukList: initialGarduInduk }: T
         isOpen={isEditGarduOpen}
         onOpenChange={setIsEditGarduOpen}
         onSubmit={handleEditGardu}
-        garduInduk={editingGardu}
+        garduIndukList={editingGardu}
         isEdit={true}
       />
     </div>

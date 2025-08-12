@@ -239,7 +239,7 @@ export function SingleLineNetwork() {
                                     const parentMarker = markerRefs.current.get(parent.code)
                                     const childMarker = markerRefs.current.get(child.code)
                                     parentMarker?.openPopup()
-                                    setTimeout(() => childMarker?.openPopup(), 700)
+                                    setTimeout(() => childMarker?.openPopup(), 2000)
                                 },
                             }}
                         />
@@ -327,7 +327,7 @@ export function SingleLineNetwork() {
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <span className="inline-block size-2 rounded-full bg-red-500" />
+                                    <span className="inline-block size-2 rounded-full bg-green-500" />
                                     <Label htmlFor="gi">GI</Label>
                                 </div>
                                 <Switch
@@ -351,7 +351,7 @@ export function SingleLineNetwork() {
 
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <span className="inline-block size-2 rounded-full bg-green-500" />
+                                    <span className="inline-block size-2 rounded-full bg-red-500" />
                                     <Label htmlFor="lbs">LBS</Label>
                                 </div>
                                 <Switch

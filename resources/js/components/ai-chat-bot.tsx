@@ -29,7 +29,7 @@ export default function AiChatBot({ n8nWebhookUrl }: AiChatBotProps) {
     // Karena URL tersebut adalah halaman web yang sudah jadi,
     // cara terbaik untuk menampilkannya adalah dengan <iframe>.
     return (
-        <Card className="h-[500px] w-full rounded-lg overflow-hidden p-0">
+        <Card className="h-[100vh] md:h-[83vh] w-full rounded-lg overflow-hidden p-0">
 
             <iframe
                 src={n8nWebhookUrl}

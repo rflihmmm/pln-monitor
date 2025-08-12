@@ -75,6 +75,7 @@ class KeypointExtController extends Controller
     public function update(Request $request, $keypoint_id)
     {
         $validated = $request->validate([
+            'keypoint_id' => 'required|integer',
             'coordinate' => 'nullable|string',
             'alamat' => 'nullable|string',
             'parent_stationpoints' => 'nullable|integer',

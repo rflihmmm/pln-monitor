@@ -38,7 +38,7 @@ class GarduIndukController extends Controller
     public function getKeypoints(Request $request)
     {
         $filter = $request->query('filter', null);
-        $keyword = "GI-";
+        //$keyword = "GI-";
 
         try {
             if (!$filter || strlen($filter) < 3) {
@@ -46,7 +46,7 @@ class GarduIndukController extends Controller
             }
 
             $keypoints = StationPointSkada::select("PKEY", "NAME")
-                ->where('NAME', 'LIKE', '%' . $keyword . '%' . $filter . '%')
+                ->where('NAME', 'LIKE', '%'  . '%' . $filter . '%')
                 ->get()
                 ->map(function ($query) {
                     return [

@@ -14,7 +14,9 @@ import { useDebounce } from "use-debounce"
 interface GarduInduk {
   id?: number
   name: string
-  coordinate: string | null,
+  coordinate: string | null
+  keypoint_id?: number | null
+  keypoint_name?: string | null
   description: string | null
   created_at?: string
 }
@@ -47,9 +49,25 @@ export default function GarduIndukForm({ garduInduk, onSubmit, onCancel, isEdit 
     if (garduInduk && isEdit) {
       setGarduData({
         name: garduInduk.name,
+        coordinate: garduInduk.coordinate || "", // Fix: Set coordinate value
         description: garduInduk.description,
       })
-      // Optionally set selectedKeypoint if garduInduk has keypoint info in edit mode
+
+      // Fix: Set selected keypoint if exists
+      if (garduInduk.keypoint_id && garduInduk.keypoint_name) {
+        setSelectedKeypoint({
+          id: garduInduk.keypoint_id,
+          name: garduInduk.keypoint_name
+        })
+      }
+    } else {
+      // Reset form untuk mode add
+      setGarduData({
+        name: "",
+        coordinate: "",
+        description: "",
+      })
+      setSelectedKeypoint(null)
     }
   }, [garduInduk, isEdit])
 
@@ -204,4 +222,3 @@ export default function GarduIndukForm({ garduInduk, onSubmit, onCancel, isEdit 
     </div>
   )
 }
-
