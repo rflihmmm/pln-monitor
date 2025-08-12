@@ -111,3 +111,7 @@ export interface Mapping {
     created_at?: string;
     updated_at?: string;
 }
+
+export interface n8nWebhook {
+    n8nWebhookUrl?: string;
+}

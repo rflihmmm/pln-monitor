@@ -43,6 +43,11 @@ const mainNavItems: ExtendedNavItem[] = [
         icon: Spline,
     },
     {
+        title: 'Chat Bot',
+        href: '/chat-bot',
+        icon: User,
+    },
+    {
         title: 'Master',
         href: '#',
         icon: Database,

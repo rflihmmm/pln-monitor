@@ -7,6 +7,7 @@ use App\Http\Controllers\MapsController;
 use App\Http\Controllers\TableHmiController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SingleLineController;
+use App\Http\Controllers\AiChatBot;
 
 // Route::get('/', function () {
 //     return Inertia::render('welcome');
@@ -39,6 +40,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
             return 'Failed: ' . $e->getMessage();
         }
     });
+
+    Route::get('/chat-bot', [AiChatBot::class, 'show'])->name('chat-bot');
+
     Route::get('/api/table-hmi', [TableHmiController::class, 'index']);
 
     // Routes untuk maps
