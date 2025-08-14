@@ -262,82 +262,121 @@ class DashboardController extends Controller
     public function getSystemLoadData()
     {
         try {
-            // Get all DCC organizations (level 1)
-            $dccOrganizations = Organization::where('level', 1)->get();
+            // STEP 1: Get the organizational hierarchy and all associated keypoint IDs from PostgreSQL.
+            // This query gathers the structure (DCC -> UP3 -> ULP) and links it to the keypoint IDs.
+            $orgStructureWithKeypoints = DB::connection('pgsql')
+                ->table('organization as dcc')
+                ->join('organization as up3', 'up3.parent_id', '=', 'dcc.id')
+                ->join('organization as ulp', 'ulp.parent_id', '=', 'up3.id')
+                ->join('organization_keypoint as okp', 'okp.organization_id', '=', 'ulp.id')
+                ->where('dcc.level', 1)
+                ->where('up3.level', 2)
+                ->where('ulp.level', 3)
+                ->select(
+                    'dcc.id as dcc_id',
+                    'dcc.name as dcc_name',
+                    'up3.id as up3_id',
+                    'up3.name as up3_name',
+                    'okp.keypoint_id'
+                )
+                ->get();
 
-            $systemLoadData = [];
-
-            foreach ($dccOrganizations as $dcc) {
-                // Get all UP3 organizations under this DCC (level 2)
-                $up3Organizations = Organization::where('level', 2)
-                    ->where('parent_id', $dcc->id)
-                    ->get();
-
-                $regions = [];
-                $totalPower = 0;
-                $totalCurrent = 0;
-
-                foreach ($up3Organizations as $up3) {
-                    // Get keypoints for this UP3 organization
-                    $organizationKeypoints = OrganizationKeypoint::where('organization_id', $up3->id)->get();
-
-                    $up3Power = 0;
-                    $up3Current = 0;
-
-                    foreach ($organizationKeypoints as $keypoint) {
-                        $stationPoint = StationPointSkada::where('PKEY', $keypoint->keypoint_id)
-                            ->where('NAME', 'LIKE', 'LBS-%')
-                            ->first();
-
-                        // Only process if it's an LBS keypoint
-                        if ($stationPoint) {
-                            // Get power data (IS from NAME column)
-                            $powerData = AnalogPointSkada::where('STATIONPID', $keypoint->keypoint_id)
-                                ->where('NAME', 'IS')
-                                ->sum('VALUE');
-
-                            // Get current data (IR from NAME column)
-                            $currentData = AnalogPointSkada::where('STATIONPID', $keypoint->keypoint_id)
-                                ->where('NAME', 'IR')
-                                ->sum('VALUE');
-
-                            $up3Power += $powerData ?? 0;
-                            $up3Current += $currentData ?? 0;
-                        }
-                    }
-
-                    // Add to regions array
-                    $regions[] = [
-                        'name' => $up3->name,
-                        'power' => number_format($up3Power) . ' MW',
-                        'current' => number_format($up3Current, 2) . ' A'
-                    ];
-
-                    // Add to totals
-                    $totalPower += $up3Power;
-                    $totalCurrent += $up3Current;
-                }
-
-                // Build system name (Beban Sistem + DCC name)
-                $systemName = "Beban Sistem " . $dcc->name;
-
-                $systemLoadData[] = [
-                    'name' => $systemName,
-                    'regions' => $regions,
-                    'total' => [
-                        'power' => number_format($totalPower, 2) . ' MW',
-                        'current' => number_format($totalCurrent, 2) . ' A'
-                    ]
-                ];
+            // If no organizational structure is found, return an empty successful response.
+            if ($orgStructureWithKeypoints->isEmpty()) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [],
+                    'grandTotal' => ['power' => '0.00 MW', 'current' => '0.00 A']
+                ]);
             }
 
-            // Calculate grand total for all systems
+            // Extract all unique keypoint IDs to be used in the next query.
+            // The filter() method removes any potential null values.
+            $keypointIds = $orgStructureWithKeypoints->pluck('keypoint_id')->unique()->filter()->all();
+
+            // STEP 2: Get all relevant analog data from SQL Server in a single query.
+            // We use the collected keypoint IDs to fetch only the necessary rows from ANALOGPOINTS.
+            $analogData = DB::connection('sqlsrv_main')
+                ->table('ANALOGPOINTS')
+                ->whereIn('STATIONPID', $keypointIds)
+                ->whereIn('NAME', ['IS', 'IR']) // 'IS' for Power, 'IR' for Current
+                ->select('STATIONPID', 'NAME', 'VALUE')
+                ->get();
+
+            // Create a lookup map for faster processing in PHP.
+            // Key: STATIONPID, Value: ['power' => X, 'current' => Y]
+            $analogValueMap = [];
+            foreach ($analogData as $point) {
+                $key = $point->STATIONPID;
+                if (!isset($analogValueMap[$key])) {
+                    $analogValueMap[$key] = ['power' => 0, 'current' => 0];
+                }
+                if ($point->NAME === 'IS') {
+                    $analogValueMap[$key]['power'] = (float)$point->VALUE;
+                } elseif ($point->NAME === 'IR') {
+                    $analogValueMap[$key]['current'] = (float)$point->VALUE;
+                }
+            }
+
+            // STEP 3: Process and aggregate the data in PHP.
+            // This is where we combine the results from the two queries.
+            $aggregatedData = [];
+            foreach ($orgStructureWithKeypoints as $orgLink) {
+                // Find the corresponding analog values from our map.
+                $values = $analogValueMap[$orgLink->keypoint_id] ?? ['power' => 0, 'current' => 0];
+
+                // Use the UP3 ID as a key for easy aggregation.
+                $dccName = $orgLink->dcc_name;
+                $up3Id = $orgLink->up3_id;
+
+                // Initialize structures if they don't exist.
+                if (!isset($aggregatedData[$dccName])) {
+                    $aggregatedData[$dccName] = [];
+                }
+                if (!isset($aggregatedData[$dccName][$up3Id])) {
+                    $aggregatedData[$dccName][$up3Id] = [
+                        'name' => $orgLink->up3_name,
+                        'power' => 0,
+                        'current' => 0
+                    ];
+                }
+
+                // Add the power and current values to the correct UP3 total.
+                $aggregatedData[$dccName][$up3Id]['power'] += $values['power'];
+                $aggregatedData[$dccName][$up3Id]['current'] += $values['current'];
+            }
+
+            // STEP 4: Format the aggregated data into the final JSON structure.
+            $systemLoadData = [];
             $grandTotalPower = 0;
             $grandTotalCurrent = 0;
 
-            foreach ($systemLoadData as $system) {
-                $grandTotalPower += floatval(str_replace([' MW', ','], '', $system['total']['power']));
-                $grandTotalCurrent += floatval(str_replace([' A', ','], '', $system['total']['current']));
+            foreach ($aggregatedData as $dccName => $up3s) {
+                $regions = [];
+                $dccTotalPower = 0;
+                $dccTotalCurrent = 0;
+
+                foreach ($up3s as $up3) {
+                    $regions[] = [
+                        'name' => $up3['name'],
+                        'power' => number_format($up3['power'], 2) . ' MW',
+                        'current' => number_format($up3['current'], 2) . ' A'
+                    ];
+                    $dccTotalPower += $up3['power'];
+                    $dccTotalCurrent += $up3['current'];
+                }
+
+                $systemLoadData[] = [
+                    'name' => 'Beban Sistem ' . $dccName,
+                    'regions' => $regions,
+                    'total' => [
+                        'power' => number_format($dccTotalPower, 2) . ' MW',
+                        'current' => number_format($dccTotalCurrent, 2) . ' A'
+                    ]
+                ];
+
+                $grandTotalPower += $dccTotalPower;
+                $grandTotalCurrent += $dccTotalCurrent;
             }
 
             return response()->json([
@@ -349,8 +388,7 @@ class DashboardController extends Controller
                 ]
             ]);
         } catch (\Exception $e) {
-            Log::error('Error fetching system load data: ' . $e->getMessage());
-
+            Log::error('Error fetching system load data (Refactored): ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Error fetching system load data',
