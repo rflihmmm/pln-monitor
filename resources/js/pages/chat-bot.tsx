@@ -11,7 +11,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 interface ChatBotPageProps {
-    n8nWebhookUrl?: string;
+    n8nWebhookUrl: string;
 }
 
 export default function ChatBot({ n8nWebhookUrl }: ChatBotPageProps) {
@@ -22,7 +22,12 @@ export default function ChatBot({ n8nWebhookUrl }: ChatBotPageProps) {
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="grid grid-cols-1">
                     <div className="space-y-6">
-                        <AiChatBot n8nWebhookUrl={n8nWebhookUrl} />
+                        <AiChatBot
+                            webhookUrl={n8nWebhookUrl}
+                            allowUploads={true}
+                            allowedMimeTypes="image/*,application/pdf"
+                            showWelcome={true}
+                        />
                     </div>
                 </div>
             </div>

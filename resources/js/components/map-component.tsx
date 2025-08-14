@@ -118,8 +118,8 @@ export default function MapComponent({ filter }: MapComponentProps) {
 
     return (
         <MapContainer
-            center={[-5.1381, 119.4469]} // Center on Makassar, Sulawesi
-            zoom={11}
+            center={[-1.980379, 120.512788]} // Center on Makassar, Sulawesi
+            zoom={7}
             style={{ height: '100%', width: '100%', zIndex: 1 }}
             zoomControl={false}
             whenCreated={(map) => {

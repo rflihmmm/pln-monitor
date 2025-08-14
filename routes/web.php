@@ -47,6 +47,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Routes untuk maps
     Route::get('/api/mapdata', [DashboardController::class, 'getMapData']);
+    Route::get('/api/system-load-data', [DashboardController::class, 'getSystemLoadData']);
 
     // Routes untuk mendapatkan data single line
     Route::get('/api/single-line', [SingleLineController::class, 'getSingleLineData']);

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Feeder;
 use App\Models\GarduInduk;
+use App\Models\Organization;
 use Illuminate\Http\Request;
 use App\Models\AnalogPointSkada;
 use App\Models\StatusPointSkada;
@@ -11,6 +12,7 @@ use App\Models\FeederStatusPoint;
 use App\Models\StationPointSkada;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Models\OrganizationKeypoint;
 
 class DashboardController extends Controller
 {
@@ -252,6 +254,106 @@ class DashboardController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error fetching filtered map data',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getSystemLoadData()
+    {
+        try {
+            // Get all DCC organizations (level 1)
+            $dccOrganizations = Organization::where('level', 1)->get();
+
+            $systemLoadData = [];
+
+            foreach ($dccOrganizations as $dcc) {
+                // Get all UP3 organizations under this DCC (level 2)
+                $up3Organizations = Organization::where('level', 2)
+                    ->where('parent_id', $dcc->id)
+                    ->get();
+
+                $regions = [];
+                $totalPower = 0;
+                $totalCurrent = 0;
+
+                foreach ($up3Organizations as $up3) {
+                    // Get keypoints for this UP3 organization
+                    $organizationKeypoints = OrganizationKeypoint::where('organization_id', $up3->id)->get();
+
+                    $up3Power = 0;
+                    $up3Current = 0;
+
+                    foreach ($organizationKeypoints as $keypoint) {
+                        $stationPoint = StationPointSkada::where('PKEY', $keypoint->keypoint_id)
+                            ->where('NAME', 'LIKE', 'LBS-%')
+                            ->first();
+
+                        // Only process if it's an LBS keypoint
+                        if ($stationPoint) {
+                            // Get power data (IS from NAME column)
+                            $powerData = AnalogPointSkada::where('STATIONPID', $keypoint->keypoint_id)
+                                ->where('NAME', 'IS')
+                                ->sum('VALUE');
+
+                            // Get current data (IR from NAME column)
+                            $currentData = AnalogPointSkada::where('STATIONPID', $keypoint->keypoint_id)
+                                ->where('NAME', 'IR')
+                                ->sum('VALUE');
+
+                            $up3Power += $powerData ?? 0;
+                            $up3Current += $currentData ?? 0;
+                        }
+                    }
+
+                    // Add to regions array
+                    $regions[] = [
+                        'name' => $up3->name,
+                        'power' => number_format($up3Power) . ' MW',
+                        'current' => number_format($up3Current, 2) . ' A'
+                    ];
+
+                    // Add to totals
+                    $totalPower += $up3Power;
+                    $totalCurrent += $up3Current;
+                }
+
+                // Build system name (Beban Sistem + DCC name)
+                $systemName = "Beban Sistem " . $dcc->name;
+
+                $systemLoadData[] = [
+                    'name' => $systemName,
+                    'regions' => $regions,
+                    'total' => [
+                        'power' => number_format($totalPower, 2) . ' MW',
+                        'current' => number_format($totalCurrent, 2) . ' A'
+                    ]
+                ];
+            }
+
+            // Calculate grand total for all systems
+            $grandTotalPower = 0;
+            $grandTotalCurrent = 0;
+
+            foreach ($systemLoadData as $system) {
+                $grandTotalPower += floatval(str_replace([' MW', ','], '', $system['total']['power']));
+                $grandTotalCurrent += floatval(str_replace([' A', ','], '', $system['total']['current']));
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $systemLoadData,
+                'grandTotal' => [
+                    'power' => number_format($grandTotalPower, 2) . ' MW',
+                    'current' => number_format($grandTotalCurrent, 2) . ' A'
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching system load data: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching system load data',
                 'error' => $e->getMessage()
             ], 500);
         }
