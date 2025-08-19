@@ -4,14 +4,28 @@ import { DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import axios from "axios"
 
 interface User {
   id?: string
   name: string
   email: string
   role: string
+  unit?: number | null
+  unit_id?: number | null
   createdAt?: string
   avatarUrl?: string
+}
+
+interface Organization {
+  id: number
+  name: string
+  level: number
+  level_name: string
+  parent_id: number | null
+  parent_name: string | null
+  address: string | null
+  display_name: string
 }
 
 interface UserFormProps {
@@ -26,9 +40,16 @@ export default function UserForm({ user, onSubmit, onCancel, isEdit = false }: U
     name: "",
     email: "",
     role: "user",
+    unit: null,
     password: "",
     password_confirmation: "",
   })
+
+  const [organizations, setOrganizations] = useState<Organization[]>([])
+  const [unitSearchTerm, setUnitSearchTerm] = useState<string>("")
+  const [isUnitSelectOpen, setIsUnitSelectOpen] = useState<boolean>(false)
+  const [passwordError, setPasswordError] = useState<string>("")
+  const [isLoadingOrganizations, setIsLoadingOrganizations] = useState<boolean>(false)
 
   useEffect(() => {
     if (user && isEdit) {
@@ -36,17 +57,91 @@ export default function UserForm({ user, onSubmit, onCancel, isEdit = false }: U
         name: user.name,
         email: user.email,
         role: user.role,
+        unit: user.unit_id || user.unit,
       })
-    }
-  }, [user, isEdit])
 
-  const handleChange = (field: string, value: string) => {
+      // Set initial search term for unit organization
+      if ((user.unit_id || user.unit) && organizations.length > 0) {
+        const selectedOrg = organizations.find(org => org.id === (user.unit_id || user.unit))
+        if (selectedOrg) {
+          setUnitSearchTerm(selectedOrg.display_name)
+        }
+      }
+    }
+  }, [user, isEdit, organizations])
+
+  // Fetch organizations data
+  useEffect(() => {
+    const fetchOrganizations = async () => {
+      setIsLoadingOrganizations(true)
+      try {
+        const response = await axios.get('/master/api/organizations')
+        if (response.data.success) {
+          setOrganizations(response.data.data)
+        }
+      } catch (error) {
+        console.error('Failed to fetch organizations:', error)
+      } finally {
+        setIsLoadingOrganizations(false)
+      }
+    }
+
+    fetchOrganizations()
+  }, [])
+
+  const handleChange = (field: string, value: string | number | null) => {
     setUserData({ ...userData, [field]: value })
+
+    // Validate password length
+    if (field === 'password') {
+      const passwordValue = value as string
+      if (passwordValue && passwordValue.length > 0 && passwordValue.length < 8) {
+        setPasswordError('Password harus minimal 8 karakter')
+      } else {
+        setPasswordError('')
+      }
+    }
   }
 
   const handleSubmit = () => {
+    // Final password validation before submit
+    if (!isEdit && userData.password && userData.password.length < 8) {
+      setPasswordError('Password harus minimal 8 karakter')
+      return
+    }
+
     onSubmit(userData)
   }
+
+  // Filter organizations based on search term
+  const filteredOrganizations = organizations.filter(org =>
+    org.display_name.toLowerCase().includes(unitSearchTerm.toLowerCase()) ||
+    org.name.toLowerCase().includes(unitSearchTerm.toLowerCase())
+  )
+
+  const handleUnitSelect = (value: string) => {
+    if (value === "none") {
+      handleChange("unit", null)
+      setUnitSearchTerm("")
+    } else {
+      const selectedOrg = organizations.find(org => org.id.toString() === value)
+      if (selectedOrg) {
+        handleChange("unit", parseInt(value))
+        setUnitSearchTerm(selectedOrg.display_name)
+      }
+    }
+    setIsUnitSelectOpen(false)
+  }
+
+  const clearUnitSelection = () => {
+    handleChange("unit", null)
+    setUnitSearchTerm("")
+  }
+
+  // Get selected unit name for display
+  const selectedUnitName = userData.unit
+    ? organizations.find(org => org.id === userData.unit)?.display_name
+    : null
 
   return (
     <div className="grid gap-4 py-4">
@@ -59,6 +154,7 @@ export default function UserForm({ user, onSubmit, onCancel, isEdit = false }: U
           placeholder="John Doe"
         />
       </div>
+
       <div className="grid gap-2">
         <Label htmlFor="email">Email</Label>
         <Input
@@ -69,28 +165,7 @@ export default function UserForm({ user, onSubmit, onCancel, isEdit = false }: U
           placeholder="john@example.com"
         />
       </div>
-      {!isEdit && (
-        <>
-          <div className="grid gap-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={userData.password}
-              onChange={(e) => handleChange("password", e.target.value)}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="password_confirmation">Confirm Password</Label>
-            <Input
-              id="password_confirmation"
-              type="password"
-              value={userData.password_confirmation}
-              onChange={(e) => handleChange("password_confirmation", e.target.value)}
-            />
-          </div>
-        </>
-      )}
+
       <div className="grid gap-2">
         <Label htmlFor="role">Role</Label>
         <Select value={userData.role} onValueChange={(value) => handleChange("role", value)}>
@@ -103,13 +178,120 @@ export default function UserForm({ user, onSubmit, onCancel, isEdit = false }: U
           </SelectContent>
         </Select>
       </div>
+
+      <div className="grid gap-2">
+        <Label htmlFor="unit">Unit</Label>
+        <div className="relative">
+          <Input
+            id="unit_search"
+            value={unitSearchTerm}
+            onChange={(e) => {
+              setUnitSearchTerm(e.target.value)
+              setIsUnitSelectOpen(true)
+            }}
+            onFocus={() => setIsUnitSelectOpen(true)}
+            placeholder={isLoadingOrganizations ? "Loading organizations..." : "Search unit organization (optional)..."}
+            className="pr-20"
+            disabled={isLoadingOrganizations}
+          />
+          {selectedUnitName && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="absolute right-1 top-1 h-8 px-2 text-xs"
+              onClick={clearUnitSelection}
+            >
+              Clear
+            </Button>
+          )}
+
+          {isUnitSelectOpen && !isLoadingOrganizations && (
+            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+              <div
+                className="px-3 py-2 cursor-pointer hover:bg-gray-100 text-sm border-b"
+                onClick={() => handleUnitSelect("none")}
+              >
+                <span className="font-medium">None</span>
+                <div className="text-xs text-gray-500">No unit assigned</div>
+              </div>
+              {filteredOrganizations.length > 0 ? (
+                filteredOrganizations.map((org) => (
+                  <div
+                    key={org.id}
+                    className="px-3 py-2 cursor-pointer hover:bg-gray-100 text-sm border-b last:border-b-0"
+                    onClick={() => handleUnitSelect(org.id.toString())}
+                  >
+                    <div className="font-medium">{org.name}</div>
+                    <div className="text-xs text-gray-500">
+                      {org.level_name}
+                      {org.parent_name && ` • Parent: ${org.parent_name}`}
+                      {org.address && ` • ${org.address}`}
+                    </div>
+                  </div>
+                ))
+              ) : unitSearchTerm && (
+                <div className="px-3 py-2 text-sm text-gray-500">
+                  No organizations found
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Show selected unit organization */}
+        {selectedUnitName && (
+          <div className="text-sm text-gray-600 mt-1">
+            Selected: <span className="font-medium">{selectedUnitName}</span>
+          </div>
+        )}
+      </div>
+
+      {!isEdit && (
+        <>
+          <div className="grid gap-2">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              value={userData.password}
+              onChange={(e) => handleChange("password", e.target.value)}
+              className={passwordError ? "border-red-500" : ""}
+            />
+            {passwordError && (
+              <div className="text-sm text-red-500 mt-1">
+                {passwordError}
+              </div>
+            )}
+            {!passwordError && userData.password && userData.password.length > 0 && userData.password.length >= 8 && (
+              <div className="text-sm text-green-500 mt-1">
+                Password sudah memenuhi syarat minimum
+              </div>
+            )}
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="password_confirmation">Confirm Password</Label>
+            <Input
+              id="password_confirmation"
+              type="password"
+              value={userData.password_confirmation}
+              onChange={(e) => handleChange("password_confirmation", e.target.value)}
+            />
+          </div>
+        </>
+      )}
+
       <DialogFooter>
         <Button variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button onClick={handleSubmit}>{isEdit ? "Save Changes" : "Add User"}</Button>
+        <Button
+          onClick={handleSubmit}
+          disabled={!isEdit && passwordError !== ""}
+        >
+          {isEdit ? "Save Changes" : "Add User"}
+        </Button>
       </DialogFooter>
     </div>
   )
 }
-

@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers\Master;
 
-use App\Http\Controllers\Controller;
 use App\Models\User;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
+use App\Models\Organization;
+use Illuminate\Http\Request;
 use Spatie\Permission\Models\Role;
+use App\Http\Controllers\Controller;
 
 class UserController extends Controller
 {
@@ -18,6 +19,8 @@ class UserController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->roles->first() ? $user->roles->first()->name : 'user',
+                'unit' => $user->organization ? $user->organization->name : null,
+                'unit_id' => $user->unit,
                 'createdAt' => $user->created_at->toISOString(),
             ];
         });
@@ -42,12 +45,14 @@ class UserController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8',
             'role' => 'required|string|exists:roles,name',
+            'unit' => 'nullable|integer|exists:organization,id',
         ]);
 
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => bcrypt($validated['password']),
+            'unit' => $validated['unit'] ?? null,
         ]);
 
         $user->assignRole($validated['role']);
@@ -61,11 +66,13 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email,' . $manage_user->id,
             'role' => 'sometimes|string|exists:roles,name',
+            'unit' => 'nullable|integer|exists:organization,id',
         ]);
 
         $manage_user->update([
             'name' => $validated['name'],
             'email' => $validated['email'],
+            'unit' => $validated['unit'] ?? null,
         ]);
 
         if (isset($validated['role'])) {
@@ -79,5 +86,31 @@ class UserController extends Controller
     {
         $manage_user->delete();
         return redirect()->route('master.manage-users.index')->with('success', 'Berhasil menghapus User.');
+    }
+
+    public function getOrganizations()
+    {
+        $organizations = Organization::select('id', 'name', 'level', 'parent_id', 'address')
+            ->with('parent:id,name')
+            ->orderBy('level')
+            ->orderBy('name')
+            ->get()
+            ->map(function ($org) {
+                return [
+                    'id' => $org->id,
+                    'name' => $org->name,
+                    'level' => $org->level,
+                    'level_name' => $org->getLevelNameAttribute(),
+                    'parent_id' => $org->parent_id,
+                    'parent_name' => $org->parent ? $org->parent->name : null,
+                    'address' => $org->address,
+                    'display_name' => $org->name . ' (' . $org->getLevelNameAttribute() . ')',
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => $organizations
+        ]);
     }
 }

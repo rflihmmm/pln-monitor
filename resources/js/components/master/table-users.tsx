@@ -23,6 +23,7 @@ interface User {
   name: string
   email: string
   role: string
+  unit: string
   createdAt: string
   avatarUrl?: string
 }
@@ -69,6 +70,7 @@ export default function TableUsers({ users: initialUsers }: TableUsersProps) {
         password: userData.password,
         password_confirmation: userData.password_confirmation,
         role: userData.role,
+        unit: userData.unit,
       },
       {
         onSuccess: () => {
@@ -88,6 +90,7 @@ export default function TableUsers({ users: initialUsers }: TableUsersProps) {
         name: userData.name,
         email: userData.email,
         role: userData.role,
+        unit: userData.unit,
       },
       {
         onSuccess: () => {
@@ -150,6 +153,7 @@ export default function TableUsers({ users: initialUsers }: TableUsersProps) {
               <TableRow>
                 <TableHead>User</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Unit</TableHead>
                 <TableHead>Created At</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -178,6 +182,9 @@ export default function TableUsers({ users: initialUsers }: TableUsersProps) {
                     </TableCell>
                     <TableCell>
                       <div className="capitalize">{user.role}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="capitalize">{user.unit || "No unit assigned"}</div>
                     </TableCell>
                     <TableCell>{formatDate(user.createdAt)}</TableCell>
                     <TableCell className="text-right">

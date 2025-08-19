@@ -45,5 +45,7 @@ Route::middleware('auth')->group(function () {
         Route::get('feeder/analogpoint-data', [FeederController::class, 'getAnalogPoints'])->name('feeder.analogpoint-data');
 
         Route::get('mapping/ulp', [OrganizationGridController::class, 'getUlpData'])->name('mapping.ulp');
+
+        Route::get('api/organizations', [UserController::class, 'getOrganizations'])->name('api.organizations');
     });
 });
