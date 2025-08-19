@@ -12,9 +12,13 @@ use App\Models\FeederStatusPoint;
 use App\Models\StationPointSkada;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Models\OrganizationKeypoint;
+use App\Http\Controllers\Traits\HasOrganizationHierarchy;
 
 class SingleLineController extends Controller
 {
+    use HasOrganizationHierarchy;
+
     public function getSingleLineData()
     {
         try {
@@ -372,6 +376,137 @@ class SingleLineController extends Controller
                 'message' => 'Error fetching filtered single line data',
                 'error' => $e->getMessage()
             ], 500);
+        }
+    }
+    public function getSingleLineDataByUser(Request $request)
+    {
+        try {
+            $user = $request->user();
+            if (!$user || !$user->unit) {
+                return response()->json(['success' => true, 'data' => [], 'count' => 0]);
+            }
+
+            $userOrganizationId = $user->unit;
+            $organizationIds = $this->getOrganizationDescendants($userOrganizationId);
+            $organizationIds[] = $userOrganizationId;
+
+            $allowedKeypointIds = OrganizationKeypoint::whereIn('organization_id', $organizationIds)
+                ->pluck('keypoint_id')
+                ->unique()
+                ->filter()
+                ->values();
+
+            if ($allowedKeypointIds->isEmpty()) {
+                return response()->json(['success' => true, 'data' => [], 'count' => 0]);
+            }
+
+            $singleLineData = [];
+            $incrementalId = 1;
+
+            // Ambil data dari gardu_induks dan keypoint_ext yang relevan
+            $garduInduks = GarduInduk::whereIn('keypoint_id', $allowedKeypointIds)->get();
+            $keypointExts = KeypointExt::whereIn('keypoint_id', $allowedKeypointIds)->get();
+
+            // Gabungkan semua keypoint_id
+            $allKeypointIds = collect();
+
+            // Dari gardu_induks
+            foreach ($garduInduks as $gardu) {
+                if ($gardu->keypoint_id) {
+                    $allKeypointIds->push([
+                        'keypoint_id' => $gardu->keypoint_id,
+                        'coordinate' => $gardu->coordinate,
+                        'source' => 'gardu_induk'
+                    ]);
+                }
+            }
+
+            // Dari keypoint_ext
+            foreach ($keypointExts as $keypoint) {
+                $allKeypointIds->push([
+                    'keypoint_id' => $keypoint->keypoint_id,
+                    'coordinate' => $keypoint->coordinate,
+                    'parent_stationpoints' => $keypoint->parent_stationpoints,
+                    'source' => 'keypoint_ext'
+                ]);
+            }
+
+            // Proses setiap keypoint
+            foreach ($allKeypointIds as $keypointData) {
+                $keypointId = $keypointData['keypoint_id'];
+
+                // Ambil data dari StationPointSkada
+                $stationPoint = StationPointSkada::where('PKEY', $keypointId)->first();
+
+                if (!$stationPoint) {
+                    continue; // Skip jika tidak ada data di StationPointSkada
+                }
+
+                $name = $stationPoint->NAME;
+                $type = $this->extractTypeFromName($name);
+                $coordinate = $this->parseCoordinate($keypointData['coordinate'] ?? null);
+
+                if (!$coordinate) {
+                    continue; // Skip jika coordinate tidak valid
+                }
+
+                // Tentukan parent
+                $parent = null;
+                if ($type !== 'GI' && isset($keypointData['parent_stationpoints'])) {
+                    $parent = $keypointData['parent_stationpoints'];
+                }
+
+                // Status
+                $status = $this->getKeypointStatus($keypointId);
+
+                // Load data
+                $loadData = $this->calculateKeypointLoad($keypointId, $type);
+
+                // Feeder data (hanya untuk type GI)
+                $feederData = null;
+                if ($type === 'GI') {
+                    $feederData = $this->getFeederData($keypointId);
+                }
+
+                $singleLineData[] = [
+                    'id' => $incrementalId++,
+                    'code' => $keypointId,
+                    'name' => $name,
+                    'type' => $type,
+                    'coordinate' => $coordinate,
+                    'parent' => $parent,
+                    'status' => $status,
+                    'data' => [
+                        'load-mw' => $loadData['load_mw'] . ' MW',
+                        'load-is' => $loadData['load_is'] . ' A',
+                        'lastUpdate' => $loadData['last_update'],
+                    ],
+                    'feeder' => $feederData
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $singleLineData,
+                'count' => count($singleLineData)
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching single line data for user',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+    public function getSingleLineDataBasedOnRole(Request $request)
+    {
+        $user = $request->user();
+        // atau bisa juga: $user = Auth::user();
+
+        if ($user && $user->unit === null) {
+            return $this->getSingleLineData();
+        } else {
+            return $this->getSingleLineDataByUser($request);
         }
     }
 }

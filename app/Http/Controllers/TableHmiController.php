@@ -2,18 +2,22 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AnalogPointSkada;
 use App\Models\Feeder;
-use App\Models\FeederKeypoint;
-use App\Models\FeederStatusPoint;
 use App\Models\GarduInduk;
-use App\Models\StatusPointSkada;
 use Illuminate\Http\Request;
+use App\Models\FeederKeypoint;
+use App\Models\AnalogPointSkada;
+use App\Models\StatusPointSkada;
+use App\Models\FeederStatusPoint;
 use Illuminate\Support\Facades\DB;
+use App\Models\OrganizationKeypoint;
 use Illuminate\Support\Facades\Cache;
+use App\Http\Controllers\Traits\HasOrganizationHierarchy;
+
 
 class TableHmiController extends Controller
 {
+    use HasOrganizationHierarchy;
     public function index()
     {
         // Cache data selama 30 detik untuk mengurangi query berulang
@@ -189,5 +193,150 @@ class TableHmiController extends Controller
             'kvBC' => $keypointData->get('KV-BC')?->first()?->VALUE,
             'kvAC' => $keypointData->get('KV-AC')?->first()?->VALUE,
         ];
+    }
+    public function indexByUser(Request $request)
+    {
+        // We don't cache user-specific data as it might not be requested frequently
+        // by the same user within a short period. Caching is more effective for global data.
+        $data = $this->getHmiDataByUser($request);
+
+        return response()->json($data);
+    }
+
+    private function getHmiDataByUser(Request $request)
+    {
+        $user = $request->user();
+        if (!$user || !$user->unit) {
+            return []; // Return empty data if user is not authenticated or has no unit
+        }
+
+        $userOrganizationId = $user->unit;
+        $organizationIds = $this->getOrganizationDescendants($userOrganizationId);
+        $organizationIds[] = $userOrganizationId;
+
+        $keypointIds = OrganizationKeypoint::whereIn('id', $organizationIds)
+            ->pluck('keypoint_id')
+            ->unique()
+            ->filter()
+            ->values();
+
+        if ($keypointIds->isEmpty()) {
+            return [];
+        }
+
+        // 1. Gunakan single query dengan JOIN untuk mendapatkan semua data sekaligus
+        $feedersData = DB::table('feeders as f')
+            ->select([
+                'f.id as feeder_id',
+                'f.name as feeder_name',
+                'gi.name as gardu_induk_name',
+                'fk.id as keypoint_relation_id',
+                'fk.keypoint_id',
+                'fk.name as keypoint_name',
+                'fsp.status_id',
+                'fsp.type as status_type'
+            ])
+            ->leftJoin('gardu_induks as gi', 'f.gardu_induk_id', '=', 'gi.id')
+            ->leftJoin('feeder_keypoints as fk', 'f.id', '=', 'fk.feeder_id')
+            ->leftJoin('feeder_status_points as fsp', 'f.id', '=', 'fsp.feeder_id')
+            ->whereIn('fk.keypoint_id', $keypointIds)
+            ->get();
+
+        // 2. Kumpulkan semua ID yang diperlukan
+        $statusIds = $feedersData->pluck('status_id')->filter()->unique()->values();
+        $filteredKeypointIds = $feedersData->pluck('keypoint_id')->filter()->unique()->values();
+
+        // 3. Ambil semua data SKADA dalam query paralel
+        $statusPointSkadaData = [];
+        $analogPointSkadaData = [];
+        $statusKeypointData = [];
+        $analogKeypointData = [];
+
+        // Query untuk StatusPointSkada (hanya untuk PMT)
+        if ($statusIds->isNotEmpty()) {
+            $statusPointSkadaData = StatusPointSkada::select(['PKEY', 'TAGLEVEL', 'VALUE'])
+                ->whereIn('PKEY', $statusIds->toArray())
+                ->get()
+                ->keyBy('PKEY');
+        }
+
+        // Query untuk AnalogPointSkada (untuk AMP dan MW berdasarkan status_id)
+        if ($statusIds->isNotEmpty()) {
+            $analogPointSkadaData = AnalogPointSkada::select(['PKEY', 'VALUE'])
+                ->whereIn('PKEY', $statusIds->toArray())
+                ->get()
+                ->keyBy('PKEY');
+        }
+
+        if ($filteredKeypointIds->isNotEmpty()) {
+            // Batch query untuk status points
+            $statusNames = ['CB', 'LR', 'HOTLINE-TAG', 'RESET-ALARM'];
+            $statusKeypointData = StatusPointSkada::select(['STATIONPID', 'NAME', 'VALUE'])
+                ->whereIn('STATIONPID', $filteredKeypointIds->toArray())
+                ->whereIn('NAME', $statusNames)
+                ->get()
+                ->groupBy(['STATIONPID', 'NAME']);
+
+            // Batch query untuk analog points
+            $analogNames = ['IR', 'IS', 'IT', 'IF-R', 'IF-S', 'IF-T', 'IF-N', 'KV-AB', 'KV-BC', 'KV-AC', 'COS-P'];
+            $analogKeypointData = AnalogPointSkada::select(['STATIONPID', 'NAME', 'VALUE'])
+                ->whereIn('STATIONPID', $filteredKeypointIds->toArray())
+                ->whereIn('NAME', $analogNames)
+                ->get()
+                ->groupBy(['STATIONPID', 'NAME']);
+        }
+
+        // 4. Group data by feeder untuk processing yang lebih efisien
+        $groupedFeeders = $feedersData->groupBy('feeder_id');
+
+        $result = [];
+        $id = 1;
+
+        foreach ($groupedFeeders as $feederId => $feederData) {
+            $feederInfo = $feederData->first();
+
+            // Cache nilai PMT1, AMP, MW per feeder
+            $feederStatusValues = $this->getFeederStatusValues($feederData, $statusPointSkadaData, $analogPointSkadaData);
+
+            // Group keypoints untuk feeder ini
+            $keypoints = $feederData->where('keypoint_id', '!=', null)->groupBy('keypoint_id');
+
+            foreach ($keypoints as $keypointId => $keypointData) {
+                $keypointInfo = $keypointData->first();
+
+                // Optimized data retrieval dengan null coalescing
+                $rowData = [
+                    'id' => (string) $id++,
+                    'garduInduk' => $feederInfo->gardu_induk_name,
+                    'feeder' => $feederInfo->feeder_name,
+                    'pmt1' => $feederStatusValues['pmt1'],
+                    'amp' => $feederStatusValues['amp'],
+                    'mw' => $feederStatusValues['mw'],
+                    'keypoint' => $keypointInfo->keypoint_name,
+                    'pmt2' => $this->getPmt2Values($keypointId, $statusKeypointData),
+                    'hotlineTag' => $statusKeypointData->get($keypointId)?->get('HOTLINE-TAG')?->first()?->VALUE,
+                    'reset' => $statusKeypointData->get($keypointId)?->get('RESET-ALARM')?->first()?->VALUE,
+                ];
+
+                // Tambahkan analog values dengan batch processing
+                $rowData = array_merge($rowData, $this->getAnalogValues($keypointId, $analogKeypointData));
+
+                $result[] = $rowData;
+            }
+        }
+
+        return $result;
+    }
+
+    public function getHmiDataBasedOnRole(Request $request)
+    {
+        $user = $request->user();
+        // atau bisa juga: $user = Auth::user();
+
+        if ($user && $user->unit === null) {
+            return $this->index();
+        } else {
+            return $this->indexByUser($request);
+        }
     }
 }

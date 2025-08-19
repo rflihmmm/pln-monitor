@@ -396,4 +396,250 @@ class DashboardController extends Controller
             ], 500);
         }
     }
+    public function getMapDataByUser(Request $request)
+    {
+        try {
+            $user = $request->user();
+            if (!$user || !$user->unit) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated or no unit assigned',
+                ], 401);
+            }
+
+            $userOrganizationId = $user->unit;
+            $organizationIds = $this->getOrganizationDescendants($userOrganizationId);
+            $organizationIds[] = $userOrganizationId;
+
+            // Get keypoint IDs for the user's organization and its descendants
+            $keypointIds = OrganizationKeypoint::whereIn('organization_id', $organizationIds)
+                ->pluck('keypoint_id')
+                ->toArray();
+
+            if (empty($keypointIds)) {
+                return response()->json(['success' => true, 'data' => []]);
+            }
+
+            // Fetch GarduInduk data based on the collected keypoint IDs
+            $garduInduks = GarduInduk::with(['feeders.statusPoints'])
+                ->whereIn('keypoint_id', $keypointIds)
+                ->get();
+
+            $mapData = [];
+            foreach ($garduInduks as $garduInduk) {
+                if (empty($garduInduk->coordinate)) {
+                    continue;
+                }
+
+                $coordinate = $this->parseCoordinate($garduInduk->coordinate);
+                if (!$coordinate) {
+                    continue;
+                }
+
+                $keypointName = null;
+                if ($garduInduk->keypoint_id) {
+                    $stationPoint = StationPointSkada::where('PKEY', $garduInduk->keypoint_id)->first();
+                    $keypointName = $stationPoint ? $stationPoint->NAME : null;
+                }
+
+                $status = $this->getGarduIndukStatus($garduInduk->keypoint_id);
+                $loadData = $this->calculateLoad($garduInduk);
+
+                $mapData[] = [
+                    'id' => $garduInduk->id,
+                    'name' => $garduInduk->name,
+                    'keypointName' => $keypointName,
+                    'coordinate' => $coordinate,
+                    'status' => $status,
+                    'data' => [
+                        'load-is' => $loadData['load_is'],
+                        'load-mw' => $loadData['load_mw'],
+                        'lastUpdate' => now()->toISOString(),
+                    ]
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $mapData
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching map data for user',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    private function getOrganizationDescendants($organizationId)
+    {
+        $descendants = [];
+        $organizations = Organization::where('parent_id', $organizationId)->get();
+
+        foreach ($organizations as $organization) {
+            $descendants[] = $organization->id;
+            $descendants = array_merge($descendants, $this->getOrganizationDescendants($organization->id));
+        }
+
+        return $descendants;
+    }
+
+    public function getSystemLoadDataByUser(Request $request)
+    {
+        try {
+            $user = $request->user();
+            if (!$user || !$user->unit) {
+                return response()->json(['success' => false, 'message' => 'User not authenticated or no unit assigned'], 401);
+            }
+
+            $userOrganizationId = $user->unit;
+            $organizationIds = $this->getOrganizationDescendants($userOrganizationId);
+            $organizationIds[] = $userOrganizationId;
+
+            $orgsWithKeypoints = DB::connection('pgsql')
+                ->table('organization as org')
+                ->leftJoin('organization_keypoint as okp', 'okp.organization_id', '=', 'org.id')
+                ->whereIn('org.id', $organizationIds)
+                ->select('org.id', 'org.name', 'org.level', 'org.parent_id', 'okp.keypoint_id')
+                ->get();
+
+            if ($orgsWithKeypoints->isEmpty()) {
+                return response()->json(['success' => true, 'data' => [], 'grandTotal' => ['power' => '0.00 MW', 'current' => '0.00 A']]);
+            }
+
+            $keypointIds = $orgsWithKeypoints->pluck('keypoint_id')->unique()->filter()->all();
+
+            $analogData = DB::connection('sqlsrv_main')
+                ->table('ANALOGPOINTS')
+                ->whereIn('STATIONPID', $keypointIds)
+                ->whereIn('NAME', ['IS', 'IR'])
+                ->select('STATIONPID', 'NAME', 'VALUE')
+                ->get();
+
+            $analogValueMap = [];
+            foreach ($analogData as $point) {
+                $key = $point->STATIONPID;
+                if (!isset($analogValueMap[$key])) {
+                    $analogValueMap[$key] = ['power' => 0, 'current' => 0];
+                }
+                if ($point->NAME === 'IS') {
+                    $analogValueMap[$key]['power'] = (float)$point->VALUE;
+                } elseif ($point->NAME === 'IR') {
+                    $analogValueMap[$key]['current'] = (float)$point->VALUE;
+                }
+            }
+
+            // Find the top-level organization for the user (DCC)
+            $userOrg = Organization::find($userOrganizationId);
+            $topLevelOrg = $userOrg;
+            while ($topLevelOrg->parent_id) {
+                $topLevelOrg = $topLevelOrg->parent;
+            }
+
+            $aggregatedData = [];
+            $allOrgs = Organization::whereIn('id', $organizationIds)->get()->keyBy('id');
+
+            foreach ($orgsWithKeypoints as $orgLink) {
+                if (!$orgLink->keypoint_id) continue;
+
+                $values = $analogValueMap[$orgLink->keypoint_id] ?? ['power' => 0, 'current' => 0];
+
+                $currentOrg = $allOrgs->get($orgLink->id);
+                if (!$currentOrg) continue;
+
+                // Find the UP3 for the current org
+                $up3 = null;
+                if ($currentOrg->level == 3) { // ULP
+                    $up3 = $allOrgs->get($currentOrg->parent_id);
+                } elseif ($currentOrg->level == 2) { // UP3
+                    $up3 = $currentOrg;
+                }
+
+                if ($up3) {
+                    $dccName = $topLevelOrg->name;
+                    $up3Id = $up3->id;
+
+                    if (!isset($aggregatedData[$dccName])) {
+                        $aggregatedData[$dccName] = [];
+                    }
+                    if (!isset($aggregatedData[$dccName][$up3Id])) {
+                        $aggregatedData[$dccName][$up3Id] = ['name' => $up3->name, 'power' => 0, 'current' => 0];
+                    }
+
+                    $aggregatedData[$dccName][$up3Id]['power'] += $values['power'];
+                    $aggregatedData[$dccName][$up3Id]['current'] += $values['current'];
+                }
+            }
+
+
+            $systemLoadData = [];
+            $grandTotalPower = 0;
+            $grandTotalCurrent = 0;
+
+            foreach ($aggregatedData as $dccName => $up3s) {
+                $regions = [];
+                $dccTotalPower = 0;
+                $dccTotalCurrent = 0;
+
+                foreach ($up3s as $up3) {
+                    $regions[] = [
+                        'name' => $up3['name'],
+                        'power' => number_format($up3['power'], 2) . ' MW',
+                        'current' => number_format($up3['current'], 2) . ' A'
+                    ];
+                    $dccTotalPower += $up3['power'];
+                    $dccTotalCurrent += $up3['current'];
+                }
+
+                $systemLoadData[] = [
+                    'name' => 'Beban Sistem ' . $dccName,
+                    'regions' => $regions,
+                    'total' => [
+                        'power' => number_format($dccTotalPower, 2) . ' MW',
+                        'current' => number_format($dccTotalCurrent, 2) . ' A'
+                    ]
+                ];
+
+                $grandTotalPower += $dccTotalPower;
+                $grandTotalCurrent += $dccTotalCurrent;
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $systemLoadData,
+                'grandTotal' => [
+                    'power' => number_format($grandTotalPower, 2) . ' MW',
+                    'current' => number_format($grandTotalCurrent, 2) . ' A'
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching system load data by user: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Error fetching system load data', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function getMapDataBasedOnRole(Request $request)
+    {
+        $user = $request->user();
+        // atau bisa juga: $user = Auth::user();
+
+        if ($user && $user->unit === null) {
+            return $this->getMapData();
+        } else {
+            return $this->getMapDataByUser($request);
+        }
+    }
+
+    public function getSystemLoadDataBasedOnRole(Request $request)
+    {
+        $user = $request->user();
+        // atau bisa juga: $user = Auth::user();
+
+        if ($user && $user->unit === null) {
+            return $this->getSystemLoadData();
+        } else {
+            return $this->getSystemLoadDataByUser($request);
+        }
+    }
 }

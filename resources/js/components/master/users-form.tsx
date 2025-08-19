@@ -49,6 +49,7 @@ export default function UserForm({ user, onSubmit, onCancel, isEdit = false }: U
   const [unitSearchTerm, setUnitSearchTerm] = useState<string>("")
   const [isUnitSelectOpen, setIsUnitSelectOpen] = useState<boolean>(false)
   const [passwordError, setPasswordError] = useState<string>("")
+  const [unitError, setUnitError] = useState<string>("")
   const [isLoadingOrganizations, setIsLoadingOrganizations] = useState<boolean>(false)
 
   useEffect(() => {
@@ -90,7 +91,14 @@ export default function UserForm({ user, onSubmit, onCancel, isEdit = false }: U
   }, [])
 
   const handleChange = (field: string, value: string | number | null) => {
-    setUserData({ ...userData, [field]: value })
+    const newUserData = { ...userData, [field]: value }
+
+    if (field === 'role' && value === 'admin') {
+      newUserData.unit = null
+      setUnitSearchTerm("")
+    }
+
+    setUserData(newUserData)
 
     // Validate password length
     if (field === 'password') {
@@ -110,6 +118,13 @@ export default function UserForm({ user, onSubmit, onCancel, isEdit = false }: U
       return
     }
 
+    // Validate unit for user role
+    if (userData.role === 'user' && !userData.unit) {
+      setUnitError('Unit is required for user role.')
+      return
+    }
+    setUnitError('') // Clear error if validation passes
+
     onSubmit(userData)
   }
 
@@ -120,6 +135,7 @@ export default function UserForm({ user, onSubmit, onCancel, isEdit = false }: U
   )
 
   const handleUnitSelect = (value: string) => {
+    if (unitError) setUnitError("")
     if (value === "none") {
       handleChange("unit", null)
       setUnitSearchTerm("")
@@ -179,73 +195,81 @@ export default function UserForm({ user, onSubmit, onCancel, isEdit = false }: U
         </Select>
       </div>
 
-      <div className="grid gap-2">
-        <Label htmlFor="unit">Unit</Label>
-        <div className="relative">
-          <Input
-            id="unit_search"
-            value={unitSearchTerm}
-            onChange={(e) => {
-              setUnitSearchTerm(e.target.value)
-              setIsUnitSelectOpen(true)
-            }}
-            onFocus={() => setIsUnitSelectOpen(true)}
-            placeholder={isLoadingOrganizations ? "Loading organizations..." : "Search unit organization (optional)..."}
-            className="pr-20"
-            disabled={isLoadingOrganizations}
-          />
-          {selectedUnitName && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="absolute right-1 top-1 h-8 px-2 text-xs"
-              onClick={clearUnitSelection}
-            >
-              Clear
-            </Button>
-          )}
-
-          {isUnitSelectOpen && !isLoadingOrganizations && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
-              <div
-                className="px-3 py-2 cursor-pointer hover:bg-gray-100 text-sm border-b"
-                onClick={() => handleUnitSelect("none")}
+      {userData.role === 'user' && (
+        <div className="grid gap-2">
+          <Label htmlFor="unit">Unit</Label>
+          <div className="relative">
+            <Input
+              id="unit_search"
+              value={unitSearchTerm}
+              onChange={(e) => {
+                setUnitSearchTerm(e.target.value)
+                setIsUnitSelectOpen(true)
+              }}
+              onFocus={() => setIsUnitSelectOpen(true)}
+              placeholder={isLoadingOrganizations ? "Loading organizations..." : "Search unit organization..."}
+              className="pr-20"
+              disabled={isLoadingOrganizations}
+              required
+            />
+            {selectedUnitName && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1 h-8 px-2 text-xs"
+                onClick={clearUnitSelection}
               >
-                <span className="font-medium">None</span>
-                <div className="text-xs text-gray-500">No unit assigned</div>
-              </div>
-              {filteredOrganizations.length > 0 ? (
-                filteredOrganizations.map((org) => (
-                  <div
-                    key={org.id}
-                    className="px-3 py-2 cursor-pointer hover:bg-gray-100 text-sm border-b last:border-b-0"
-                    onClick={() => handleUnitSelect(org.id.toString())}
-                  >
-                    <div className="font-medium">{org.name}</div>
-                    <div className="text-xs text-gray-500">
-                      {org.level_name}
-                      {org.parent_name && ` • Parent: ${org.parent_name}`}
-                      {org.address && ` • ${org.address}`}
-                    </div>
-                  </div>
-                ))
-              ) : unitSearchTerm && (
-                <div className="px-3 py-2 text-sm text-gray-500">
-                  No organizations found
+                Clear
+              </Button>
+            )}
+
+            {isUnitSelectOpen && !isLoadingOrganizations && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                <div
+                  className="px-3 py-2 cursor-pointer hover:bg-gray-100 text-sm border-b"
+                  onClick={() => handleUnitSelect("none")}
+                >
+                  <span className="font-medium">None</span>
+                  <div className="text-xs text-gray-500">No unit assigned</div>
                 </div>
-              )}
+                {filteredOrganizations.length > 0 ? (
+                  filteredOrganizations.map((org) => (
+                    <div
+                      key={org.id}
+                      className="px-3 py-2 cursor-pointer hover:bg-gray-100 text-sm border-b last:border-b-0"
+                      onClick={() => handleUnitSelect(org.id.toString())}
+                    >
+                      <div className="font-medium">{org.name}</div>
+                      <div className="text-xs text-gray-500">
+                        {org.level_name}
+                        {org.parent_name && ` • Parent: ${org.parent_name}`}
+                        {org.address && ` • ${org.address}`}
+                      </div>
+                    </div>
+                  ))
+                ) : unitSearchTerm && (
+                  <div className="px-3 py-2 text-sm text-gray-500">
+                    No organizations found
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Show selected unit organization */}
+          {selectedUnitName && (
+            <div className="text-sm text-gray-600 mt-1">
+              Selected: <span className="font-medium">{selectedUnitName}</span>
+            </div>
+          )}
+          {unitError && (
+            <div className="text-sm text-red-500 mt-1">
+              {unitError}
             </div>
           )}
         </div>
-
-        {/* Show selected unit organization */}
-        {selectedUnitName && (
-          <div className="text-sm text-gray-600 mt-1">
-            Selected: <span className="font-medium">{selectedUnitName}</span>
-          </div>
-        )}
-      </div>
+      )}
 
       {!isEdit && (
         <>

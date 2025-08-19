@@ -44,14 +44,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/chat-bot', [AiChatBot::class, 'show'])->name('chat-bot');
 
-    Route::get('/api/table-hmi', [TableHmiController::class, 'index']);
+    Route::get('/api/table-hmi', [TableHmiController::class, 'getHmiDataBasedOnRole']);
 
     // Routes untuk maps
-    Route::get('/api/mapdata', [DashboardController::class, 'getMapData']);
-    Route::get('/api/system-load-data', [DashboardController::class, 'getSystemLoadData']);
+    Route::get('/api/mapdata', [DashboardController::class, 'getMapDataBasedOnRole']);
+    Route::get('/api/system-load-data', [DashboardController::class, 'getSystemLoadDataBasedOnRole']);
 
     // Routes untuk mendapatkan data single line
-    Route::get('/api/single-line', [SingleLineController::class, 'getSingleLineData']);
+    Route::get('/api/single-line', [SingleLineController::class, 'getSingleLineDataBasedOnRole']);
 
     // // Routes untuk mendapatkan daftar DCC yang tersedia
     // Route::get('/maps/dcc', [MapsController::class, 'getAvailableDcc']);
