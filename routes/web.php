@@ -2,12 +2,13 @@
 
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
+use App\Http\Controllers\AiChatBot;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\MapsController;
 use App\Http\Controllers\TableHmiController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SingleLineController;
-use App\Http\Controllers\AiChatBot;
+use App\Http\Controllers\Master\UserController;
 
 // Route::get('/', function () {
 //     return Inertia::render('welcome');
@@ -15,7 +16,7 @@ use App\Http\Controllers\AiChatBot;
 //
 
 Route::redirect('/', '/login')->name('home');
-
+Route::get('api/organizations', [UserController::class, 'getOrganizations'])->name('api.organizations');
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {
         return Inertia::render('dashboard');

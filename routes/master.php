@@ -46,6 +46,6 @@ Route::middleware('auth')->group(function () {
 
         Route::get('mapping/ulp', [OrganizationGridController::class, 'getUlpData'])->name('mapping.ulp');
 
-        Route::get('api/organizations', [UserController::class, 'getOrganizations'])->name('api.organizations');
+        Route::get('api/organizations', [UserController::class, 'getOrganizations'])->name('master.api.organizations');
     });
 });
