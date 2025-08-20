@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Feeder;
 use App\Models\GarduInduk;
+use App\Models\Organization;
 use Illuminate\Http\Request;
 use App\Models\FeederKeypoint;
 use App\Models\AnalogPointSkada;
@@ -14,10 +15,10 @@ use App\Models\OrganizationKeypoint;
 use Illuminate\Support\Facades\Cache;
 use App\Http\Controllers\Traits\HasOrganizationHierarchy;
 
-
 class TableHmiController extends Controller
 {
     use HasOrganizationHierarchy;
+
     public function index()
     {
         // Cache data selama 30 detik untuk mengurangi query berulang
@@ -194,6 +195,7 @@ class TableHmiController extends Controller
             'kvAC' => $keypointData->get('KV-AC')?->first()?->VALUE,
         ];
     }
+
     public function indexByUser(Request $request)
     {
         // We don't cache user-specific data as it might not be requested frequently
@@ -211,20 +213,40 @@ class TableHmiController extends Controller
         }
 
         $userOrganizationId = $user->unit;
-        $organizationIds = $this->getOrganizationDescendants($userOrganizationId);
-        $organizationIds[] = $userOrganizationId;
 
-        $keypointIds = OrganizationKeypoint::whereIn('id', $organizationIds)
+        // 1. Cek apakah organization ID ada di table organization
+        $userOrganization = Organization::find($userOrganizationId);
+        if (!$userOrganization) {
+            return []; // Return empty if organization not found
+        }
+
+        // 2. Dapatkan semua descendant organization IDs (termasuk current organization)
+        $organizationIds = $this->getOrganizationDescendants($userOrganizationId);
+        $organizationIds[] = $userOrganizationId; // Include current organization
+
+        // 3. Dapatkan keypoint_ids dari organization_keypoint berdasarkan organization hierarchy
+        $authorizedKeypointIds = OrganizationKeypoint::whereIn('organization_id', $organizationIds)
             ->pluck('keypoint_id')
             ->unique()
             ->filter()
             ->values();
 
-        if ($keypointIds->isEmpty()) {
-            return [];
+        if ($authorizedKeypointIds->isEmpty()) {
+            return []; // No keypoints found for user's organization hierarchy
         }
 
-        // 1. Gunakan single query dengan JOIN untuk mendapatkan semua data sekaligus
+        // 4. Dapatkan gardu_induk yang memiliki keypoint_id yang sama dengan authorized keypoints
+        $authorizedGarduIndukIds = GarduInduk::whereIn('keypoint_id', $authorizedKeypointIds)
+            ->pluck('id')
+            ->unique()
+            ->filter()
+            ->values();
+
+        if ($authorizedGarduIndukIds->isEmpty()) {
+            return []; // No gardu induk found for authorized keypoints
+        }
+
+        // 5. Query utama dengan filter berdasarkan gardu_induk_id saja
         $feedersData = DB::table('feeders as f')
             ->select([
                 'f.id as feeder_id',
@@ -239,14 +261,18 @@ class TableHmiController extends Controller
             ->leftJoin('gardu_induks as gi', 'f.gardu_induk_id', '=', 'gi.id')
             ->leftJoin('feeder_keypoints as fk', 'f.id', '=', 'fk.feeder_id')
             ->leftJoin('feeder_status_points as fsp', 'f.id', '=', 'fsp.feeder_id')
-            ->whereIn('fk.keypoint_id', $keypointIds)
+            ->whereIn('f.gardu_induk_id', $authorizedGarduIndukIds) // Filter hanya berdasarkan authorized gardu induk
             ->get();
 
-        // 2. Kumpulkan semua ID yang diperlukan
-        $statusIds = $feedersData->pluck('status_id')->filter()->unique()->values();
-        $filteredKeypointIds = $feedersData->pluck('keypoint_id')->filter()->unique()->values();
+        if ($feedersData->isEmpty()) {
+            return []; // No feeder data found for user's authorization
+        }
 
-        // 3. Ambil semua data SKADA dalam query paralel
+        // 6. Kumpulkan semua ID yang diperlukan untuk SKADA data
+        $statusIds = $feedersData->pluck('status_id')->filter()->unique()->values();
+        $keypointIds = $feedersData->pluck('keypoint_id')->filter()->unique()->values();
+
+        // 7. Ambil semua data SKADA dalam query paralel
         $statusPointSkadaData = [];
         $analogPointSkadaData = [];
         $statusKeypointData = [];
@@ -268,11 +294,11 @@ class TableHmiController extends Controller
                 ->keyBy('PKEY');
         }
 
-        if ($filteredKeypointIds->isNotEmpty()) {
+        if ($keypointIds->isNotEmpty()) {
             // Batch query untuk status points
             $statusNames = ['CB', 'LR', 'HOTLINE-TAG', 'RESET-ALARM'];
             $statusKeypointData = StatusPointSkada::select(['STATIONPID', 'NAME', 'VALUE'])
-                ->whereIn('STATIONPID', $filteredKeypointIds->toArray())
+                ->whereIn('STATIONPID', $keypointIds->toArray())
                 ->whereIn('NAME', $statusNames)
                 ->get()
                 ->groupBy(['STATIONPID', 'NAME']);
@@ -280,13 +306,13 @@ class TableHmiController extends Controller
             // Batch query untuk analog points
             $analogNames = ['IR', 'IS', 'IT', 'IF-R', 'IF-S', 'IF-T', 'IF-N', 'KV-AB', 'KV-BC', 'KV-AC', 'COS-P'];
             $analogKeypointData = AnalogPointSkada::select(['STATIONPID', 'NAME', 'VALUE'])
-                ->whereIn('STATIONPID', $filteredKeypointIds->toArray())
+                ->whereIn('STATIONPID', $keypointIds->toArray())
                 ->whereIn('NAME', $analogNames)
                 ->get()
                 ->groupBy(['STATIONPID', 'NAME']);
         }
 
-        // 4. Group data by feeder untuk processing yang lebih efisien
+        // 8. Group data by feeder untuk processing yang lebih efisien
         $groupedFeeders = $feedersData->groupBy('feeder_id');
 
         $result = [];
