@@ -42,11 +42,14 @@ const mainNavItems: ExtendedNavItem[] = [
         href: '/single-line',
         icon: Spline,
     },
-    // {
-    //     title: 'Chat Bot',
-    //     href: '/chat-bot',
-    //     icon: User,
-    // },
+    {
+        title: 'Chat Bot',
+        href: '/chat-bot',
+        icon: User,
+        canAccess: (roles: string[]) => {
+            return roles.includes('admin');
+        },
+    },
     {
         title: 'Master',
         href: '#',
