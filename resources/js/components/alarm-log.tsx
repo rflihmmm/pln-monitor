@@ -154,11 +154,17 @@ export default function AlarmLog() {
         }
     };
 
-    const isErrorAlarm = (text: string) => {
-        const errorKeywords = ['error', 'fault', 'fail', 'outage', 'trip', 'alarm', 'critical', 'emergency'];
-        return errorKeywords.some(keyword =>
-            text.toLowerCase().includes(keyword)
-        );
+    const getAlarmColorClass = () => {
+        // 0 = putih, 1 = cyan, 2 = ungu, 3 = kuning dan 4 = merah
+        const colors = [
+            'text-white',
+            'text-cyan-400',
+            'text-purple-400',
+            'text-yellow-400',
+            'text-red-400',
+        ];
+        const randomIndex = Math.floor(Math.random() * colors.length);
+        return colors[randomIndex];
     };
 
     // Tampilkan pesan error khusus jika realtime gagal
@@ -209,19 +215,16 @@ export default function AlarmLog() {
                         </div>
                     ) : (
                         alarms.map((alarm) => {
-                            const isError = isErrorAlarm(alarm.TEXT || '');
+                            const colorClass = getAlarmColorClass();
 
                             return (
                                 <div key={alarm.id} className="border-b py-2 last:border-0">
                                     <div className="flex items-start gap-2">
-                                        {isError && (
-                                            <AlertTriangle className="text-destructive mt-0.5 h-4 w-4 shrink-0" />
-                                        )}
                                         <div className="flex-1">
-                                            <div className={`text-xs ${isError ? 'text-destructive' : 'text-muted-foreground'}`}>
+                                            <div className={`text-xs text-muted-foreground`}>
                                                 {formatTimestamp(alarm.TIME)}
                                             </div>
-                                            <div className="mt-1 text-sm">
+                                            <div className={`mt-1 text-sm ${colorClass}`}>
                                                 {alarm.TEXT || 'No message'}
                                             </div>
                                             <div className="mt-1 text-xs text-muted-foreground">

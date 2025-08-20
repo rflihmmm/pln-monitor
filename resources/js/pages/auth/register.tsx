@@ -138,7 +138,7 @@ export default function Register() {
                     </div>
 
                     <div className="grid gap-2">
-                        <Label htmlFor="unit">Unit (Optional)</Label>
+                        <Label htmlFor="unit">Unit</Label>
                         <div className="relative">
                             <Input
                                 id="unit_search"
@@ -148,10 +148,11 @@ export default function Register() {
                                     setIsUnitSelectOpen(true);
                                 }}
                                 onFocus={() => setIsUnitSelectOpen(true)}
-                                placeholder={isLoadingOrganizations ? "Loading organizations..." : "Search unit organization (optional)..."}
+                                placeholder={isLoadingOrganizations ? "Loading organizations..." : "Search unit organization..."}
                                 className="pr-20"
                                 disabled={isLoadingOrganizations || processing}
                                 tabIndex={3}
+                                required
                             />
                             {selectedUnitName && (
                                 <Button
