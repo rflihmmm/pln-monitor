@@ -42,7 +42,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         }
     });
 
-    Route::get('/chat-bot', [AiChatBot::class, 'show'])->name('chat-bot');
+    //Route::get('/chat-bot', [AiChatBot::class, 'show'])->name('chat-bot');
 
     Route::get('/api/table-hmi', [TableHmiController::class, 'getHmiDataBasedOnRole']);
 
