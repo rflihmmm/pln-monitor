@@ -65,7 +65,7 @@ export default function AlarmLog() {
         }, 5000);
 
         // Set up real-time subscription
-        let channel;
+        let channel: any;
         try {
             channel = supabase
                 .channel('alarm-log-updates')

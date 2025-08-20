@@ -296,11 +296,14 @@ class DashboardController extends Controller
 
             // STEP 2: Get all relevant analog data from SQL Server in a single query.
             // We use the collected keypoint IDs to fetch only the necessary rows from ANALOGPOINTS.
+            // Filter by keypoint name starting with 'LBS-'
             $analogData = DB::connection('sqlsrv_main')
-                ->table('ANALOGPOINTS')
-                ->whereIn('STATIONPID', $keypointIds)
-                ->whereIn('NAME', ['IS', 'IR']) // 'IS' for Power, 'IR' for Current
-                ->select('STATIONPID', 'NAME', 'VALUE')
+                ->table('ANALOGPOINTS as ap')
+                ->join('STATIONPOINTS as sp', 'ap.STATIONPID', '=', 'sp.PKEY')
+                ->whereIn('ap.STATIONPID', $keypointIds)
+                ->whereIn('ap.NAME', ['IS', 'IR']) // 'IS' for Power, 'IR' for Current
+                ->where('sp.NAME', 'LIKE', 'LBS-%') // Filter by keypoint name
+                ->select('ap.STATIONPID', 'ap.NAME', 'ap.VALUE')
                 ->get();
 
             // Create a lookup map for faster processing in PHP.
@@ -408,42 +411,71 @@ class DashboardController extends Controller
             }
 
             $userOrganizationId = $user->unit;
-            $organizationIds = $this->getOrganizationDescendants($userOrganizationId);
-            $organizationIds[] = $userOrganizationId;
 
-            // Get keypoint IDs for the user's organization and its descendants
-            $keypointIds = OrganizationKeypoint::whereIn('organization_id', $organizationIds)
-                ->pluck('keypoint_id')
-                ->toArray();
+            // 1. Cek apakah organization ID ada di table organization
+            $userOrganization = Organization::find($userOrganizationId);
+            if (!$userOrganization) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Organization not found',
+                ], 404);
+            }
 
-            if (empty($keypointIds)) {
+            // 2. Dapatkan semua descendant organization IDs berdasarkan level hierarchy
+            $organizationIds = $this->getAuthorizedOrganizationIds($userOrganization);
+
+            if (empty($organizationIds)) {
                 return response()->json(['success' => true, 'data' => []]);
             }
 
-            // Fetch GarduInduk data based on the collected keypoint IDs
-            $garduInduks = GarduInduk::with(['feeders.statusPoints'])
-                ->whereIn('keypoint_id', $keypointIds)
+            // 3. Dapatkan keypoint_ids yang authorized berdasarkan organization_keypoint
+            $authorizedKeypointIds = OrganizationKeypoint::whereIn('organization_id', $organizationIds)
+                ->pluck('keypoint_id')
+                ->unique()
+                ->filter()
+                ->values()
+                ->toArray();
+
+            if (empty($authorizedKeypointIds)) {
+                return response()->json(['success' => true, 'data' => []]);
+            }
+
+            // 4. Query untuk mendapatkan gardu induk yang memiliki keypoint authorized
+            // melalui relasi feeder -> feeder_keypoints -> organization_keypoint
+            $garduInduksWithAuthorizedKeypoints = DB::table('gardu_induks as gi')
+                ->join('feeders as f', 'f.gardu_induk_id', '=', 'gi.id')
+                ->join('feeder_keypoints as fk', 'fk.feeder_id', '=', 'f.id')
+                ->whereIn('fk.keypoint_id', $authorizedKeypointIds)
+                ->whereNotNull('gi.coordinate') // Hanya yang memiliki coordinate
+                ->select('gi.id', 'gi.name', 'gi.coordinate', 'gi.keypoint_id')
+                ->distinct()
                 ->get();
 
-            $mapData = [];
-            foreach ($garduInduks as $garduInduk) {
-                if (empty($garduInduk->coordinate)) {
-                    continue;
-                }
+            if ($garduInduksWithAuthorizedKeypoints->isEmpty()) {
+                return response()->json(['success' => true, 'data' => []]);
+            }
 
+            $mapData = [];
+
+            foreach ($garduInduksWithAuthorizedKeypoints as $garduInduk) {
+                // Parse coordinate
                 $coordinate = $this->parseCoordinate($garduInduk->coordinate);
                 if (!$coordinate) {
                     continue;
                 }
 
+                // Get keypoint name untuk gardu induk
                 $keypointName = null;
                 if ($garduInduk->keypoint_id) {
                     $stationPoint = StationPointSkada::where('PKEY', $garduInduk->keypoint_id)->first();
                     $keypointName = $stationPoint ? $stationPoint->NAME : null;
                 }
 
+                // Get status gardu induk
                 $status = $this->getGarduIndukStatus($garduInduk->keypoint_id);
-                $loadData = $this->calculateLoad($garduInduk);
+
+                // Calculate load untuk gardu induk ini berdasarkan authorized keypoints saja
+                $loadData = $this->calculateLoadForAuthorizedKeypoints($garduInduk->id, $authorizedKeypointIds);
 
                 $mapData[] = [
                     'id' => $garduInduk->id,
@@ -472,128 +504,165 @@ class DashboardController extends Controller
         }
     }
 
-    private function getOrganizationDescendants($organizationId)
+    /**
+     * Calculate load untuk gardu induk berdasarkan authorized keypoints saja
+     */
+    private function calculateLoadForAuthorizedKeypoints($garduIndukId, $authorizedKeypointIds)
     {
-        $descendants = [];
-        $organizations = Organization::where('parent_id', $organizationId)->get();
+        $loadIs = 0;
+        $loadMw = 0;
 
-        foreach ($organizations as $organization) {
-            $descendants[] = $organization->id;
-            $descendants = array_merge($descendants, $this->getOrganizationDescendants($organization->id));
+        try {
+            // Hanya ambil feeders yang memiliki keypoints yang authorized
+            $feedersWithAuthorizedKeypoints = DB::table('feeders as f')
+                ->join('feeder_keypoints as fk', 'fk.feeder_id', '=', 'f.id')
+                ->where('f.gardu_induk_id', $garduIndukId)
+                ->whereIn('fk.keypoint_id', $authorizedKeypointIds)
+                ->select('f.id as feeder_id')
+                ->distinct()
+                ->pluck('feeder_id')
+                ->toArray();
+
+            if (empty($feedersWithAuthorizedKeypoints)) {
+                return ['load_is' => 0, 'load_mw' => 0];
+            }
+
+            // Ambil status points untuk AMP (load-is) dari feeders yang authorized
+            $ampStatusPoints = FeederStatusPoint::whereIn('feeder_id', $feedersWithAuthorizedKeypoints)
+                ->where('type', 'AMP')
+                ->get();
+
+            foreach ($ampStatusPoints as $statusPoint) {
+                $analogPoint = AnalogPointSkada::where('PKEY', $statusPoint->status_id)->first();
+                if ($analogPoint && is_numeric($analogPoint->VALUE)) {
+                    $loadIs += floatval($analogPoint->VALUE);
+                }
+            }
+
+            // Ambil status points untuk MW (load-mw) dari feeders yang authorized
+            $mwStatusPoints = FeederStatusPoint::whereIn('feeder_id', $feedersWithAuthorizedKeypoints)
+                ->where('type', 'MW')
+                ->get();
+
+            foreach ($mwStatusPoints as $statusPoint) {
+                $analogPoint = AnalogPointSkada::where('PKEY', $statusPoint->status_id)->first();
+                if ($analogPoint && is_numeric($analogPoint->VALUE)) {
+                    $loadMw += floatval($analogPoint->VALUE);
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error('Error calculating load for authorized keypoints in gardu induk ' . $garduIndukId . ': ' . $e->getMessage());
         }
 
-        return $descendants;
+        return [
+            'load_is' => round($loadIs, 2),
+            'load_mw' => round($loadMw, 2)
+        ];
     }
+
+
 
     public function getSystemLoadDataByUser(Request $request)
     {
         try {
             $user = $request->user();
             if (!$user || !$user->unit) {
-                return response()->json(['success' => false, 'message' => 'User not authenticated or no unit assigned'], 401);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated or no unit assigned'
+                ], 401);
             }
 
             $userOrganizationId = $user->unit;
-            $organizationIds = $this->getOrganizationDescendants($userOrganizationId);
-            $organizationIds[] = $userOrganizationId;
 
-            $orgsWithKeypoints = DB::connection('pgsql')
-                ->table('organization as org')
-                ->leftJoin('organization_keypoint as okp', 'okp.organization_id', '=', 'org.id')
-                ->whereIn('org.id', $organizationIds)
-                ->select('org.id', 'org.name', 'org.level', 'org.parent_id', 'okp.keypoint_id')
-                ->get();
-
-            if ($orgsWithKeypoints->isEmpty()) {
-                return response()->json(['success' => true, 'data' => [], 'grandTotal' => ['power' => '0.00 MW', 'current' => '0.00 A']]);
+            // 1. Cek apakah organization ID ada di table organization
+            $userOrganization = Organization::find($userOrganizationId);
+            if (!$userOrganization) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Organization not found',
+                ], 404);
             }
 
-            $keypointIds = $orgsWithKeypoints->pluck('keypoint_id')->unique()->filter()->all();
+            // 2. Dapatkan semua ID organisasi yang relevan (ancestor, user's org, dan descendant)
+            $ancestorIds = $this->getOrganizationAncestorsAndSelf($userOrganizationId);
+            $authorizedDescendantIds = $this->getAuthorizedOrganizationIds($userOrganization);
+            $organizationIds = array_unique(array_merge($ancestorIds, $authorizedDescendantIds));
 
+            if (empty($organizationIds)) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [],
+                    'grandTotal' => ['power' => '0.00 MW', 'current' => '0.00 A']
+                ]);
+            }
+
+            // 3. Dapatkan keypoint_ids yang authorized berdasarkan organization_keypoint
+            $authorizedKeypointIds = OrganizationKeypoint::whereIn('organization_id', $organizationIds)
+                ->pluck('keypoint_id')
+                ->unique()
+                ->filter()
+                ->values()
+                ->toArray();
+
+            if (empty($authorizedKeypointIds)) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [],
+                    'grandTotal' => ['power' => '0.00 MW', 'current' => '0.00 A']
+                ]);
+            }
+
+            // 4. Ambil data analog dari SQL Server berdasarkan authorized keypoints
+            // Filter by keypoint name starting with 'LBS-'
             $analogData = DB::connection('sqlsrv_main')
-                ->table('ANALOGPOINTS')
-                ->whereIn('STATIONPID', $keypointIds)
-                ->whereIn('NAME', ['IS', 'IR'])
-                ->select('STATIONPID', 'NAME', 'VALUE')
+                ->table('ANALOGPOINTS as ap')
+                ->join('STATIONPOINTS as sp', 'ap.STATIONPID', '=', 'sp.PKEY')
+                ->whereIn('ap.STATIONPID', $authorizedKeypointIds)
+                ->whereIn('ap.NAME', ['IS', 'MW']) // IS untuk current, MW untuk power
+                ->where('sp.NAME', 'LIKE', 'LBS-%') // Filter by keypoint name
+                ->select('ap.STATIONPID', 'ap.NAME', 'ap.VALUE')
                 ->get();
 
+            // 5. Buat lookup map untuk analog values
             $analogValueMap = [];
             foreach ($analogData as $point) {
                 $key = $point->STATIONPID;
                 if (!isset($analogValueMap[$key])) {
                     $analogValueMap[$key] = ['power' => 0, 'current' => 0];
                 }
-                if ($point->NAME === 'IS') {
+                if ($point->NAME === 'MW') {
                     $analogValueMap[$key]['power'] = (float)$point->VALUE;
-                } elseif ($point->NAME === 'IR') {
+                } elseif ($point->NAME === 'IS') {
                     $analogValueMap[$key]['current'] = (float)$point->VALUE;
                 }
             }
 
-            // Find the top-level organization for the user (DCC)
-            $userOrg = Organization::find($userOrganizationId);
-            $topLevelOrg = $userOrg;
-            while ($topLevelOrg->parent_id) {
-                $topLevelOrg = $topLevelOrg->parent;
-            }
+            // 6. Dapatkan organization structure dengan keypoints
+            $organizationStructure = $this->buildOrganizationStructureWithKeypoints($organizationIds, $analogValueMap);
 
-            $aggregatedData = [];
-            $allOrgs = Organization::whereIn('id', $organizationIds)->get()->keyBy('id');
-
-            foreach ($orgsWithKeypoints as $orgLink) {
-                if (!$orgLink->keypoint_id) continue;
-
-                $values = $analogValueMap[$orgLink->keypoint_id] ?? ['power' => 0, 'current' => 0];
-
-                $currentOrg = $allOrgs->get($orgLink->id);
-                if (!$currentOrg) continue;
-
-                // Find the UP3 for the current org
-                $up3 = null;
-                if ($currentOrg->level == 3) { // ULP
-                    $up3 = $allOrgs->get($currentOrg->parent_id);
-                } elseif ($currentOrg->level == 2) { // UP3
-                    $up3 = $currentOrg;
-                }
-
-                if ($up3) {
-                    $dccName = $topLevelOrg->name;
-                    $up3Id = $up3->id;
-
-                    if (!isset($aggregatedData[$dccName])) {
-                        $aggregatedData[$dccName] = [];
-                    }
-                    if (!isset($aggregatedData[$dccName][$up3Id])) {
-                        $aggregatedData[$dccName][$up3Id] = ['name' => $up3->name, 'power' => 0, 'current' => 0];
-                    }
-
-                    $aggregatedData[$dccName][$up3Id]['power'] += $values['power'];
-                    $aggregatedData[$dccName][$up3Id]['current'] += $values['current'];
-                }
-            }
-
-
+            // 7. Aggregate data berdasarkan hierarchy
             $systemLoadData = [];
             $grandTotalPower = 0;
             $grandTotalCurrent = 0;
 
-            foreach ($aggregatedData as $dccName => $up3s) {
+            foreach ($organizationStructure as $dccData) {
                 $regions = [];
                 $dccTotalPower = 0;
                 $dccTotalCurrent = 0;
 
-                foreach ($up3s as $up3) {
+                foreach ($dccData['up3s'] as $up3Data) {
                     $regions[] = [
-                        'name' => $up3['name'],
-                        'power' => number_format($up3['power'], 2) . ' MW',
-                        'current' => number_format($up3['current'], 2) . ' A'
+                        'name' => $up3Data['name'],
+                        'power' => number_format($up3Data['total_power'], 2) . ' MW',
+                        'current' => number_format($up3Data['total_current'], 2) . ' A'
                     ];
-                    $dccTotalPower += $up3['power'];
-                    $dccTotalCurrent += $up3['current'];
+                    $dccTotalPower += $up3Data['total_power'];
+                    $dccTotalCurrent += $up3Data['total_current'];
                 }
 
                 $systemLoadData[] = [
-                    'name' => 'Beban Sistem ' . $dccName,
+                    'name' => 'Beban Sistem ' . $dccData['name'],
                     'regions' => $regions,
                     'total' => [
                         'power' => number_format($dccTotalPower, 2) . ' MW',
@@ -615,8 +684,193 @@ class DashboardController extends Controller
             ]);
         } catch (\Exception $e) {
             Log::error('Error fetching system load data by user: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Error fetching system load data', 'error' => $e->getMessage()], 500);
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching system load data',
+                'error' => $e->getMessage()
+            ], 500);
         }
+    }
+
+    /**
+     * Build organization structure dengan keypoints dan load calculation
+     */
+    private function buildOrganizationStructureWithKeypoints($organizationIds, $analogValueMap)
+    {
+        // Ambil semua organization data yang terlibat
+        $organizations = Organization::whereIn('id', $organizationIds)
+            ->select('id', 'name', 'level', 'parent_id')
+            ->get()
+            ->keyBy('id');
+
+        // Ambil data organization_keypoint untuk authorized organizations
+        $orgKeypoints = OrganizationKeypoint::whereIn('organization_id', $organizationIds)
+            ->select('organization_id', 'keypoint_id')
+            ->get();
+
+        $structure = [];
+
+        // Group keypoints by organization_id dan hitung load
+        $orgLoads = [];
+        foreach ($orgKeypoints as $orgKeypoint) {
+            $orgId = $orgKeypoint->organization_id;
+            $keypointId = $orgKeypoint->keypoint_id;
+
+            if (!isset($orgLoads[$orgId])) {
+                $orgLoads[$orgId] = ['power' => 0, 'current' => 0];
+            }
+
+            // Tambahkan load dari keypoint ini
+            if (isset($analogValueMap[$keypointId])) {
+                $orgLoads[$orgId]['power'] += $analogValueMap[$keypointId]['power'];
+                $orgLoads[$orgId]['current'] += $analogValueMap[$keypointId]['current'];
+            }
+        }
+
+        // Build structure berdasarkan hierarchy
+        $dccGroups = [];
+
+        foreach ($organizations as $org) {
+            $orgLoad = $orgLoads[$org->id] ?? ['power' => 0, 'current' => 0];
+
+            if ($org->level == 3) { // ULP
+                $up3 = $organizations->get($org->parent_id);
+                if ($up3) {
+                    $dcc = $organizations->get($up3->parent_id);
+                    if ($dcc) {
+                        $dccName = $dcc->name;
+                        $up3Id = $up3->id;
+                        $up3Name = $up3->name;
+
+                        // Initialize structure
+                        if (!isset($dccGroups[$dccName])) {
+                            $dccGroups[$dccName] = [
+                                'name' => $dccName,
+                                'up3s' => []
+                            ];
+                        }
+
+                        if (!isset($dccGroups[$dccName]['up3s'][$up3Id])) {
+                            $dccGroups[$dccName]['up3s'][$up3Id] = [
+                                'name' => $up3Name,
+                                'total_power' => 0,
+                                'total_current' => 0
+                            ];
+                        }
+
+                        // Tambahkan load ULP ke UP3
+                        $dccGroups[$dccName]['up3s'][$up3Id]['total_power'] += $orgLoad['power'];
+                        $dccGroups[$dccName]['up3s'][$up3Id]['total_current'] += $orgLoad['current'];
+                    }
+                }
+            } elseif ($org->level == 2) { // UP3
+                $dcc = $organizations->get($org->parent_id);
+                if ($dcc) {
+                    $dccName = $dcc->name;
+                    $up3Id = $org->id;
+                    $up3Name = $org->name;
+
+                    // Initialize structure
+                    if (!isset($dccGroups[$dccName])) {
+                        $dccGroups[$dccName] = [
+                            'name' => $dccName,
+                            'up3s' => []
+                        ];
+                    }
+
+                    if (!isset($dccGroups[$dccName]['up3s'][$up3Id])) {
+                        $dccGroups[$dccName]['up3s'][$up3Id] = [
+                            'name' => $up3Name,
+                            'total_power' => 0,
+                            'total_current' => 0
+                        ];
+                    }
+
+                    // Tambahkan load UP3 langsung
+                    $dccGroups[$dccName]['up3s'][$up3Id]['total_power'] += $orgLoad['power'];
+                    $dccGroups[$dccName]['up3s'][$up3Id]['total_current'] += $orgLoad['current'];
+                }
+            } elseif ($org->level == 1) { // DCC
+                $dccName = $org->name;
+
+                // Initialize structure
+                if (!isset($dccGroups[$dccName])) {
+                    $dccGroups[$dccName] = [
+                        'name' => $dccName,
+                        'up3s' => []
+                    ];
+                }
+
+                // Untuk DCC, load akan ditambahkan melalui UP3 dan ULP di bawahnya
+                // Jadi tidak perlu tambah load langsung di sini
+            }
+        }
+
+        return array_values($dccGroups);
+    }
+
+    /**
+     * Mendapatkan semua ID organisasi dari user saat ini hingga ke root (DCC)
+     */
+    private function getOrganizationAncestorsAndSelf($organizationId)
+    {
+        $ids = [];
+        $currentOrg = Organization::find($organizationId);
+
+        while ($currentOrg) {
+            $ids[] = $currentOrg->id;
+            $currentOrg = $currentOrg->parent; // Assuming 'parent' relationship is defined in Organization model
+        }
+
+        return array_reverse($ids); // Return from DCC down to current
+    }
+
+    /**
+     * Mendapatkan organization IDs yang authorized berdasarkan hierarchy
+     */
+    private function getAuthorizedOrganizationIds($userOrganization)
+    {
+        $organizationIds = [];
+
+        switch ($userOrganization->level) {
+            case 1: // DCC - dapat akses semua UP3 dan ULP dibawahnya
+                // Dapatkan semua UP3 yang parent_id = DCC ID
+                $up3Ids = Organization::where('parent_id', $userOrganization->id)
+                    ->where('level', 2)
+                    ->pluck('id')
+                    ->toArray();
+
+                // Dapatkan semua ULP yang parent_id ada di UP3 IDs
+                $ulpIds = [];
+                if (!empty($up3Ids)) {
+                    $ulpIds = Organization::whereIn('parent_id', $up3Ids)
+                        ->where('level', 3)
+                        ->pluck('id')
+                        ->toArray();
+                }
+
+                $organizationIds = array_merge([$userOrganization->id], $up3Ids, $ulpIds);
+                break;
+
+            case 2: // UP3 - dapat akses semua ULP dibawahnya
+                // Dapatkan semua ULP yang parent_id = UP3 ID
+                $ulpIds = Organization::where('parent_id', $userOrganization->id)
+                    ->where('level', 3)
+                    ->pluck('id')
+                    ->toArray();
+
+                $organizationIds = array_merge([$userOrganization->id], $ulpIds);
+                break;
+
+            case 3: // ULP - hanya dapat akses keypoint milik ULP tersebut
+                $organizationIds = [$userOrganization->id];
+                break;
+
+            default:
+                $organizationIds = [];
+        }
+
+        return $organizationIds;
     }
 
     public function getMapDataBasedOnRole(Request $request)

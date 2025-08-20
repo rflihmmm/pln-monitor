@@ -220,33 +220,27 @@ class TableHmiController extends Controller
             return []; // Return empty if organization not found
         }
 
-        // 2. Dapatkan semua descendant organization IDs (termasuk current organization)
-        $organizationIds = $this->getOrganizationDescendants($userOrganizationId);
-        $organizationIds[] = $userOrganizationId; // Include current organization
+        // 2. Dapatkan semua descendant organization IDs berdasarkan level hierarchy
+        $organizationIds = $this->getAuthorizedOrganizationIds($userOrganization);
 
-        // 3. Dapatkan keypoint_ids dari organization_keypoint berdasarkan organization hierarchy
+        if (empty($organizationIds)) {
+            return [];
+        }
+
+        // 3. Dapatkan keypoint_ids yang authorized berdasarkan organization_keypoint
         $authorizedKeypointIds = OrganizationKeypoint::whereIn('organization_id', $organizationIds)
             ->pluck('keypoint_id')
             ->unique()
             ->filter()
-            ->values();
+            ->values()
+            ->toArray();
 
-        if ($authorizedKeypointIds->isEmpty()) {
+        if (empty($authorizedKeypointIds)) {
             return []; // No keypoints found for user's organization hierarchy
         }
 
-        // 4. Dapatkan gardu_induk yang memiliki keypoint_id yang sama dengan authorized keypoints
-        $authorizedGarduIndukIds = GarduInduk::whereIn('keypoint_id', $authorizedKeypointIds)
-            ->pluck('id')
-            ->unique()
-            ->filter()
-            ->values();
-
-        if ($authorizedGarduIndukIds->isEmpty()) {
-            return []; // No gardu induk found for authorized keypoints
-        }
-
-        // 5. Query utama dengan filter berdasarkan gardu_induk_id saja
+        // 4. Query utama dengan filter berdasarkan keypoint_id yang authorized
+        // Hanya tampilkan data dimana keypoint_id ada di organization_keypoint
         $feedersData = DB::table('feeders as f')
             ->select([
                 'f.id as feeder_id',
@@ -261,18 +255,19 @@ class TableHmiController extends Controller
             ->leftJoin('gardu_induks as gi', 'f.gardu_induk_id', '=', 'gi.id')
             ->leftJoin('feeder_keypoints as fk', 'f.id', '=', 'fk.feeder_id')
             ->leftJoin('feeder_status_points as fsp', 'f.id', '=', 'fsp.feeder_id')
-            ->whereIn('f.gardu_induk_id', $authorizedGarduIndukIds) // Filter hanya berdasarkan authorized gardu induk
+            ->whereIn('fk.keypoint_id', $authorizedKeypointIds) // Filter berdasarkan authorized keypoints
+            ->whereNotNull('fk.keypoint_id') // Pastikan keypoint_id tidak null
             ->get();
 
         if ($feedersData->isEmpty()) {
             return []; // No feeder data found for user's authorization
         }
 
-        // 6. Kumpulkan semua ID yang diperlukan untuk SKADA data
+        // 5. Kumpulkan semua ID yang diperlukan untuk SKADA data
         $statusIds = $feedersData->pluck('status_id')->filter()->unique()->values();
         $keypointIds = $feedersData->pluck('keypoint_id')->filter()->unique()->values();
 
-        // 7. Ambil semua data SKADA dalam query paralel
+        // 6. Ambil semua data SKADA dalam query paralel
         $statusPointSkadaData = [];
         $analogPointSkadaData = [];
         $statusKeypointData = [];
@@ -312,7 +307,7 @@ class TableHmiController extends Controller
                 ->groupBy(['STATIONPID', 'NAME']);
         }
 
-        // 8. Group data by feeder untuk processing yang lebih efisien
+        // 7. Group data by feeder untuk processing yang lebih efisien
         $groupedFeeders = $feedersData->groupBy('feeder_id');
 
         $result = [];
@@ -329,6 +324,11 @@ class TableHmiController extends Controller
 
             foreach ($keypoints as $keypointId => $keypointData) {
                 $keypointInfo = $keypointData->first();
+
+                // Double check: pastikan keypoint_id masih dalam authorized list
+                if (!in_array($keypointId, $authorizedKeypointIds)) {
+                    continue;
+                }
 
                 // Optimized data retrieval dengan null coalescing
                 $rowData = [
@@ -352,6 +352,51 @@ class TableHmiController extends Controller
         }
 
         return $result;
+    }
+
+    /**
+     * Mendapatkan organization IDs yang authorized berdasarkan hierarchy
+     */
+    private function getAuthorizedOrganizationIds($userOrganization)
+    {
+        $organizationIds = [];
+
+        switch ($userOrganization->level) {
+            case 1: // DCC - dapat akses semua ULP dibawahnya
+                // Dapatkan semua UP3 yang parent_id = DCC ID
+                $up3Ids = Organization::where('parent_id', $userOrganization->id)
+                    ->where('level', 2)
+                    ->pluck('id')
+                    ->toArray();
+
+                // Dapatkan semua ULP yang parent_id ada di UP3 IDs
+                $ulpIds = Organization::whereIn('parent_id', $up3Ids)
+                    ->where('level', 3)
+                    ->pluck('id')
+                    ->toArray();
+
+                $organizationIds = array_merge([$userOrganization->id], $up3Ids, $ulpIds);
+                break;
+
+            case 2: // UP3 - dapat akses semua ULP dibawahnya
+                // Dapatkan semua ULP yang parent_id = UP3 ID
+                $ulpIds = Organization::where('parent_id', $userOrganization->id)
+                    ->where('level', 3)
+                    ->pluck('id')
+                    ->toArray();
+
+                $organizationIds = array_merge([$userOrganization->id], $ulpIds);
+                break;
+
+            case 3: // ULP - hanya dapat akses keypoint milik ULP tersebut
+                $organizationIds = [$userOrganization->id];
+                break;
+
+            default:
+                $organizationIds = [];
+        }
+
+        return $organizationIds;
     }
 
     public function getHmiDataBasedOnRole(Request $request)
