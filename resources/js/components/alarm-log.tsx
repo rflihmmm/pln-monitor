@@ -22,6 +22,7 @@ interface AlarmEntry {
     id: number;
     TEXT: string;
     TIME: string;
+    PRIORITY: number;
 }
 
 export default function AlarmLog() {
@@ -34,7 +35,7 @@ export default function AlarmLog() {
         try {
             const { data, error } = await supabase
                 .from('alarms')
-                .select('id, TEXT, TIME')
+                .select('id, TEXT, TIME, PRIORITY')
                 .order('id', { ascending: false })
                 .limit(30);
 
@@ -154,16 +155,16 @@ export default function AlarmLog() {
         }
     };
 
-    const getAlarmColorClass = () => {
+    const getAlarmColorClass = (priority: number) => {
         // 0 = putih, 1 = cyan, 2 = ungu, 3 = kuning dan 4 = merah
         const colors = [
-            'text-white',
-            'text-cyan-400',
-            'text-purple-400',
-            'text-yellow-400',
-            'text-red-400',
+            'bg-grey-100',
+            'bg-cyan-100',
+            'bg-purple-100',
+            'bg-yellow-100',
+            'bg-red-100',
         ];
-        const randomIndex = Math.floor(Math.random() * colors.length);
+        const randomIndex = priority;
         return colors[randomIndex];
     };
 
@@ -215,16 +216,16 @@ export default function AlarmLog() {
                         </div>
                     ) : (
                         alarms.map((alarm) => {
-                            const colorClass = getAlarmColorClass();
+                            const colorClass = getAlarmColorClass(alarm.PRIORITY);
 
                             return (
-                                <div key={alarm.id} className="border-b py-2 last:border-0">
+                                <div key={alarm.id} className={`border-b py-2 last:border-0 ${colorClass}`}>
                                     <div className="flex items-start gap-2">
                                         <div className="flex-1">
                                             <div className={`text-xs text-muted-foreground`}>
                                                 {formatTimestamp(alarm.TIME)}
                                             </div>
-                                            <div className={`mt-1 text-sm ${colorClass}`}>
+                                            <div className={`mt-1 text-sm`}>
                                                 {alarm.TEXT || 'No message'}
                                             </div>
                                             <div className="mt-1 text-xs text-muted-foreground">
