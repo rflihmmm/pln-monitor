@@ -36,6 +36,8 @@ export default function TableOrganization({ organizationList: initialOrganizatio
     const [isAddOrgOpen, setIsAddOrgOpen] = useState(false)
     const [isEditOrgOpen, setIsEditOrgOpen] = useState(false)
     const [editingOrg, setEditingOrg] = useState<Organization | null>(null)
+    const [currentPage, setCurrentPage] = useState(1)
+    const itemsPerPage = 15
 
     const levelOptions = [
         { value: "1", label: "1 : DCC" },
@@ -61,6 +63,17 @@ export default function TableOrganization({ organizationList: initialOrganizatio
 
         return matchesSearch && matchesLevel
     })
+
+    // Pagination logic
+    const indexOfLastItem = currentPage * itemsPerPage
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage
+    const currentItems = filteredOrganizations.slice(indexOfFirstItem, indexOfLastItem)
+    const totalPages = Math.ceil(filteredOrganizations.length / itemsPerPage)
+
+    const handlePageChange = (pageNumber: number) => {
+        setCurrentPage(pageNumber)
+    }
+
 
     // Format date to readable format
     const formatDate = (dateString: string) => {
@@ -184,14 +197,14 @@ export default function TableOrganization({ organizationList: initialOrganizatio
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredOrganizations.length === 0 ? (
+                            {currentItems.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={8} className="text-muted-foreground py-8 text-center">
                                         No organizations found matching your search criteria
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                filteredOrganizations.map((org) => (
+                                currentItems.map((org) => (
                                     <TableRow key={org.id}>
                                         <TableCell>{org.id}</TableCell>
                                         <TableCell>
@@ -240,8 +253,29 @@ export default function TableOrganization({ organizationList: initialOrganizatio
 
                 <div className="flex items-center justify-between">
                     <div className="text-muted-foreground text-sm">
-                        Showing <strong>{filteredOrganizations.length}</strong> of <strong>{initialOrganizations.length}</strong>{" "}
+                        Showing <strong>{currentItems.length}</strong> of <strong>{filteredOrganizations.length}</strong>{" "}
                         organizations
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 1}
+                        >
+                            Previous
+                        </Button>
+                        <span className="text-sm">
+                            Page {currentPage} of {totalPages}
+                        </span>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages}
+                        >
+                            Next
+                        </Button>
                     </div>
                 </div>
             </div>

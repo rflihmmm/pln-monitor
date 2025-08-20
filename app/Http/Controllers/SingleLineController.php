@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Feeder;
 use App\Models\GarduInduk;
 use App\Models\KeypointExt;
+use App\Models\Organization;
 use Illuminate\Http\Request;
 use App\Models\AnalogPointSkada;
 use App\Models\StatusPointSkada;
@@ -387,9 +388,18 @@ class SingleLineController extends Controller
             }
 
             $userOrganizationId = $user->unit;
+
+            // Get user's organization info to determine level
+            $userOrganization = Organization::find($userOrganizationId);
+            if (!$userOrganization) {
+                return response()->json(['success' => true, 'data' => [], 'count' => 0]);
+            }
+
+            // Get organization descendants based on hierarchy
             $organizationIds = $this->getOrganizationDescendants($userOrganizationId);
             $organizationIds[] = $userOrganizationId;
 
+            // Get all keypoints that are related to user's organization hierarchy
             $allowedKeypointIds = OrganizationKeypoint::whereIn('organization_id', $organizationIds)
                 ->pluck('keypoint_id')
                 ->unique()
@@ -403,70 +413,88 @@ class SingleLineController extends Controller
             $singleLineData = [];
             $incrementalId = 1;
 
-            // Ambil data dari gardu_induks dan keypoint_ext yang relevan
-            $garduInduks = GarduInduk::whereIn('keypoint_id', $allowedKeypointIds)->get();
+            // Get keypoint_ext data that are allowed for this user (non-GI keypoints)
             $keypointExts = KeypointExt::whereIn('keypoint_id', $allowedKeypointIds)->get();
 
-            // Gabungkan semua keypoint_id
-            $allKeypointIds = collect();
+            // Get GarduInduk that have feeders connected to allowed keypoints
+            $garduInduksWithAllowedKeypoints = $this->getGarduIndukWithAllowedKeypoints($allowedKeypointIds);
 
-            // Dari gardu_induks
-            foreach ($garduInduks as $gardu) {
-                if ($gardu->keypoint_id) {
-                    $allKeypointIds->push([
-                        'keypoint_id' => $gardu->keypoint_id,
-                        'coordinate' => $gardu->coordinate,
-                        'source' => 'gardu_induk'
-                    ]);
-                }
-            }
-
-            // Dari keypoint_ext
+            // Process keypoint_ext data (REC, LBS, GH, etc.)
             foreach ($keypointExts as $keypoint) {
-                $allKeypointIds->push([
-                    'keypoint_id' => $keypoint->keypoint_id,
-                    'coordinate' => $keypoint->coordinate,
-                    'parent_stationpoints' => $keypoint->parent_stationpoints,
-                    'source' => 'keypoint_ext'
-                ]);
-            }
+                $keypointId = $keypoint->keypoint_id;
 
-            // Proses setiap keypoint
-            foreach ($allKeypointIds as $keypointData) {
-                $keypointId = $keypointData['keypoint_id'];
-
-                // Ambil data dari StationPointSkada
+                // Get station point data
                 $stationPoint = StationPointSkada::where('PKEY', $keypointId)->first();
-
                 if (!$stationPoint) {
-                    continue; // Skip jika tidak ada data di StationPointSkada
+                    continue; // Skip if no data in StationPointSkada
                 }
 
                 $name = $stationPoint->NAME;
                 $type = $this->extractTypeFromName($name);
-                $coordinate = $this->parseCoordinate($keypointData['coordinate'] ?? null);
+                $coordinate = $this->parseCoordinate($keypoint->coordinate ?? null);
 
                 if (!$coordinate) {
-                    continue; // Skip jika coordinate tidak valid
+                    continue; // Skip if coordinate is invalid
                 }
 
-                // Tentukan parent
+                // Determine parent
                 $parent = null;
-                if ($type !== 'GI' && isset($keypointData['parent_stationpoints'])) {
-                    $parent = $keypointData['parent_stationpoints'];
+                if ($keypoint->parent_stationpoints) {
+                    $parent = $keypoint->parent_stationpoints;
                 }
 
-                // Status
+                // Get status
                 $status = $this->getKeypointStatus($keypointId);
 
-                // Load data
+                // Calculate load data
                 $loadData = $this->calculateKeypointLoad($keypointId, $type);
 
-                // Feeder data (hanya untuk type GI)
-                $feederData = null;
-                if ($type === 'GI') {
-                    $feederData = $this->getFeederData($keypointId);
+                $singleLineData[] = [
+                    'id' => $incrementalId++,
+                    'code' => $keypointId,
+                    'name' => $name,
+                    'type' => $type,
+                    'coordinate' => $coordinate,
+                    'parent' => $parent,
+                    'status' => $status,
+                    'data' => [
+                        'load-mw' => $loadData['load_mw'] . ' MW',
+                        'load-is' => $loadData['load_is'] . ' A',
+                        'lastUpdate' => $loadData['last_update'],
+                    ],
+                    'feeder' => null // Non-GI keypoints don't have feeder data
+                ];
+            }
+
+            // Process GarduInduk data that have connections to allowed keypoints
+            foreach ($garduInduksWithAllowedKeypoints as $gardu) {
+                $keypointId = $gardu->keypoint_id;
+
+                // Get station point data
+                $stationPoint = StationPointSkada::where('PKEY', $keypointId)->first();
+                if (!$stationPoint) {
+                    continue;
                 }
+
+                $name = $stationPoint->NAME;
+                $type = $this->extractTypeFromName($name);
+                $coordinate = $this->parseCoordinate($gardu->coordinate ?? null);
+
+                if (!$coordinate) {
+                    continue; // Skip if coordinate is invalid
+                }
+
+                // GI doesn't have parent
+                $parent = null;
+
+                // Get status
+                $status = $this->getKeypointStatus($keypointId);
+
+                // Calculate load data
+                $loadData = $this->calculateKeypointLoad($keypointId, $type);
+
+                // Get feeder data for GI
+                $feederData = $this->getFeederData($keypointId);
 
                 $singleLineData[] = [
                     'id' => $incrementalId++,
@@ -491,12 +519,25 @@ class SingleLineController extends Controller
                 'count' => count($singleLineData)
             ]);
         } catch (\Exception $e) {
+            Log::error('Error fetching single line data by user: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Error fetching single line data for user',
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Get GarduInduk that have feeders connected to allowed keypoints
+     */
+    private function getGarduIndukWithAllowedKeypoints($allowedKeypointIds)
+    {
+        return GarduInduk::whereHas('feeders.keypoints', function ($query) use ($allowedKeypointIds) {
+            $query->whereIn('keypoint_id', $allowedKeypointIds);
+        })
+            ->orWhereIn('keypoint_id', $allowedKeypointIds)
+            ->get();
     }
     public function getSingleLineDataBasedOnRole(Request $request)
     {
