@@ -23,6 +23,7 @@ interface AlarmEntry {
     TEXT: string;
     TIME: string;
     PRIORITY: number;
+    STATIONPID: number;
 }
 
 export default function AlarmLog() {
@@ -35,7 +36,7 @@ export default function AlarmLog() {
         try {
             const { data, error } = await supabase
                 .from('alarms')
-                .select('id, TEXT, TIME, PRIORITY')
+                .select('id, TEXT, TIME, PRIORITY, STATIONPID')
                 .order('id', { ascending: false })
                 .limit(30);
 
