@@ -3,6 +3,7 @@ import AppLayoutTemplate from '@/layouts/app/app-header-layout';
 import { type BreadcrumbItem } from '@/types';
 import { type ReactNode } from 'react';
 import { Toaster } from 'sonner';
+import AppFooter from '@/layouts/app/app-footer';
 
 interface AppLayoutProps {
     children: ReactNode;
@@ -16,6 +17,7 @@ export default ({ children, breadcrumbs, ...props }: AppLayoutProps) => {
         <AppLayoutTemplate breadcrumbs={breadcrumbs} {...props}>
             {children}
             <Toaster position="bottom-center" />
+            <AppFooter />
         </AppLayoutTemplate>
     );
 };

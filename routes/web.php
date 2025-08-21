@@ -53,18 +53,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Routes untuk mendapatkan data single line
     Route::get('/api/single-line', [SingleLineController::class, 'getSingleLineDataBasedOnRole']);
 
-    // // Routes untuk mendapatkan daftar DCC yang tersedia
-    // Route::get('/maps/dcc', [MapsController::class, 'getAvailableDcc']);
+    // Route for getting user's keypoints
+    Route::get('/api/user-keypoints', [\App\Http\Controllers\AlarmController::class, 'getKeypoints'])->name('api.user-keypoints');
 
-    // // Routes untuk keypoints berdasarkan DCC (API pertama)
-    // Route::get('/maps/keypoints/selatan', [MapsController::class, 'keypointsSelatan']);
-    // Route::get('/maps/keypoints/utara', [MapsController::class, 'keypointsUtara']);
-    // Route::get('/maps/keypoints/tenggara', [MapsController::class, 'keypointsTenggara']);
-
-    // // Routes untuk summary berdasarkan DCC (API kedua)
-    // Route::get('/maps/summary/selatan', [MapsController::class, 'summarySelatan']);
-    // Route::get('/maps/summary/utara', [MapsController::class, 'summaryUtara']);
-    // Route::get('/maps/summary/tenggara', [MapsController::class, 'summaryTenggara']);
 
     // Routes dinamis (opsional, jika ingin lebih fleksibel)
     Route::get('/maps/keypoints/{dcc}', [MapsController::class, 'getKeypointsByDcc']);

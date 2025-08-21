@@ -30,15 +30,46 @@ export default function AlarmLog() {
     const [alarms, setAlarms] = useState<AlarmEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [realtimeError, setRealtimeError] = useState(false); // PERBAIKAN 3: State untuk error realtime
+    const [realtimeError, setRealtimeError] = useState(false);
+    const [allowedStationPIDs, setAllowedStationPIDs] = useState<number[] | null>(null);
 
-    const fetchAlarms = async () => {
+    useEffect(() => {
+        const fetchAllowedKeypoints = async () => {
+            try {
+                const response = await fetch('/api/user-keypoints');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                setAllowedStationPIDs(data);
+            } catch (err) {
+                console.error('Error fetching allowed keypoints:', err);
+                setError('Failed to load user keypoints.');
+                setLoading(false);
+            }
+        };
+
+        fetchAllowedKeypoints();
+    }, []);
+
+    const fetchAlarms = async (stationPIDs: number[] | null) => {
+        if (stationPIDs === null) {
+            // Still loading allowedStationPIDs, or an error occurred
+            return;
+        }
+
         try {
-            const { data, error } = await supabase
+            let query = supabase
                 .from('alarms')
                 .select('id, TEXT, TIME, PRIORITY, STATIONPID')
                 .order('id', { ascending: false })
                 .limit(30);
+
+            if (stationPIDs.length > 0) {
+                query = query.in('STATIONPID', stationPIDs);
+            }
+
+            const { data, error } = await query;
 
             if (error) {
                 throw error;
@@ -55,7 +86,9 @@ export default function AlarmLog() {
 
     useEffect(() => {
         let isMounted = true;
-        fetchAlarms();
+        if (allowedStationPIDs !== null) {
+            fetchAlarms(allowedStationPIDs);
+        }
 
         // PERBAIKAN 4: Tambahkan timeout untuk fallback jika realtime gagal
         const realtimeTimeout = setTimeout(() => {
@@ -127,14 +160,14 @@ export default function AlarmLog() {
 
     // PERBAIKAN 6: Fallback polling jika realtime gagal
     useEffect(() => {
-        if (!realtimeError) return;
+        if (!realtimeError || allowedStationPIDs === null) return;
 
         const intervalId = setInterval(() => {
-            fetchAlarms();
+            fetchAlarms(allowedStationPIDs);
         }, 10000);
 
         return () => clearInterval(intervalId);
-    }, [realtimeError]);
+    }, [realtimeError, allowedStationPIDs]);
 
     // Format timestamp for display
     const formatTimestamp = (timestamp: string) => {
