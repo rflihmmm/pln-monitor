@@ -263,7 +263,6 @@ class DashboardController extends Controller
     {
         try {
             // STEP 1: Get the organizational hierarchy and all associated keypoint IDs from PostgreSQL.
-            // This query gathers the structure (DCC -> UP3 -> ULP) and links it to the keypoint IDs.
             $orgStructureWithKeypoints = DB::connection('pgsql')
                 ->table('organization as dcc')
                 ->join('organization as up3', 'up3.parent_id', '=', 'dcc.id')
@@ -281,7 +280,6 @@ class DashboardController extends Controller
                 )
                 ->get();
 
-            // If no organizational structure is found, return an empty successful response.
             if ($orgStructureWithKeypoints->isEmpty()) {
                 return response()->json([
                     'success' => true,
@@ -290,49 +288,73 @@ class DashboardController extends Controller
                 ]);
             }
 
-            // Extract all unique keypoint IDs to be used in the next query.
-            // The filter() method removes any potential null values.
             $keypointIds = $orgStructureWithKeypoints->pluck('keypoint_id')->unique()->filter()->all();
 
-            // STEP 2: Get all relevant analog data from SQL Server in a single query.
-            // We use the collected keypoint IDs to fetch only the necessary rows from ANALOGPOINTS.
-            // Filter by keypoint name starting with 'LBS-'
+            // STEP 2: Get analog data for load calculation from SQL Server
+            // Get IR, IS, IT for current calculation and KV-AB, KV-BC, KV-AC for voltage calculation
             $analogData = DB::connection('sqlsrv_main')
                 ->table('ANALOGPOINTS as ap')
                 ->join('STATIONPOINTS as sp', 'ap.STATIONPID', '=', 'sp.PKEY')
                 ->whereIn('ap.STATIONPID', $keypointIds)
-                ->whereIn('ap.NAME', ['IS', 'IR']) // 'IS' for Power, 'IR' for Current
+                ->whereIn('ap.NAME', ['IR', 'IS', 'IT', 'KV-AB', 'KV-BC', 'KV-AC'])
                 ->where('sp.NAME', 'LIKE', 'LBS-%') // Filter by keypoint name
                 ->select('ap.STATIONPID', 'ap.NAME', 'ap.VALUE')
                 ->get();
 
-            // Create a lookup map for faster processing in PHP.
-            // Key: STATIONPID, Value: ['power' => X, 'current' => Y]
+            // Create analog value map grouped by keypoint and parameter name
             $analogValueMap = [];
             foreach ($analogData as $point) {
-                $key = $point->STATIONPID;
-                if (!isset($analogValueMap[$key])) {
-                    $analogValueMap[$key] = ['power' => 0, 'current' => 0];
+                $keypointId = $point->STATIONPID;
+                $paramName = $point->NAME;
+                $value = (float)$point->VALUE;
+
+                if (!isset($analogValueMap[$keypointId])) {
+                    $analogValueMap[$keypointId] = [
+                        'current' => ['IR' => 0, 'IS' => 0, 'IT' => 0],
+                        'voltage' => ['KV-AB' => 0, 'KV-BC' => 0, 'KV-AC' => 0]
+                    ];
                 }
-                if ($point->NAME === 'IS') {
-                    $analogValueMap[$key]['power'] = (float)$point->VALUE;
-                } elseif ($point->NAME === 'IR') {
-                    $analogValueMap[$key]['current'] = (float)$point->VALUE;
+
+                if (in_array($paramName, ['IR', 'IS', 'IT'])) {
+                    $analogValueMap[$keypointId]['current'][$paramName] = $value;
+                } elseif (in_array($paramName, ['KV-AB', 'KV-BC', 'KV-AC'])) {
+                    $analogValueMap[$keypointId]['voltage'][$paramName] = $value;
                 }
             }
 
-            // STEP 3: Process and aggregate the data in PHP.
-            // This is where we combine the results from the two queries.
+            // STEP 3: Calculate load-is and load-mw for each keypoint
+            $processedValues = [];
+            foreach ($analogValueMap as $keypointId => $data) {
+                // Calculate load-is: average of IR, IS, IT
+                $currentValues = array_values($data['current']);
+                $currentCount = count(array_filter($currentValues, function ($val) {
+                    return $val > 0;
+                }));
+                $loadIs = $currentCount > 0 ? array_sum($currentValues) / $currentCount : 0;
+
+                // Calculate load-mw: average of KV-AB, KV-BC, KV-AC multiplied by load-is
+                $voltageValues = array_values($data['voltage']);
+                $voltageCount = count(array_filter($voltageValues, function ($val) {
+                    return $val > 0;
+                }));
+                $avgVoltage = $voltageCount > 0 ? array_sum($voltageValues) / $voltageCount : 0;
+
+                // Convert to MW: (voltage_kV * current_A) / 1000 = MW
+                $loadMw = ($avgVoltage * $loadIs) / 1000;
+
+                $processedValues[$keypointId] = [
+                    'power' => $loadMw,
+                    'current' => $loadIs
+                ];
+            }
+
+            // STEP 4: Process and aggregate the data
             $aggregatedData = [];
             foreach ($orgStructureWithKeypoints as $orgLink) {
-                // Find the corresponding analog values from our map.
-                $values = $analogValueMap[$orgLink->keypoint_id] ?? ['power' => 0, 'current' => 0];
-
-                // Use the UP3 ID as a key for easy aggregation.
+                $values = $processedValues[$orgLink->keypoint_id] ?? ['power' => 0, 'current' => 0];
                 $dccName = $orgLink->dcc_name;
                 $up3Id = $orgLink->up3_id;
 
-                // Initialize structures if they don't exist.
                 if (!isset($aggregatedData[$dccName])) {
                     $aggregatedData[$dccName] = [];
                 }
@@ -344,12 +366,11 @@ class DashboardController extends Controller
                     ];
                 }
 
-                // Add the power and current values to the correct UP3 total.
                 $aggregatedData[$dccName][$up3Id]['power'] += $values['power'];
                 $aggregatedData[$dccName][$up3Id]['current'] += $values['current'];
             }
 
-            // STEP 4: Format the aggregated data into the final JSON structure.
+            // STEP 5: Format the final response
             $systemLoadData = [];
             $grandTotalPower = 0;
             $grandTotalCurrent = 0;
@@ -391,7 +412,7 @@ class DashboardController extends Controller
                 ]
             ]);
         } catch (\Exception $e) {
-            Log::error('Error fetching system load data (Refactored): ' . $e->getMessage());
+            Log::error('Error fetching system load data: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Error fetching system load data',
@@ -399,6 +420,7 @@ class DashboardController extends Controller
             ], 500);
         }
     }
+
     public function getMapDataByUser(Request $request)
     {
         try {
@@ -560,8 +582,6 @@ class DashboardController extends Controller
         ];
     }
 
-
-
     public function getSystemLoadDataByUser(Request $request)
     {
         try {
@@ -584,7 +604,7 @@ class DashboardController extends Controller
                 ], 404);
             }
 
-            // 2. Dapatkan semua ID organisasi yang relevan (ancestor, user's org, dan descendant)
+            // 2. Dapatkan semua ID organisasi yang relevan
             $ancestorIds = $this->getOrganizationAncestorsAndSelf($userOrganizationId);
             $authorizedDescendantIds = $this->getAuthorizedOrganizationIds($userOrganization);
             $organizationIds = array_unique(array_merge($ancestorIds, $authorizedDescendantIds));
@@ -613,35 +633,67 @@ class DashboardController extends Controller
                 ]);
             }
 
-            // 4. Ambil data analog dari SQL Server berdasarkan authorized keypoints
-            // Filter by keypoint name starting with 'LBS-'
+            // 4. Get analog data for load calculation from SQL Server
             $analogData = DB::connection('sqlsrv_main')
                 ->table('ANALOGPOINTS as ap')
                 ->join('STATIONPOINTS as sp', 'ap.STATIONPID', '=', 'sp.PKEY')
                 ->whereIn('ap.STATIONPID', $authorizedKeypointIds)
-                ->whereIn('ap.NAME', ['IS', 'MW']) // IS untuk current, MW untuk power
+                ->whereIn('ap.NAME', ['IR', 'IS', 'IT', 'KV-AB', 'KV-BC', 'KV-AC'])
                 ->where('sp.NAME', 'LIKE', 'LBS-%') // Filter by keypoint name
                 ->select('ap.STATIONPID', 'ap.NAME', 'ap.VALUE')
                 ->get();
 
-            // 5. Buat lookup map untuk analog values
+            // 5. Create analog value map grouped by keypoint and parameter name
             $analogValueMap = [];
             foreach ($analogData as $point) {
-                $key = $point->STATIONPID;
-                if (!isset($analogValueMap[$key])) {
-                    $analogValueMap[$key] = ['power' => 0, 'current' => 0];
+                $keypointId = $point->STATIONPID;
+                $paramName = $point->NAME;
+                $value = (float)$point->VALUE;
+
+                if (!isset($analogValueMap[$keypointId])) {
+                    $analogValueMap[$keypointId] = [
+                        'current' => ['IR' => 0, 'IS' => 0, 'IT' => 0],
+                        'voltage' => ['KV-AB' => 0, 'KV-BC' => 0, 'KV-AC' => 0]
+                    ];
                 }
-                if ($point->NAME === 'MW') {
-                    $analogValueMap[$key]['power'] = (float)$point->VALUE;
-                } elseif ($point->NAME === 'IS') {
-                    $analogValueMap[$key]['current'] = (float)$point->VALUE;
+
+                if (in_array($paramName, ['IR', 'IS', 'IT'])) {
+                    $analogValueMap[$keypointId]['current'][$paramName] = $value;
+                } elseif (in_array($paramName, ['KV-AB', 'KV-BC', 'KV-AC'])) {
+                    $analogValueMap[$keypointId]['voltage'][$paramName] = $value;
                 }
             }
 
-            // 6. Dapatkan organization structure dengan keypoints
-            $organizationStructure = $this->buildOrganizationStructureWithKeypoints($organizationIds, $analogValueMap);
+            // 6. Calculate load-is and load-mw for each keypoint
+            $processedValues = [];
+            foreach ($analogValueMap as $keypointId => $data) {
+                // Calculate load-is: average of IR, IS, IT
+                $currentValues = array_values($data['current']);
+                $currentCount = count(array_filter($currentValues, function ($val) {
+                    return $val > 0;
+                }));
+                $loadIs = $currentCount > 0 ? array_sum($currentValues) / $currentCount : 0;
 
-            // 7. Aggregate data berdasarkan hierarchy
+                // Calculate load-mw: average of KV-AB, KV-BC, KV-AC multiplied by load-is
+                $voltageValues = array_values($data['voltage']);
+                $voltageCount = count(array_filter($voltageValues, function ($val) {
+                    return $val > 0;
+                }));
+                $avgVoltage = $voltageCount > 0 ? array_sum($voltageValues) / $voltageCount : 0;
+
+                // Convert to MW: (voltage_kV * current_A) / 1000 = MW
+                $loadMw = ($avgVoltage * $loadIs) / 1000;
+
+                $processedValues[$keypointId] = [
+                    'power' => $loadMw,
+                    'current' => $loadIs
+                ];
+            }
+
+            // 7. Dapatkan organization structure dengan keypoints
+            $organizationStructure = $this->buildOrganizationStructureWithKeypoints($organizationIds, $processedValues);
+
+            // 8. Aggregate data berdasarkan hierarchy
             $systemLoadData = [];
             $grandTotalPower = 0;
             $grandTotalCurrent = 0;
@@ -695,7 +747,7 @@ class DashboardController extends Controller
     /**
      * Build organization structure dengan keypoints dan load calculation
      */
-    private function buildOrganizationStructureWithKeypoints($organizationIds, $analogValueMap)
+    private function buildOrganizationStructureWithKeypoints($organizationIds, $processedValues)
     {
         // Ambil semua organization data yang terlibat
         $organizations = Organization::whereIn('id', $organizationIds)
@@ -721,9 +773,9 @@ class DashboardController extends Controller
             }
 
             // Tambahkan load dari keypoint ini
-            if (isset($analogValueMap[$keypointId])) {
-                $orgLoads[$orgId]['power'] += $analogValueMap[$keypointId]['power'];
-                $orgLoads[$orgId]['current'] += $analogValueMap[$keypointId]['current'];
+            if (isset($processedValues[$keypointId])) {
+                $orgLoads[$orgId]['power'] += $processedValues[$keypointId]['power'];
+                $orgLoads[$orgId]['current'] += $processedValues[$keypointId]['current'];
             }
         }
 

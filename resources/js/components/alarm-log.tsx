@@ -23,53 +23,22 @@ interface AlarmEntry {
     TEXT: string;
     TIME: string;
     PRIORITY: number;
-    STATIONPID: number;
+    STATIONPID: number
 }
 
 export default function AlarmLog() {
     const [alarms, setAlarms] = useState<AlarmEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [realtimeError, setRealtimeError] = useState(false);
-    const [allowedStationPIDs, setAllowedStationPIDs] = useState<number[] | null>(null);
+    const [realtimeError, setRealtimeError] = useState(false); // PERBAIKAN 3: State untuk error realtime
 
-    useEffect(() => {
-        const fetchAllowedKeypoints = async () => {
-            try {
-                const response = await fetch('/api/user-keypoints');
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                setAllowedStationPIDs(data);
-            } catch (err) {
-                console.error('Error fetching allowed keypoints:', err);
-                setError('Failed to load user keypoints.');
-                setLoading(false);
-            }
-        };
-
-        fetchAllowedKeypoints();
-    }, []);
-
-    const fetchAlarms = async (stationPIDs: number[] | null) => {
-        if (stationPIDs === null) {
-            // Still loading allowedStationPIDs, or an error occurred
-            return;
-        }
-
+    const fetchAlarms = async () => {
         try {
-            let query = supabase
+            const { data, error } = await supabase
                 .from('alarms')
                 .select('id, TEXT, TIME, PRIORITY, STATIONPID')
                 .order('id', { ascending: false })
                 .limit(30);
-
-            if (stationPIDs.length > 0) {
-                query = query.in('STATIONPID', stationPIDs);
-            }
-
-            const { data, error } = await query;
 
             if (error) {
                 throw error;
@@ -86,9 +55,7 @@ export default function AlarmLog() {
 
     useEffect(() => {
         let isMounted = true;
-        if (allowedStationPIDs !== null) {
-            fetchAlarms(allowedStationPIDs);
-        }
+        fetchAlarms();
 
         // PERBAIKAN 4: Tambahkan timeout untuk fallback jika realtime gagal
         const realtimeTimeout = setTimeout(() => {
@@ -160,14 +127,14 @@ export default function AlarmLog() {
 
     // PERBAIKAN 6: Fallback polling jika realtime gagal
     useEffect(() => {
-        if (!realtimeError || allowedStationPIDs === null) return;
+        if (!realtimeError) return;
 
         const intervalId = setInterval(() => {
-            fetchAlarms(allowedStationPIDs);
+            fetchAlarms();
         }, 10000);
 
         return () => clearInterval(intervalId);
-    }, [realtimeError, allowedStationPIDs]);
+    }, [realtimeError]);
 
     // Format timestamp for display
     const formatTimestamp = (timestamp: string) => {
@@ -189,16 +156,16 @@ export default function AlarmLog() {
         }
     };
 
-    const getAlarmColorClass = (priority: number) => {
+    const getAlarmColorClass = () => {
         // 0 = putih, 1 = cyan, 2 = ungu, 3 = kuning dan 4 = merah
         const colors = [
-            'bg-grey-100',
-            'bg-cyan-100',
-            'bg-purple-100',
-            'bg-yellow-100',
-            'bg-red-100',
+            'text-white',
+            'text-blue-400',
+            'text-purple-400',
+            'text-yellow-400',
+            'text-red-400',
         ];
-        const randomIndex = priority;
+        const randomIndex = Math.floor(Math.random() * colors.length);
         return colors[randomIndex];
     };
 
@@ -250,16 +217,16 @@ export default function AlarmLog() {
                         </div>
                     ) : (
                         alarms.map((alarm) => {
-                            const colorClass = getAlarmColorClass(alarm.PRIORITY);
+                            const colorClass = getAlarmColorClass();
 
                             return (
-                                <div key={alarm.id} className={`border-b py-2 last:border-0 ${colorClass}`}>
+                                <div key={alarm.id} className="border-b py-2 last:border-0">
                                     <div className="flex items-start gap-2">
                                         <div className="flex-1">
                                             <div className={`text-xs text-muted-foreground`}>
                                                 {formatTimestamp(alarm.TIME)}
                                             </div>
-                                            <div className={`mt-1 text-sm`}>
+                                            <div className={`mt-1 text-sm ${colorClass}`}>
                                                 {alarm.TEXT || 'No message'}
                                             </div>
                                             <div className="mt-1 text-xs text-muted-foreground">
