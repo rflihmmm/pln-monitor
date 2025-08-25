@@ -260,7 +260,7 @@ export default function AlarmLog() {
         }
     };
 
-    const getAlarmColorClass = () => {
+    const getAlarmColorClass = (priority: number) => {
         // 0 = hitam, 1 = cyan, 2 = ungu, 3 = kuning dan 4 = merah
         const colors = [
             'text-black',
@@ -269,8 +269,7 @@ export default function AlarmLog() {
             'text-yellow-400',
             'text-red-400',
         ];
-        const randomIndex = Math.floor(Math.random() * colors.length);
-        return colors[randomIndex];
+        return colors[priority] || colors[0];
     };
 
     if (loading || keypointsLoading) {
@@ -363,7 +362,7 @@ export default function AlarmLog() {
                         </div>
                     ) : (
                         currentAlarms.map((alarm) => {
-                            const colorClass = getAlarmColorClass();
+                            const colorClass = getAlarmColorClass(alarm.PRIORITY);
 
                             return (
                                 <div key={alarm.id} className="border-b py-2 last:border-0">
