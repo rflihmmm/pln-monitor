@@ -261,9 +261,9 @@ export default function AlarmLog() {
     };
 
     const getAlarmColorClass = () => {
-        // 0 = putih, 1 = cyan, 2 = ungu, 3 = kuning dan 4 = merah
+        // 0 = hitam, 1 = cyan, 2 = ungu, 3 = kuning dan 4 = merah
         const colors = [
-            'text-white',
+            'text-black',
             'text-blue-400',
             'text-purple-400',
             'text-yellow-400',

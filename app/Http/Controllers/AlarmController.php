@@ -43,28 +43,6 @@ class AlarmController extends Controller
         return response()->json($keypoints);
     }
 
-    public function getTableStructure()
-    {
-        try {
-            // Get table structure for ALARMS
-            $alarmsColumns = DB::connection('sqlsrv_main')
-                ->select("SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'ALARMS'");
-
-            // Get table structure for STATIONPOINTS
-            $stationColumns = DB::connection('sqlsrv_main')
-                ->select("SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'STATIONPOINTS'");
-
-            return response()->json([
-                'alarms_columns' => $alarmsColumns,
-                'station_columns' => $stationColumns
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => $e->getMessage()
-            ]);
-        }
-    }
-
     public function searchAlarms(Request $request)
     {
         $user = $request->user();
