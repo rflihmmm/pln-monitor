@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\AiChatBot;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\MapsController;
+use App\Http\Controllers\AlarmController;
 use App\Http\Controllers\TableHmiController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SingleLineController;
@@ -56,6 +57,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Route for getting user's keypoints
     Route::get('/api/user-keypoints', [\App\Http\Controllers\AlarmController::class, 'getKeypoints'])->name('api.user-keypoints');
 
+    // Routes for alarm functionality
+    Route::get('/api/user-keypoints', [AlarmController::class, 'getKeypoints'])->name('api.user-keypoints');
+    Route::get('/api/search-alarms', [AlarmController::class, 'searchAlarms'])->name('api.search-alarms');
+    Route::get('/api/filtered-keypoints', [AlarmController::class, 'getFilteredKeypoints'])->name('api.filtered-keypoints');
 
     // Routes dinamis (opsional, jika ingin lebih fleksibel)
     Route::get('/maps/keypoints/{dcc}', [MapsController::class, 'getKeypointsByDcc']);

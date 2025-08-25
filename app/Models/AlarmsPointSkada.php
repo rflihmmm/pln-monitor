@@ -4,13 +4,15 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class AnalogPointSkada extends Model
+class AlarmsPointSkada extends Model
 {
     protected $connection = 'sqlsrv_main';
 
     protected $table = 'ALARMS';
 
     protected $guarded = [];
+
+    public $timestamps = false;
     /**
      * Relasi ke StationPointSkada berdasarkan STATIONPID -> PKEY
      */
