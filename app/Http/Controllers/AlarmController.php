@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\KeypointExt;
+use App\Models\Organization;
 use App\Models\OrganizationKeypoint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -11,19 +12,54 @@ use Illuminate\Support\Facades\DB;
 
 class AlarmController extends Controller
 {
+    /**
+     * Get all descendant organization IDs for a given organization
+     * This handles the hierarchy: Keypoint<ULP<UP3<DCC
+     */
+    /**
+     * Get all descendant organization IDs for a given organization (iterative approach)
+     * This handles the hierarchy: Keypoint<ULP<UP3<DCC
+     */
+    private function getAllDescendantOrganizations($organizationId)
+    {
+        $descendantIds = collect();
+        $queue = collect([$organizationId]);
+        $processed = collect();
+
+        while ($queue->isNotEmpty()) {
+            $currentOrgId = $queue->shift();
+
+            if ($processed->contains($currentOrgId)) {
+                continue;
+            }
+
+            $descendantIds->push($currentOrgId);
+            $processed->push($currentOrgId);
+
+            $children = Organization::where('parent_id', $currentOrgId)->pluck('id');
+
+            foreach ($children as $childId) {
+                if (!$processed->contains($childId)) {
+                    $queue->push($childId);
+                }
+            }
+        }
+
+        return $descendantIds->unique()->values();
+    }
+
     public function getKeypoints(Request $request)
     {
         $user = $request->user();
 
-        // If user is not logged in or has roles other than 'unit', return all keypoints
-        if ($user && $user->unit !== null) {
-            // Fetch all keypoint IDs if the user does not have a specific unit assigned
+        // If user is not logged in or has no unit assigned, return all keypoints
+        if (!$user || $user->unit === null) {
             return response()->json(
-                \App\Models\KeypointExt::pluck('keypoint_id')->toArray()
+                KeypointExt::pluck('keypoint_id')->toArray()
             );
         }
 
-        $cacheKey = 'user_keypoints_' . $user->id;
+        $cacheKey = 'user_keypoints_' . $user->id . '_' . $user->unit;
         $keypoints = Cache::remember($cacheKey, now()->addMinutes(60), function () use ($user) {
             // Get the organization ID (unit) from the user
             $organizationId = $user->unit;
@@ -32,8 +68,12 @@ class AlarmController extends Controller
                 return [];
             }
 
-            // Get keypoint_ids associated with the user's organization
-            $keypointIds = OrganizationKeypoint::where('organization_id', $organizationId)
+            // Get all descendant organizations (including the user's organization)
+            $allOrganizationIds = $this->getAllDescendantOrganizations($organizationId);
+
+            // Get keypoint_ids associated with all descendant organizations
+            // This will include keypoints from DCC, UP3, and ULP levels if they exist in OrganizationKeypoint
+            $keypointIds = OrganizationKeypoint::whereIn('organization_id', $allOrganizationIds)
                 ->pluck('keypoint_id')
                 ->toArray();
 
@@ -48,6 +88,8 @@ class AlarmController extends Controller
         $user = $request->user();
         $search = $request->get('search');
         $limit = $request->get('limit', 30);
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
 
         try {
             // First, let's discover the available columns
@@ -104,13 +146,26 @@ class AlarmController extends Controller
             // Apply user unit filter if not admin
             if ($user && $user->unit !== null) {
                 $organizationId = $user->unit;
-                $keypointIds = OrganizationKeypoint::where('organization_id', $organizationId)
+
+                // Get all descendant organizations
+                $allOrganizationIds = $this->getAllDescendantOrganizations($organizationId);
+
+                $keypointIds = OrganizationKeypoint::whereIn('organization_id', $allOrganizationIds)
                     ->pluck('keypoint_id')
                     ->toArray();
 
                 if (!empty($keypointIds)) {
                     $query->whereIn('a.STATIONPID', $keypointIds);
                 }
+            }
+
+            // Apply date range filter if provided
+            if ($startDate && $endDate) {
+                $query->whereBetween('a.TIME', [$startDate, $endDate]);
+            } elseif ($startDate) {
+                $query->where('a.TIME', '>=', $startDate);
+            } elseif ($endDate) {
+                $query->where('a.TIME', '<=', $endDate);
             }
 
             // Apply search filter if provided
@@ -151,7 +206,8 @@ class AlarmController extends Controller
                 'data' => $alarms,
                 'total' => $alarms->count(),
                 'available_columns' => $availableColumns,
-                'primary_key_used' => $primaryKey
+                'primary_key_used' => $primaryKey,
+                'date_filter_applied' => !empty($startDate) || !empty($endDate)
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -169,16 +225,15 @@ class AlarmController extends Controller
         try {
             // If user is admin (no specific unit), return all keypoints
             if (!$user || $user->unit === null) {
-                $keypoints = KeypointExt::pluck('keypoint_id')->toArray();
                 return response()->json([
                     'success' => true,
-                    'data' => $keypoints,
+                    'data' => [],
                     'is_admin' => true
                 ]);
             }
 
             // For users with specific unit, get filtered keypoints
-            $cacheKey = 'user_keypoints_' . $user->id;
+            $cacheKey = 'user_keypoints_' . $user->id . '_' . $user->unit;
             $keypoints = Cache::remember($cacheKey, now()->addMinutes(60), function () use ($user) {
                 $organizationId = $user->unit;
 
@@ -186,7 +241,12 @@ class AlarmController extends Controller
                     return [];
                 }
 
-                return OrganizationKeypoint::where('organization_id', $organizationId)
+                // Get all descendant organizations
+                $allOrganizationIds = $this->getAllDescendantOrganizations($organizationId);
+
+                // Get keypoint_ids associated with all descendant organizations
+                // This will include keypoints from DCC, UP3, and ULP levels if they exist in OrganizationKeypoint
+                return OrganizationKeypoint::whereIn('organization_id', $allOrganizationIds)
                     ->pluck('keypoint_id')
                     ->toArray();
             });

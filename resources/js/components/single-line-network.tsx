@@ -99,10 +99,14 @@ export function SingleLineNetwork() {
     const [zoom, setZoom] = useState(12)
 
     // Base64 SVG ikon
-    const activeIconUrl =
+    const giIconUrl =
         "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgY2xhc3M9Imx1Y2lkZSBsdWNpZGUtY2lyY2xlIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIgZmlsbD0iIzEwYjk4MSIvPjwvc3ZnPg=="
-    const inactiveIconUrl =
+    const recIconUrl =
+        "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgY2xhc3M9Imx1Y2lkZSBsdWNpZGUtY2lyY2xlIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIgZmlsbD0iIzNiODJmNiIvPjwvc3ZnPg=="
+    const lbsIconUrl =
         "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgY2xhc3M9Imx1Y2lkZSBsdWNpZGUtY2lyY2xlIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIgZmlsbD0iI2VmNDQ0NCIvPjwvc3ZnPg=="
+    const ghIconUrl =
+        "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FapPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgY2xhc3M9Imx1Y2lkZSBsdWNpZGUtY2lyY2xlIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIgZmlsbD0iI2Y5NzMxNiIvPjwvc3ZnPg=="
 
     // Hitung ukuran ikon mengikuti zoom:
     // - Saat zoom out (z kecil), ukuran minimum 12px agar tidak terlihat membesar relatif peta
@@ -116,16 +120,33 @@ export function SingleLineNetwork() {
     }
 
     const buildIcon = useCallback(
-        (status: string, z: number) => {
+        (type: NodeType, z: number) => {
             const s = sizeForZoom(z)
+            let iconUrl: string
+            switch (type) {
+                case "GI":
+                    iconUrl = giIconUrl
+                    break
+                case "REC":
+                    iconUrl = recIconUrl
+                    break
+                case "LBS":
+                    iconUrl = lbsIconUrl
+                    break
+                case "GH":
+                    iconUrl = ghIconUrl
+                    break
+                default:
+                    iconUrl = giIconUrl // Fallback
+            }
             return new L.Icon({
-                iconUrl: status === "active" ? activeIconUrl : inactiveIconUrl,
+                iconUrl: iconUrl,
                 iconSize: [s, s],
                 iconAnchor: [s / 2, s / 2],
                 popupAnchor: [0, -s / 2],
             })
         },
-        [activeIconUrl, inactiveIconUrl]
+        [giIconUrl, recIconUrl, lbsIconUrl, ghIconUrl]
     )
 
     const [visible, setVisible] = useState<Visibility>({ GI: true, REC: true, LBS: true, GH: true })
@@ -250,7 +271,7 @@ export function SingleLineNetwork() {
                         <Marker
                             key={n.id}
                             position={n.coordinate}
-                            icon={buildIcon(n.status, zoom)}
+                            icon={buildIcon(n.type, zoom)}
                             ref={registerMarkerRef(n.code)}
                         >
                             <Popup>

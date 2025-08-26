@@ -238,27 +238,57 @@ class SingleLineController extends Controller
                     }
                 }
             } else {
-                // Untuk selain GI, ambil dari AnalogPointSkada langsung
-                // Load IS - cari yang ada "IS" di kolom NAME
-                $isAnalogPoint = AnalogPointSkada::where('STATIONPID', $keypointId)
-                    ->where('NAME', 'LIKE', '%IS%')
-                    ->first();
+                // Untuk selain GI, ambil dari AnalogPointSkada
+                $analogPoints = AnalogPointSkada::where('STATIONPID', $keypointId)
+                    ->whereIn('NAME', ['IR', 'IS', 'IT', 'KV-AB', 'KV-BC', 'KV-AC'])
+                    ->get();
 
-                if ($isAnalogPoint && is_numeric($isAnalogPoint->VALUE)) {
-                    $loadIs = floatval($isAnalogPoint->VALUE);
-                    $lastUpdate = $isAnalogPoint->UPDATETIME;
+                $irValues = [];
+                $isValues = [];
+                $itValues = [];
+                $kvAbValues = [];
+                $kvBcValues = [];
+                $kvAcValues = [];
+
+                foreach ($analogPoints as $point) {
+                    if (is_numeric($point->VALUE)) {
+                        switch ($point->NAME) {
+                            case 'IR':
+                                $irValues[] = floatval($point->VALUE);
+                                break;
+                            case 'IS':
+                                $isValues[] = floatval($point->VALUE);
+                                break;
+                            case 'IT':
+                                $itValues[] = floatval($point->VALUE);
+                                break;
+                            case 'KV-AB':
+                                $kvAbValues[] = floatval($point->VALUE);
+                                break;
+                            case 'KV-BC':
+                                $kvBcValues[] = floatval($point->VALUE);
+                                break;
+                            case 'KV-AC':
+                                $kvAcValues[] = floatval($point->VALUE);
+                                break;
+                        }
+                        if (!$lastUpdate || $point->UPDATETIME > $lastUpdate) {
+                            $lastUpdate = $point->UPDATETIME;
+                        }
+                    }
                 }
 
-                // Load MW - cari yang ada "MW" di kolom NAME
-                $mwAnalogPoint = AnalogPointSkada::where('STATIONPID', $keypointId)
-                    ->where('NAME', 'LIKE', '%MW%')
-                    ->first();
+                // Calculate load-is (average of IR, IS, IT)
+                $allIsValues = array_merge($irValues, $isValues, $itValues);
+                if (!empty($allIsValues)) {
+                    $loadIs = array_sum($allIsValues) / count($allIsValues);
+                }
 
-                if ($mwAnalogPoint && is_numeric($mwAnalogPoint->VALUE)) {
-                    $loadMw = floatval($mwAnalogPoint->VALUE);
-                    if (!$lastUpdate || $mwAnalogPoint->UPDATETIME > $lastUpdate) {
-                        $lastUpdate = $mwAnalogPoint->UPDATETIME;
-                    }
+                // Calculate load-mw (average of kv-AB, kv-BC, kv-AC multiplied by load-is)
+                $allKvValues = array_merge($kvAbValues, $kvBcValues, $kvAcValues);
+                if (!empty($allKvValues) && $loadIs > 0) {
+                    $avgKv = array_sum($allKvValues) / count($allKvValues);
+                    $loadMw = $avgKv * $loadIs;
                 }
             }
         } catch (\Exception $e) {

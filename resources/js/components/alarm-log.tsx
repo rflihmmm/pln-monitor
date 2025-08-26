@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, Bell, Search, X, Database } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { AlertTriangle, Bell, Search, X, Database, Calendar } from 'lucide-react';
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import axios from 'axios';
@@ -36,6 +37,12 @@ interface UserKeypoints {
     is_admin: boolean;
 }
 
+interface SearchFilters {
+    text: string;
+    startDate: string;
+    endDate: string;
+}
+
 export default function AlarmLog() {
     const [alarms, setAlarms] = useState<AlarmEntry[]>([]);
     const [loading, setLoading] = useState(true);
@@ -43,10 +50,15 @@ export default function AlarmLog() {
     const [realtimeError, setRealtimeError] = useState(false);
 
     // Search functionality states
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchFilters, setSearchFilters] = useState<SearchFilters>({
+        text: '',
+        startDate: '',
+        endDate: ''
+    });
     const [isSearching, setIsSearching] = useState(false);
     const [searchResults, setSearchResults] = useState<AlarmEntry[]>([]);
     const [searchMode, setSearchMode] = useState(false);
+    const [showDateFilter, setShowDateFilter] = useState(false);
 
     // User permissions
     const [userKeypoints, setUserKeypoints] = useState<number[]>([]);
@@ -104,47 +116,119 @@ export default function AlarmLog() {
     };
 
     // Search alarms from database
-    const searchAlarms = async (query: string) => {
-        if (!query.trim()) {
+    const searchAlarms = async (filters: SearchFilters) => {
+        const hasTextFilter = filters.text.trim();
+        const hasDateFilter = filters.startDate || filters.endDate;
+
+        if (!hasTextFilter && !hasDateFilter) {
             setSearchMode(false);
             setSearchResults([]);
             return;
         }
 
         setIsSearching(true);
+        setError(null); // Clear any previous errors
+
         try {
-            const response = await axios.get('/api/search-alarms', {
-                params: {
-                    search: query,
-                    limit: 50
-                }
-            });
+            const params: any = {
+                limit: 50
+            };
+
+            if (hasTextFilter) {
+                params.search = filters.text.trim();
+            }
+
+            if (filters.startDate) {
+                // Convert to proper format for SQL Server
+                const startDate = new Date(filters.startDate);
+                params.start_date = startDate.toISOString();
+            }
+
+            if (filters.endDate) {
+                // Convert to proper format for SQL Server
+                const endDate = new Date(filters.endDate);
+                params.end_date = endDate.toISOString();
+            }
+
+            console.log('Search params:', params); // Debug log
+
+            const response = await axios.get('/api/search-alarms', { params });
 
             if (response.data.success) {
+                // Temporarily bypass client-side filtering for search results to debug display issue
                 setSearchResults(response.data.data);
                 setSearchMode(true);
+                console.log('Search results (unfiltered):', response.data.data.length, 'items'); // Debug log
             } else {
-                setError('Failed to search alarms');
+                setError('Failed to search alarms: ' + response.data.message);
+                console.error('Search failed:', response.data);
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error searching alarms:', err);
-            setError('Failed to search alarms');
+            setError('Failed to search alarms: ' + (err.response?.data?.message || err.message));
         } finally {
             setIsSearching(false);
         }
     };
 
-    // Handle search input
+    // Handle search form submit
     const handleSearchSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        searchAlarms(searchQuery);
+        searchAlarms(searchFilters);
+    };
+
+    // Handle date range search
+    const handleDateSearch = () => {
+        if (searchFilters.startDate || searchFilters.endDate) {
+            searchAlarms(searchFilters);
+        }
+    };
+
+    // Handle date change and auto-search if both dates are set
+    const handleDateChange = (field: 'startDate' | 'endDate', value: string) => {
+        const newFilters = {
+            ...searchFilters,
+            [field]: value
+        };
+        setSearchFilters(newFilters);
+
+        // Auto-search if both dates are set or if clearing a date while the other is set
+        if (newFilters.startDate && newFilters.endDate) {
+            searchAlarms(newFilters);
+        } else if (!value && (newFilters.startDate || newFilters.endDate)) {
+            // If clearing one date but the other is still set, search with remaining date
+            searchAlarms(newFilters);
+        }
     };
 
     // Clear search
     const clearSearch = () => {
-        setSearchQuery('');
+        setSearchFilters({
+            text: '',
+            startDate: '',
+            endDate: ''
+        });
         setSearchMode(false);
         setSearchResults([]);
+        setShowDateFilter(false);
+        // Return to live mode
+        fetchAlarms();
+    };
+
+    // Set quick date filters
+    const setQuickDateFilter = (hours: number) => {
+        const endDate = new Date();
+        const startDate = new Date(endDate.getTime() - (hours * 60 * 60 * 1000));
+
+        const newFilters = {
+            ...searchFilters,
+            startDate: startDate.toISOString().slice(0, 16), // Format: YYYY-MM-DDTHH:MM
+            endDate: endDate.toISOString().slice(0, 16)
+        };
+
+        setSearchFilters(newFilters);
+        // Automatically search when quick filter is applied
+        searchAlarms(newFilters);
     };
 
     // Initialize component
@@ -322,18 +406,29 @@ export default function AlarmLog() {
             </CardHeader>
             <CardContent>
                 {/* Search Form */}
-                <form onSubmit={handleSearchSubmit} className="mb-4">
+                <form onSubmit={handleSearchSubmit} className="mb-4 space-y-3">
+                    {/* Text Search */}
                     <div className="flex gap-2">
                         <div className="flex-1 relative">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
                                 type="text"
                                 placeholder="Search by Station ID, Station Name, or Alarm Text..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
+                                value={searchFilters.text}
+                                onChange={(e) => setSearchFilters(prev => ({
+                                    ...prev,
+                                    text: e.target.value
+                                }))}
                                 className="pl-9"
                             />
                         </div>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setShowDateFilter(!showDateFilter)}
+                        >
+                            <Calendar className="h-4 w-4" />
+                        </Button>
                         <Button type="submit" disabled={isSearching}>
                             {isSearching ? 'Searching...' : 'Search'}
                         </Button>
@@ -343,13 +438,126 @@ export default function AlarmLog() {
                             </Button>
                         )}
                     </div>
+
+                    {/* Date Filter */}
+                    {showDateFilter && (
+                        <div className="p-4 border rounded-lg bg-gray-50 space-y-3">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Calendar className="h-4 w-4" />
+                                <Label className="text-sm font-medium">Filter by Date Range</Label>
+                            </div>
+
+                            {/* Quick date buttons */}
+                            <div className="flex gap-2 flex-wrap">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setQuickDateFilter(1)}
+                                >
+                                    Last 1h
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setQuickDateFilter(6)}
+                                >
+                                    Last 6h
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setQuickDateFilter(24)}
+                                >
+                                    Last 24h
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setQuickDateFilter(168)}
+                                >
+                                    Last 7d
+                                </Button>
+                            </div>
+
+                            {/* Date inputs */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <Label htmlFor="start-date" className="text-xs">From</Label>
+                                    <Input
+                                        id="start-date"
+                                        type="datetime-local"
+                                        value={searchFilters.startDate}
+                                        onChange={(e) => handleDateChange('startDate', e.target.value)}
+                                        className="text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <Label htmlFor="end-date" className="text-xs">To</Label>
+                                    <Input
+                                        id="end-date"
+                                        type="datetime-local"
+                                        value={searchFilters.endDate}
+                                        onChange={(e) => handleDateChange('endDate', e.target.value)}
+                                        className="text-sm"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2">
+                                <Button
+                                    type="button"
+                                    onClick={handleDateSearch}
+                                    disabled={!searchFilters.startDate && !searchFilters.endDate}
+                                    size="sm"
+                                >
+                                    Apply Date Filter
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => {
+                                        const clearedFilters = {
+                                            ...searchFilters,
+                                            startDate: '',
+                                            endDate: ''
+                                        };
+                                        setSearchFilters(clearedFilters);
+                                        // If in search mode, re-search with cleared dates
+                                        if (searchMode) {
+                                            searchAlarms(clearedFilters);
+                                        }
+                                    }}
+                                    size="sm"
+                                >
+                                    Clear Dates
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </form>
+
+                {/* Error Display */}
+                {error && (
+                    <div className="mb-2 p-2 bg-red-50 text-red-800 text-xs rounded flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        {error}
+                    </div>
+                )}
 
                 {/* Search Mode Indicator */}
                 {searchMode && (
                     <div className="mb-2 p-2 bg-blue-50 text-blue-800 text-xs rounded flex items-center gap-2">
                         <Database className="h-4 w-4" />
                         Showing search results from database. Real-time updates are disabled in search mode.
+                        {(searchFilters.startDate || searchFilters.endDate) && (
+                            <span className="ml-2 font-medium">
+                                Date filter: {searchFilters.startDate ? formatTimestamp(searchFilters.startDate) : 'Any'} - {searchFilters.endDate ? formatTimestamp(searchFilters.endDate) : 'Any'}
+                            </span>
+                        )}
                     </div>
                 )}
 
