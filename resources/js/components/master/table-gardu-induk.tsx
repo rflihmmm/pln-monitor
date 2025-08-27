@@ -1,8 +1,16 @@
 import { router } from "@inertiajs/react"
 import { Edit, MoreHorizontal, Plus, Search, Trash } from "lucide-react"
-import { useState } from "react"
+import { useState, useMemo } from "react"
 
 import { Button } from "@/components/ui/button"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,22 +44,46 @@ export default function TableGarduInduk({ garduIndukList }: TableGarduIndukProps
   const [isEditGarduOpen, setIsEditGarduOpen] = useState(false)
   const [editingGardu, setEditingGardu] = useState<GarduInduk | null>(null)
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 25 // Maksimal 25 data per halaman
+
   // Filter gardu induk based on search term
-  const filteredGarduInduk = garduIndukList.filter((gardu) => {
-    return (
-      gardu.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (gardu.description && gardu.description.toLowerCase().includes(searchTerm.toLowerCase()))
-    )
-  })
+  const filteredGarduInduk = useMemo(() => {
+    return garduIndukList.filter((gardu) => {
+      return (
+        gardu.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (gardu.description && gardu.description.toLowerCase().includes(searchTerm.toLowerCase()))
+      )
+    })
+  }, [garduIndukList, searchTerm])
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredGarduInduk.length / itemsPerPage)
+  const paginatedGarduInduk = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    return filteredGarduInduk.slice(startIndex, endIndex)
+  }, [filteredGarduInduk, currentPage, itemsPerPage])
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
 
   // Format date to readable format
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) {
+      return "-";
+    }
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return "-";
+    }
     return new Intl.DateTimeFormat("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
-    }).format(date)
+    }).format(date);
   }
 
   // Handle adding a new gardu induk
@@ -147,7 +179,7 @@ export default function TableGarduInduk({ garduIndukList }: TableGarduIndukProps
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredGarduInduk.map((gardu) => (
+                paginatedGarduInduk.map((gardu) => (
                   <TableRow key={gardu.id}>
                     <TableCell>{gardu.id}</TableCell>
                     <TableCell>
@@ -193,9 +225,87 @@ export default function TableGarduInduk({ garduIndukList }: TableGarduIndukProps
 
         <div className="flex items-center justify-between">
           <div className="text-muted-foreground text-sm">
-            Showing <strong>{filteredGarduInduk.length}</strong> of <strong>{garduIndukList.length}</strong>{" "}
-            substations
+            Showing{" "}
+            <strong>
+              {(currentPage - 1) * itemsPerPage + 1} -{" "}
+              {Math.min(currentPage * itemsPerPage, filteredGarduInduk.length)}
+            </strong>{" "}
+            of <strong>{filteredGarduInduk.length}</strong> substations
           </div>
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
+                />
+              </PaginationItem>
+              {/* Render first page */}
+              {totalPages > 0 && (
+                <PaginationItem>
+                  <PaginationLink
+                    onClick={() => handlePageChange(1)}
+                    isActive={currentPage === 1}
+                  >
+                    1
+                  </PaginationLink>
+                </PaginationItem>
+              )}
+
+              {/* Render ellipsis if needed after first page */}
+              {currentPage > 3 && totalPages > 5 && (
+                <PaginationItem>
+                  <span className="px-2 py-1.5 text-sm">...</span>
+                </PaginationItem>
+              )}
+
+              {/* Render pages around current page */}
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((pageNumber) => {
+                  if (totalPages <= 5) return true; // Show all if 5 or less pages
+                  if (pageNumber === 1 || pageNumber === totalPages) return false; // Already handled
+                  return (
+                    pageNumber >= currentPage - 1 &&
+                    pageNumber <= currentPage + 1
+                  );
+                })
+                .map((pageNumber) => (
+                  <PaginationItem key={pageNumber}>
+                    <PaginationLink
+                      onClick={() => handlePageChange(pageNumber)}
+                      isActive={currentPage === pageNumber}
+                    >
+                      {pageNumber}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+
+              {/* Render ellipsis if needed before last page */}
+              {currentPage < totalPages - 2 && totalPages > 5 && (
+                <PaginationItem>
+                  <span className="px-2 py-1.5 text-sm">...</span>
+                </PaginationItem>
+              )}
+
+              {/* Render last page */}
+              {totalPages > 1 && (
+                <PaginationItem>
+                  <PaginationLink
+                    onClick={() => handlePageChange(totalPages)}
+                    isActive={currentPage === totalPages}
+                  >
+                    {totalPages}
+                  </PaginationLink>
+                </PaginationItem>
+              )}
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : undefined}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       </div>
 
@@ -218,4 +328,3 @@ export default function TableGarduInduk({ garduIndukList }: TableGarduIndukProps
     </div>
   )
 }
-

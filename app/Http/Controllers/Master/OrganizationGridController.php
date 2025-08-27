@@ -17,10 +17,12 @@ class OrganizationGridController extends Controller
     public function index(Request $request)
     {
         try {
-            // Query untuk mendapatkan data dari OrganizationKeypoint (hanya level 3/ULP)
-            $organizationKeypoints = DB::table('organization_keypoint as ok')
-                ->join('organization as org', 'ok.organization_id', '=', 'org.id')
-                ->where('org.level', 3) // Hanya ambil yang level 3 (ULP)
+            // 1. Refactored main query with hierarchy joins
+            $organizationData = DB::table('organization_keypoint as ok')
+                ->join('organization as ulp', 'ok.organization_id', '=', 'ulp.id')
+                ->where('ulp.level', 3) // ULP is level 3
+                ->leftJoin('organization as up3', 'ulp.parent_id', '=', 'up3.id') // Join for UP3
+                ->leftJoin('organization as dcc', 'up3.parent_id', '=', 'dcc.id') // Join for DCC
                 ->leftJoin('feeder_keypoints as fk', 'ok.keypoint_id', '=', 'fk.keypoint_id')
                 ->leftJoin('feeders as f', 'fk.feeder_id', '=', 'f.id')
                 ->leftJoin('gardu_induks as gi', 'f.gardu_induk_id', '=', 'gi.id')
@@ -28,9 +30,9 @@ class OrganizationGridController extends Controller
                 ->select([
                     'ok.id',
                     'ok.keypoint_id',
-                    'ok.organization_id',
-                    'org.name as ulp_name',
-                    'org.parent_id as up3_id',
+                    'dcc.name as dcc',
+                    'up3.name as up3',
+                    'ulp.name as ulp',
                     'gi.name as gardu_induk',
                     'f.name as feeder',
                     'ke.coordinate',
@@ -38,120 +40,46 @@ class OrganizationGridController extends Controller
                 ])
                 ->get();
 
-            // Get keypoint IDs untuk query STATIONPOINTS
-            $keypointIds = $organizationKeypoints->pluck('keypoint_id')->unique()->toArray();
+            // 2. Consolidate cross-database queries
+            $keypointIds = $organizationData->pluck('keypoint_id')->filter();
+            $parentKeypointIds = $organizationData->pluck('parent_stationpoints')->filter();
+            $allRequiredIds = $keypointIds->merge($parentKeypointIds)->unique()->toArray();
 
-            // Query STATIONPOINTS dari MSSQL database
-            $stationPoints = [];
-            if (!empty($keypointIds)) {
+            $keypointNames = [];
+            if (!empty($allRequiredIds)) {
                 $stationPointsData = DB::connection('sqlsrv_main')
                     ->table('STATIONPOINTS')
-                    ->whereIn('PKEY', $keypointIds)
+                    ->whereIn('PKEY', $allRequiredIds)
                     ->select('PKEY', 'NAME')
                     ->get();
 
-                // Convert to associative array for easier lookup
+                // Create a lookup map for keypoint names
                 foreach ($stationPointsData as $sp) {
-                    $stationPoints[$sp->PKEY] = $sp->NAME;
+                    $keypointNames[$sp->PKEY] = $sp->NAME;
                 }
             }
 
-            // Get unique UP3 IDs untuk query hierarchy
-            $up3Ids = $organizationKeypoints->pluck('up3_id')->unique()->filter()->toArray();
-
-            // Query untuk mendapatkan data UP3 dan DCC
-            $hierarchyData = [];
-            if (!empty($up3Ids)) {
-                $up3Data = DB::table('organization')
-                    ->whereIn('id', $up3Ids)
-                    ->where('level', 2)
-                    ->select('id', 'name', 'parent_id')
-                    ->get();
-
-                foreach ($up3Data as $up3) {
-                    $hierarchyData[$up3->id] = [
-                        'up3_name' => $up3->name,
-                        'dcc_id' => $up3->parent_id
-                    ];
-                }
-
-                // Get DCC data
-                $dccIds = $up3Data->pluck('parent_id')->unique()->filter()->toArray();
-                if (!empty($dccIds)) {
-                    $dccData = DB::table('organization')
-                        ->whereIn('id', $dccIds)
-                        ->where('level', 1)
-                        ->select('id', 'name')
-                        ->get();
-
-                    foreach ($dccData as $dcc) {
-                        // Update hierarchy data dengan DCC name
-                        foreach ($hierarchyData as $up3Id => &$hierarchy) {
-                            if ($hierarchy['dcc_id'] == $dcc->id) {
-                                $hierarchy['dcc_name'] = $dcc->name;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Ambil semua parent_stationpoints yang ada
-            $allParentStationpoints = $organizationKeypoints->pluck('parent_stationpoints')->filter()->unique()->toArray();
-            $parentStationNames = [];
-            if (!empty($allParentStationpoints)) {
-                // Query ke STATIONPOINTS untuk mapping parent_stationpoints ke NAME
-                $parentStationsData = DB::connection('sqlsrv_main')
-                    ->table('STATIONPOINTS')
-                    ->whereIn('PKEY', $allParentStationpoints)
-                    ->select('PKEY', 'NAME')
-                    ->get();
-                foreach ($parentStationsData as $ps) {
-                    $parentStationNames[$ps->PKEY] = $ps->NAME;
-                }
-            }
-
+            // Query for the dropdown list (remains separate)
             $allKeypoints = DB::connection('sqlsrv_main')
                 ->table('STATIONPOINTS')
                 ->select('PKEY as id', 'NAME as name')
-                ->orderBy('NAME', 'asc') // Opsional: urutkan agar lebih rapi di dropdown
+                ->orderBy('NAME', 'asc')
                 ->get();
 
-            $result = [];
-            $id = 0;
-
-            foreach ($organizationKeypoints as $item) {
-                // Build hierarchy dari OrganizationKeypoint
-                $dcc = '';
-                $up3 = '';
-                $ulp = $item->ulp_name;
-
-                // Get UP3 dan DCC dari hierarchy data
-                if (isset($hierarchyData[$item->up3_id])) {
-                    $up3 = $hierarchyData[$item->up3_id]['up3_name'];
-                    $dcc = $hierarchyData[$item->up3_id]['dcc_name'] ?? '';
-                }
-
-                // Get keypoint name dari STATIONPOINTS
-                $keypoint = $stationPoints[$item->keypoint_id] ?? '';
-
-                // Get parent keypoint name
-                $parent = '';
-                if (!empty($item->parent_stationpoints) && isset($parentStationNames[$item->parent_stationpoints])) {
-                    $parent = $parentStationNames[$item->parent_stationpoints];
-                }
-
-                $result[] = [
-                    'id' => $item->id ?? $id++,
-                    'dcc' => $dcc,
-                    'up3' => $up3,
-                    'ulp' => $ulp,
+            // 3. Simplify data processing
+            $result = $organizationData->map(function ($item) use ($keypointNames) {
+                return [
+                    'id' => $item->id,
+                    'dcc' => $item->dcc ?? '',
+                    'up3' => $item->up3 ?? '',
+                    'ulp' => $item->ulp ?? '',
                     'gardu_induk' => $item->gardu_induk ?? '',
                     'feeder' => $item->feeder ?? '',
-                    'keypoint' => $keypoint,
+                    'keypoint' => $keypointNames[$item->keypoint_id] ?? '',
                     'coordinate' => $item->coordinate ?? '',
-                    'parent_keypoint' => $parent
+                    'parent_keypoint' => $keypointNames[$item->parent_stationpoints] ?? ''
                 ];
-            }
+            });
 
             return inertia('master/mapping', [
                 'datas' => $result,
@@ -159,11 +87,13 @@ class OrganizationGridController extends Controller
                 'success' => session('success')
             ]);
         } catch (\Exception $e) {
+            // It's good practice to log the actual error for debugging
+            \Illuminate\Support\Facades\Log::error('Failed to fetch organization grid data: ' . $e->getMessage());
             return inertia('master/mapping', [
                 'datas' => [],
                 'keypointsList' => [],
-                'error' => 'Failed to fetch data',
-                'message' => $e->getMessage()
+                'error' => 'Gagal mengambil data. Silakan coba lagi.', // User-friendly message
+                'message' => config('app.debug') ? $e->getMessage() : '' // Show detailed error only in debug mode
             ]);
         }
     }

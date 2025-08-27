@@ -19,54 +19,7 @@ class DashboardController extends Controller
     public function getMapData()
     {
         try {
-            // Ambil semua data gardu induk dengan relasi yang dibutuhkan
-            $garduInduks = GarduInduk::with(['feeders.statusPoints'])->get();
-
-            $mapData = [];
-
-            foreach ($garduInduks as $garduInduk) {
-                // Skip jika coordinate kosong
-                if (empty($garduInduk->coordinate)) {
-                    continue;
-                }
-
-                // 1. ID dan Name
-                $id = $garduInduk->id;
-                $name = $garduInduk->name;
-
-                // 2. Keypoint Name
-                $keypointName = null;
-                if ($garduInduk->keypoint_id) {
-                    $stationPoint = StationPointSkada::where('PKEY', $garduInduk->keypoint_id)->first();
-                    $keypointName = $stationPoint ? $stationPoint->NAME : null;
-                }
-
-                // 3. Coordinate - convert string to array
-                $coordinate = $this->parseCoordinate($garduInduk->coordinate);
-                if (!$coordinate) {
-                    continue; // Skip jika coordinate tidak valid
-                }
-
-                // 4. Status dari StatusPointSkada
-                $status = $this->getGarduIndukStatus($garduInduk->keypoint_id);
-
-                // 5. Load IS dan Load MW
-                $loadData = $this->calculateLoad($garduInduk);
-
-                $mapData[] = [
-                    'id' => $id,
-                    'name' => $name,
-                    'keypointName' => $keypointName,
-                    'coordinate' => $coordinate,
-                    'status' => $status,
-                    'data' => [
-                        'load-is' => $loadData['load_is'],
-                        'load-mw' => $loadData['load_mw'],
-                        'lastUpdate' => now()->toISOString(),
-                    ]
-                ];
-            }
-
+            $mapData = $this->processMapData(GarduInduk::query());
             return response()->json([
                 'success' => true,
                 'data' => $mapData
@@ -108,79 +61,102 @@ class DashboardController extends Controller
     }
 
     /**
-     * Get status from StatusPointSkada
+     * Get statuses from StatusPointSkada for multiple keypoints.
      */
-    private function getGarduIndukStatus($keypointId)
+    private function getGarduIndukStatuses(array $keypointIds)
     {
-        if (!$keypointId) {
-            return 'inactive';
+        if (empty($keypointIds)) {
+            return [];
         }
 
         try {
-            // Cari status point dengan NAME = RTU-STAT yang terhubung ke station point
-            $statusPoint = StatusPointSkada::join('STATIONPOINTS', 'STATUSPOINTS.STATIONPID', '=', 'STATIONPOINTS.PKEY')
-                ->where('STATIONPOINTS.PKEY', $keypointId)
+            $statuses = StatusPointSkada::join('STATIONPOINTS', 'STATUSPOINTS.STATIONPID', '=', 'STATIONPOINTS.PKEY')
+                ->whereIn('STATIONPOINTS.PKEY', $keypointIds)
                 ->where('STATUSPOINTS.NAME', 'RTU-STAT')
-                ->select('STATUSPOINTS.VALUE')
-                ->first();
+                ->select('STATIONPOINTS.PKEY', 'STATUSPOINTS.VALUE')
+                ->get()
+                ->keyBy('PKEY');
 
-            if (!$statusPoint) {
-                return 'inactive';
+            $results = [];
+            foreach ($keypointIds as $keypointId) {
+                $statusPoint = $statuses->get($keypointId);
+                // Default to inactive. Active if VALUE is 0.
+                $results[$keypointId] = ($statusPoint && $statusPoint->VALUE == 0) ? 'active' : 'inactive';
             }
-
-            // Jika VALUE = 0 maka active, jika VALUE = 1 maka inactive
-            return $statusPoint->VALUE == 0 ? 'active' : 'inactive';
+            return $results;
         } catch (\Exception $e) {
-            return 'inactive';
+            // On error, return all as inactive
+            return array_fill_keys($keypointIds, 'inactive');
         }
     }
 
     /**
-     * Calculate load IS and MW for a gardu induk
+     * Calculate load IS and MW for a collection of gardu induks.
      */
-    private function calculateLoad(GarduInduk $garduInduk)
+    private function calculateLoads($garduInduks)
     {
-        $loadIs = 0;
-        $loadMw = 0;
-
-        try {
-            // Ambil semua feeder yang terkait dengan gardu induk ini
-            $feeders = $garduInduk->feeders;
-
-            foreach ($feeders as $feeder) {
-                // Ambil status points untuk AMP (load-is)
-                $ampStatusPoints = FeederStatusPoint::where('feeder_id', $feeder->id)
-                    ->where('type', 'AMP')
-                    ->get();
-
-                foreach ($ampStatusPoints as $statusPoint) {
-                    $analogPoint = AnalogPointSkada::where('PKEY', $statusPoint->status_id)->first();
-                    if ($analogPoint && is_numeric($analogPoint->VALUE)) {
-                        $loadIs += floatval($analogPoint->VALUE);
-                    }
-                }
-
-                // Ambil status points untuk MW (load-mw)
-                $mwStatusPoints = FeederStatusPoint::where('feeder_id', $feeder->id)
-                    ->where('type', 'MW')
-                    ->get();
-
-                foreach ($mwStatusPoints as $statusPoint) {
-                    $analogPoint = AnalogPointSkada::where('PKEY', $statusPoint->status_id)->first();
-                    if ($analogPoint && is_numeric($analogPoint->VALUE)) {
-                        $loadMw += floatval($analogPoint->VALUE);
-                    }
-                }
-            }
-        } catch (\Exception $e) {
-            // Log error if needed
-            Log::error('Error calculating load for gardu induk ' . $garduInduk->id . ': ' . $e->getMessage());
+        $results = [];
+        if ($garduInduks->isEmpty()) {
+            return $results;
         }
 
-        return [
-            'load_is' => round($loadIs, 2),
-            'load_mw' => round($loadMw, 2)
-        ];
+        // Initialize results with 0
+        foreach ($garduInduks as $garduInduk) {
+            $results[$garduInduk->id] = ['load_is' => 0, 'load_mw' => 0];
+        }
+
+        $feederIds = $garduInduks->pluck('feeders')->flatten()->pluck('id')->unique()->all();
+
+        if (empty($feederIds)) {
+            return $results;
+        }
+
+        // Fetch all status points for all feeders at once
+        $feederStatusPoints = FeederStatusPoint::whereIn('feeder_id', $feederIds)
+            ->whereIn('type', ['AMP', 'MW'])
+            ->get();
+
+        $statusIds = $feederStatusPoints->pluck('status_id')->unique()->all();
+
+        if (empty($statusIds)) {
+            return $results;
+        }
+
+        // Fetch all analog values at once
+        $analogValues = AnalogPointSkada::whereIn('PKEY', $statusIds)
+            ->select('PKEY', 'VALUE')
+            ->get()
+            ->pluck('VALUE', 'PKEY');
+
+        // Map feeder IDs to their Gardu Induk ID
+        $feederToGarduMap = [];
+        foreach ($garduInduks as $garduInduk) {
+            foreach ($garduInduk->feeders as $feeder) {
+                $feederToGarduMap[$feeder->id] = $garduInduk->id;
+            }
+        }
+
+        // Calculate loads in memory
+        foreach ($feederStatusPoints as $statusPoint) {
+            $value = floatval($analogValues->get($statusPoint->status_id) ?? 0);
+            $garduIndukId = $feederToGarduMap[$statusPoint->feeder_id] ?? null;
+
+            if ($garduIndukId) {
+                if ($statusPoint->type === 'AMP') {
+                    $results[$garduIndukId]['load_is'] += $value;
+                } elseif ($statusPoint->type === 'MW') {
+                    $results[$garduIndukId]['load_mw'] += $value;
+                }
+            }
+        }
+
+        // Round the final values
+        foreach ($results as $garduIndukId => $loads) {
+            $results[$garduIndukId]['load_is'] = round($loads['load_is'], 2);
+            $results[$garduIndukId]['load_mw'] = round($loads['load_mw'], 2);
+        }
+
+        return $results;
     }
 
     /**
@@ -192,58 +168,14 @@ class DashboardController extends Controller
             $filter = $request->query('filter', 'ALL'); // GI, GH, or ALL
             $status = $request->query('status'); // active, inactive, or null for all
 
-            $garduInduks = GarduInduk::with(['feeders.statusPoints']);
+            $garduInduksQuery = GarduInduk::query();
 
             // Apply name filtering if needed (e.g., GI- or GH- prefix)
             if ($filter !== 'ALL') {
-                $garduInduks->where('name', 'LIKE', $filter . '-%');
+                $garduInduksQuery->where('name', 'LIKE', $filter . '-%');
             }
 
-            $garduInduks = $garduInduks->get();
-
-            $mapData = [];
-
-            foreach ($garduInduks as $garduInduk) {
-                if (empty($garduInduk->coordinate)) {
-                    continue;
-                }
-
-                $id = $garduInduk->id;
-                $name = $garduInduk->name;
-
-                $keypointName = null;
-                if ($garduInduk->keypoint_id) {
-                    $stationPoint = StationPointSkada::where('PKEY', $garduInduk->keypoint_id)->first();
-                    $keypointName = $stationPoint ? $stationPoint->NAME : null;
-                }
-
-                $coordinate = $this->parseCoordinate($garduInduk->coordinate);
-                if (!$coordinate) {
-                    continue;
-                }
-
-                $garduStatus = $this->getGarduIndukStatus($garduInduk->keypoint_id);
-
-                // Apply status filtering
-                if ($status && $garduStatus !== $status) {
-                    continue;
-                }
-
-                $loadData = $this->calculateLoad($garduInduk);
-
-                $mapData[] = [
-                    'id' => $id,
-                    'name' => $name,
-                    'keypointName' => $keypointName,
-                    'coordinate' => $coordinate,
-                    'status' => $garduStatus,
-                    'data' => [
-                        'load-is' => $loadData['load_is'],
-                        'load-mw' => $loadData['load_mw'],
-                        'lastUpdate' => now()->toISOString(),
-                    ]
-                ];
-            }
+            $mapData = $this->processMapData($garduInduksQuery, $status);
 
             return response()->json([
                 'success' => true,
@@ -257,6 +189,73 @@ class DashboardController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    private function processMapData($garduInduksQuery, $statusFilter = null)
+    {
+        // a. Get the initial collection of GarduInduk objects with their feeders
+        $garduInduks = $garduInduksQuery->with('feeders')->get();
+
+        if ($garduInduks->isEmpty()) {
+            return [];
+        }
+
+        // b. Collect all unique keypoint IDs
+        $keypointIds = $garduInduks->pluck('keypoint_id')->filter()->unique()->all();
+
+        // c. Bulk fetch keypoint names (from StationPointSkada) and statuses
+        $keypointNames = [];
+        if (!empty($keypointIds)) {
+            $keypointNames = StationPointSkada::whereIn('PKEY', $keypointIds)
+                ->pluck('NAME', 'PKEY');
+        }
+        $garduStatuses = $this->getGarduIndukStatuses($keypointIds);
+
+        // d. & e. Bulk calculate all loads
+        $allLoadData = $this->calculateLoads($garduInduks);
+
+        $mapData = [];
+
+        // f. & g. Loop through the collection and build the map data from pre-fetched values
+        foreach ($garduInduks as $garduInduk) {
+            // Skip records without coordinates
+            if (empty($garduInduk->coordinate)) {
+                continue;
+            }
+
+            // Get status from the pre-fetched map
+            $status = $garduStatuses[$garduInduk->keypoint_id] ?? 'inactive';
+
+            // Apply status filtering (if provided)
+            if ($statusFilter && $status !== $statusFilter) {
+                continue;
+            }
+
+            // Parse coordinate
+            $coordinate = $this->parseCoordinate($garduInduk->coordinate);
+            if (!$coordinate) {
+                continue;
+            }
+
+            // Get data from pre-fetched maps
+            $keypointName = $keypointNames[$garduInduk->keypoint_id] ?? null;
+            $loadData = $allLoadData[$garduInduk->id] ?? ['load_is' => 0, 'load_mw' => 0];
+
+            $mapData[] = [
+                'id' => $garduInduk->id,
+                'name' => $garduInduk->name,
+                'keypointName' => $keypointName,
+                'coordinate' => $coordinate,
+                'status' => $status,
+                'data' => [
+                    'load-is' => $loadData['load_is'],
+                    'load-mw' => $loadData['load_mw'],
+                    'lastUpdate' => now()->toISOString(),
+                ]
+            ];
+        }
+
+        return $mapData;
     }
 
     public function getSystemLoadData()
@@ -432,10 +431,7 @@ class DashboardController extends Controller
                 ], 401);
             }
 
-            $userOrganizationId = $user->unit;
-
-            // 1. Cek apakah organization ID ada di table organization
-            $userOrganization = Organization::find($userOrganizationId);
+            $userOrganization = Organization::find($user->unit);
             if (!$userOrganization) {
                 return response()->json([
                     'success' => false,
@@ -443,75 +439,36 @@ class DashboardController extends Controller
                 ], 404);
             }
 
-            // 2. Dapatkan semua descendant organization IDs berdasarkan level hierarchy
             $organizationIds = $this->getAuthorizedOrganizationIds($userOrganization);
-
             if (empty($organizationIds)) {
                 return response()->json(['success' => true, 'data' => []]);
             }
 
-            // 3. Dapatkan keypoint_ids yang authorized berdasarkan organization_keypoint
             $authorizedKeypointIds = OrganizationKeypoint::whereIn('organization_id', $organizationIds)
-                ->pluck('keypoint_id')
-                ->unique()
-                ->filter()
-                ->values()
-                ->toArray();
+                ->pluck('keypoint_id')->unique()->filter()->values()->all();
 
             if (empty($authorizedKeypointIds)) {
                 return response()->json(['success' => true, 'data' => []]);
             }
 
-            // 4. Query untuk mendapatkan gardu induk yang memiliki keypoint authorized
-            // melalui relasi feeder -> feeder_keypoints -> organization_keypoint
-            $garduInduksWithAuthorizedKeypoints = DB::table('gardu_induks as gi')
+            // Get the IDs of the authorized Gardu Induks
+            $authorizedGarduIndukIds = DB::table('gardu_induks as gi')
                 ->join('feeders as f', 'f.gardu_induk_id', '=', 'gi.id')
                 ->join('feeder_keypoints as fk', 'fk.feeder_id', '=', 'f.id')
                 ->whereIn('fk.keypoint_id', $authorizedKeypointIds)
-                ->whereNotNull('gi.coordinate') // Hanya yang memiliki coordinate
-                ->select('gi.id', 'gi.name', 'gi.coordinate', 'gi.keypoint_id')
+                ->whereNotNull('gi.coordinate')
                 ->distinct()
-                ->get();
+                ->pluck('gi.id');
 
-            if ($garduInduksWithAuthorizedKeypoints->isEmpty()) {
+            if ($authorizedGarduIndukIds->isEmpty()) {
                 return response()->json(['success' => true, 'data' => []]);
             }
 
-            $mapData = [];
+            // Create the query builder for the authorized Gardu Induks
+            $garduInduksQuery = GarduInduk::whereIn('id', $authorizedGarduIndukIds);
 
-            foreach ($garduInduksWithAuthorizedKeypoints as $garduInduk) {
-                // Parse coordinate
-                $coordinate = $this->parseCoordinate($garduInduk->coordinate);
-                if (!$coordinate) {
-                    continue;
-                }
-
-                // Get keypoint name untuk gardu induk
-                $keypointName = null;
-                if ($garduInduk->keypoint_id) {
-                    $stationPoint = StationPointSkada::where('PKEY', $garduInduk->keypoint_id)->first();
-                    $keypointName = $stationPoint ? $stationPoint->NAME : null;
-                }
-
-                // Get status gardu induk
-                $status = $this->getGarduIndukStatus($garduInduk->keypoint_id);
-
-                // Calculate load untuk gardu induk ini berdasarkan authorized keypoints saja
-                $loadData = $this->calculateLoadForAuthorizedKeypoints($garduInduk->id, $authorizedKeypointIds);
-
-                $mapData[] = [
-                    'id' => $garduInduk->id,
-                    'name' => $garduInduk->name,
-                    'keypointName' => $keypointName,
-                    'coordinate' => $coordinate,
-                    'status' => $status,
-                    'data' => [
-                        'load-is' => $loadData['load_is'],
-                        'load-mw' => $loadData['load_mw'],
-                        'lastUpdate' => now()->toISOString(),
-                    ]
-                ];
-            }
+            // Use the optimized helper method to get the map data
+            $mapData = $this->processMapData($garduInduksQuery);
 
             return response()->json([
                 'success' => true,
@@ -524,62 +481,6 @@ class DashboardController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
-    }
-
-    /**
-     * Calculate load untuk gardu induk berdasarkan authorized keypoints saja
-     */
-    private function calculateLoadForAuthorizedKeypoints($garduIndukId, $authorizedKeypointIds)
-    {
-        $loadIs = 0;
-        $loadMw = 0;
-
-        try {
-            // Hanya ambil feeders yang memiliki keypoints yang authorized
-            $feedersWithAuthorizedKeypoints = DB::table('feeders as f')
-                ->join('feeder_keypoints as fk', 'fk.feeder_id', '=', 'f.id')
-                ->where('f.gardu_induk_id', $garduIndukId)
-                ->whereIn('fk.keypoint_id', $authorizedKeypointIds)
-                ->select('f.id as feeder_id')
-                ->distinct()
-                ->pluck('feeder_id')
-                ->toArray();
-
-            if (empty($feedersWithAuthorizedKeypoints)) {
-                return ['load_is' => 0, 'load_mw' => 0];
-            }
-
-            // Ambil status points untuk AMP (load-is) dari feeders yang authorized
-            $ampStatusPoints = FeederStatusPoint::whereIn('feeder_id', $feedersWithAuthorizedKeypoints)
-                ->where('type', 'AMP')
-                ->get();
-
-            foreach ($ampStatusPoints as $statusPoint) {
-                $analogPoint = AnalogPointSkada::where('PKEY', $statusPoint->status_id)->first();
-                if ($analogPoint && is_numeric($analogPoint->VALUE)) {
-                    $loadIs += floatval($analogPoint->VALUE);
-                }
-            }
-
-            // Ambil status points untuk MW (load-mw) dari feeders yang authorized
-            $mwStatusPoints = FeederStatusPoint::whereIn('feeder_id', $feedersWithAuthorizedKeypoints)
-                ->where('type', 'MW')
-                ->get();
-
-            foreach ($mwStatusPoints as $statusPoint) {
-                $analogPoint = AnalogPointSkada::where('PKEY', $statusPoint->status_id)->first();
-                if ($analogPoint && is_numeric($analogPoint->VALUE)) {
-                    $loadMw += floatval($analogPoint->VALUE);
-                }
-            }
-        } catch (\Exception $e) {
-            Log::error('Error calculating load for authorized keypoints in gardu induk ' . $garduIndukId . ': ' . $e->getMessage());
-        }
-
-        return [
-            'load_is' => round($loadIs, 2),
-            'load_mw' => round($loadMw, 2)
-        ];
     }
 
     public function getSystemLoadDataByUser(Request $request)

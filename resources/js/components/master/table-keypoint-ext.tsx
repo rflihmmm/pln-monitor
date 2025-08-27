@@ -1,8 +1,16 @@
 import { router } from "@inertiajs/react";
 import { Edit, MoreHorizontal, Plus, Search, Trash } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+    Pagination,
+    PaginationContent,
+    PaginationItem,
+    PaginationLink,
+    PaginationNext,
+    PaginationPrevious,
+} from "@/components/ui/pagination";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -44,6 +52,10 @@ export default function TableKeypointExt({
     const [isEditKeypointExtOpen, setIsEditKeypointExtOpen] = useState(false);
     const [editingKeypointExt, setEditingKeypointExt] = useState<KeypointExt | null>(null);
 
+    // Pagination states
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 25; // Maksimal 25 data per halaman
+
     const keypointTypes = ["GI", "REC", "LBS", "GH"]; // Opsi filter
 
     // Fungsi untuk toggle filter
@@ -53,26 +65,41 @@ export default function TableKeypointExt({
                 ? prevFilters.filter((f) => f !== filter) // Hapus filter jika sudah ada
                 : [...prevFilters, filter] // Tambahkan filter jika belum ada
         );
+        setCurrentPage(1); // Reset halaman ke 1 saat filter berubah
     };
 
     // Filter keypoint extensions berdasarkan search term dan filter aktif
-    const filteredKeypointExts = initialKeypointExts.filter((keypointExt) => {
-        // Cek kecocokan dengan filter prefiks yang aktif
-        const matchesFilter =
-            activeFilters.length === 0 || // Tampilkan semua jika tidak ada filter aktif
-            activeFilters.some((filter) => keypointExt.name?.startsWith(filter));
+    const filteredKeypointExts = useMemo(() => {
+        return initialKeypointExts.filter((keypointExt) => {
+            // Cek kecocokan dengan filter prefiks yang aktif
+            const matchesFilter =
+                activeFilters.length === 0 || // Tampilkan semua jika tidak ada filter aktif
+                activeFilters.some((filter) => keypointExt.name?.startsWith(filter));
 
-        // Cek kecocokan dengan search term
-        const matchesSearch =
-            !searchTerm || // Tampilkan semua jika search kosong
-            (keypointExt.name && keypointExt.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (keypointExt.coordinate && keypointExt.coordinate.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (keypointExt.alamat && keypointExt.alamat.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (keypointExt.parent_name && keypointExt.parent_name.toLowerCase().includes(searchTerm.toLowerCase()));
+            // Cek kecocokan dengan search term
+            const matchesSearch =
+                !searchTerm || // Tampilkan semua jika search kosong
+                (keypointExt.name && keypointExt.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (keypointExt.coordinate && keypointExt.coordinate.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (keypointExt.alamat && keypointExt.alamat.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (keypointExt.parent_name && keypointExt.parent_name.toLowerCase().includes(searchTerm.toLowerCase()));
 
-        // Hasil harus cocok dengan kedua kriteria
-        return matchesFilter && matchesSearch;
-    });
+            // Hasil harus cocok dengan kedua kriteria
+            return matchesFilter && matchesSearch;
+        });
+    }, [initialKeypointExts, searchTerm, activeFilters]);
+
+    // Pagination logic
+    const totalPages = Math.ceil(filteredKeypointExts.length / itemsPerPage);
+    const paginatedKeypointExts = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return filteredKeypointExts.slice(startIndex, endIndex);
+    }, [filteredKeypointExts, currentPage, itemsPerPage]);
+
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
+    };
 
     // Format date to "MMM DD, YYYY"
     const formatDate = (dateString?: string) => {
@@ -199,7 +226,7 @@ export default function TableKeypointExt({
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                filteredKeypointExts.map((keypointExt) => (
+                                paginatedKeypointExts.map((keypointExt) => (
                                     <TableRow key={keypointExt.keypoint_id}>
                                         <TableCell>
                                             <div className="font-medium">{keypointExt.keypoint_id}</div>
@@ -257,9 +284,87 @@ export default function TableKeypointExt({
 
                 <div className="flex items-center justify-between">
                     <div className="text-muted-foreground text-sm">
-                        Showing <strong>{filteredKeypointExts.length}</strong> of{" "}
-                        <strong>{initialKeypointExts.length}</strong> keypoint extensions
+                        Showing{" "}
+                        <strong>
+                            {(currentPage - 1) * itemsPerPage + 1} -{" "}
+                            {Math.min(currentPage * itemsPerPage, filteredKeypointExts.length)}
+                        </strong>{" "}
+                        of <strong>{filteredKeypointExts.length}</strong> keypoint extensions
                     </div>
+                    <Pagination>
+                        <PaginationContent>
+                            <PaginationItem>
+                                <PaginationPrevious
+                                    onClick={() => handlePageChange(currentPage - 1)}
+                                    className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
+                                />
+                            </PaginationItem>
+                            {/* Render first page */}
+                            {totalPages > 0 && (
+                                <PaginationItem>
+                                    <PaginationLink
+                                        onClick={() => handlePageChange(1)}
+                                        isActive={currentPage === 1}
+                                    >
+                                        1
+                                    </PaginationLink>
+                                </PaginationItem>
+                            )}
+
+                            {/* Render ellipsis if needed after first page */}
+                            {currentPage > 3 && totalPages > 5 && (
+                                <PaginationItem>
+                                    <span className="px-2 py-1.5 text-sm">...</span>
+                                </PaginationItem>
+                            )}
+
+                            {/* Render pages around current page */}
+                            {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                .filter((pageNumber) => {
+                                    if (totalPages <= 5) return true; // Show all if 5 or less pages
+                                    if (pageNumber === 1 || pageNumber === totalPages) return false; // Already handled
+                                    return (
+                                        pageNumber >= currentPage - 1 &&
+                                        pageNumber <= currentPage + 1
+                                    );
+                                })
+                                .map((pageNumber) => (
+                                    <PaginationItem key={pageNumber}>
+                                        <PaginationLink
+                                            onClick={() => handlePageChange(pageNumber)}
+                                            isActive={currentPage === pageNumber}
+                                        >
+                                            {pageNumber}
+                                        </PaginationLink>
+                                    </PaginationItem>
+                                ))}
+
+                            {/* Render ellipsis if needed before last page */}
+                            {currentPage < totalPages - 2 && totalPages > 5 && (
+                                <PaginationItem>
+                                    <span className="px-2 py-1.5 text-sm">...</span>
+                                </PaginationItem>
+                            )}
+
+                            {/* Render last page */}
+                            {totalPages > 1 && (
+                                <PaginationItem>
+                                    <PaginationLink
+                                        onClick={() => handlePageChange(totalPages)}
+                                        isActive={currentPage === totalPages}
+                                    >
+                                        {totalPages}
+                                    </PaginationLink>
+                                </PaginationItem>
+                            )}
+                            <PaginationItem>
+                                <PaginationNext
+                                    onClick={() => handlePageChange(currentPage + 1)}
+                                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : undefined}
+                                />
+                            </PaginationItem>
+                        </PaginationContent>
+                    </Pagination>
                 </div>
             </div>
 

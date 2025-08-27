@@ -8,6 +8,14 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { RefreshCw, Search, Circle } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import {
+    Pagination,
+    PaginationContent,
+    PaginationItem,
+    PaginationLink,
+    PaginationNext,
+    PaginationPrevious,
+} from "@/components/ui/pagination";
 
 // Define types for our data
 interface KeypointData {
@@ -40,6 +48,17 @@ export default function TableHMI() {
     const [isUpdating, setIsUpdating] = useState(false);
     const [lastUpdated, setLastUpdated] = useState(new Date());
 
+    // Pagination states
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 25; // Maksimal 25 data per halaman
+    const [paginatedData, setPaginatedData] = useState<KeypointData[]>([]);
+
+    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
+    };
+
     // Function to fetch data from API
     const fetchData = useCallback(async () => {
         try {
@@ -66,7 +85,7 @@ export default function TableHMI() {
         }
     }, []);
 
-    // Filter data based on search term
+    // Filter and sort data based on search term and then apply pagination
     useEffect(() => {
         const filtered = data.filter(
             (item) =>
@@ -74,8 +93,22 @@ export default function TableHMI() {
                 item.garduInduk?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 item.feeder?.toLowerCase().includes(searchTerm.toLowerCase()),
         );
-        setFilteredData(filtered);
+
+        // Sort by garduInduk to keep same GIs together
+        const sorted = [...filtered].sort((a, b) =>
+            a.garduInduk.localeCompare(b.garduInduk)
+        );
+
+        setFilteredData(sorted);
+        setCurrentPage(1); // Reset to first page on filter/sort change
     }, [searchTerm, data]);
+
+    // Apply pagination whenever filteredData, currentPage, or itemsPerPage changes
+    useEffect(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        setPaginatedData(filteredData.slice(startIndex, endIndex));
+    }, [filteredData, currentPage, itemsPerPage]);
 
     // Initial data load
     useEffect(() => {
@@ -94,9 +127,10 @@ export default function TableHMI() {
     };
 
     // Helper function to calculate rowspan for cells that should be merged
+    // This function now operates on the paginatedData
     const calculateRowSpan = (data: KeypointData[], rowIndex: number, field: keyof KeypointData): number | undefined => {
         if (rowIndex === 0 || data[rowIndex][field] !== data[rowIndex - 1][field]) {
-            // Count how many consecutive rows have the same value
+            // Count how many consecutive rows have the same value within the current page
             let span = 1;
             while (rowIndex + span < data.length && data[rowIndex + span][field] === data[rowIndex][field]) {
                 span++;
@@ -107,6 +141,7 @@ export default function TableHMI() {
     };
 
     // Helper function to determine if a cell should be rendered
+    // This function now operates on the paginatedData
     const shouldRenderCell = (data: KeypointData[], rowIndex: number, field: keyof KeypointData): boolean => {
         return rowIndex === 0 || data[rowIndex][field] !== data[rowIndex - 1][field];
     };
@@ -216,8 +251,8 @@ export default function TableHMI() {
                                     'IF-T',
                                     'IF-N',
                                     'KV-AB',
-                                    'KV BC',
-                                    'KV AC',
+                                    'KV-BC',
+                                    'KV-AC',
                                 ].map((header, index) => (
                                     <th key={index} className="bg-gray-100 border border-gray-300 p-2 text-center font-bold text-sm">
                                         {header}
@@ -226,53 +261,53 @@ export default function TableHMI() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredData.map((row, rowIndex) => (
+                            {paginatedData.map((row, rowIndex) => (
                                 <tr key={row.id} className={rowIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                                     {/* GARDU INDUK - Merged cells */}
-                                    {shouldRenderCell(filteredData, rowIndex, 'garduInduk') && (
+                                    {shouldRenderCell(paginatedData, rowIndex, 'garduInduk') && (
                                         <td
                                             className="border border-gray-300 p-2 text-center align-middle font-medium"
-                                            rowSpan={calculateRowSpan(filteredData, rowIndex, 'garduInduk')}
+                                            rowSpan={calculateRowSpan(paginatedData, rowIndex, 'garduInduk')}
                                         >
                                             {row.garduInduk}
                                         </td>
                                     )}
 
                                     {/* FEEDER - Merged cells */}
-                                    {shouldRenderCell(filteredData, rowIndex, 'feeder') && (
+                                    {shouldRenderCell(paginatedData, rowIndex, 'feeder') && (
                                         <td
                                             className="border border-gray-300 p-2 text-center align-middle font-medium"
-                                            rowSpan={calculateRowSpan(filteredData, rowIndex, 'feeder')}
+                                            rowSpan={calculateRowSpan(paginatedData, rowIndex, 'feeder')}
                                         >
                                             {row.feeder}
                                         </td>
                                     )}
 
                                     {/* PMT1 - Merged cells per feeder */}
-                                    {shouldRenderCell(filteredData, rowIndex, 'feeder') && (
+                                    {shouldRenderCell(paginatedData, rowIndex, 'feeder') && (
                                         <td
                                             className="border border-gray-300 p-2 text-center align-middle"
-                                            rowSpan={calculateRowSpan(filteredData, rowIndex, 'feeder')}
+                                            rowSpan={calculateRowSpan(paginatedData, rowIndex, 'feeder')}
                                         >
                                             {renderPmt1Status(row.pmt1)}
                                         </td>
                                     )}
 
                                     {/* AMP - Merged cells per feeder */}
-                                    {shouldRenderCell(filteredData, rowIndex, 'feeder') && (
+                                    {shouldRenderCell(paginatedData, rowIndex, 'feeder') && (
                                         <td
                                             className="border border-gray-300 p-2 text-center align-middle"
-                                            rowSpan={calculateRowSpan(filteredData, rowIndex, 'feeder')}
+                                            rowSpan={calculateRowSpan(paginatedData, rowIndex, 'feeder')}
                                         >
                                             {formatValue(row.amp)}
                                         </td>
                                     )}
 
                                     {/* MW - Merged cells per feeder */}
-                                    {shouldRenderCell(filteredData, rowIndex, 'feeder') && (
+                                    {shouldRenderCell(paginatedData, rowIndex, 'feeder') && (
                                         <td
                                             className="border border-gray-300 p-2 text-center align-middle"
-                                            rowSpan={calculateRowSpan(filteredData, rowIndex, 'feeder')}
+                                            rowSpan={calculateRowSpan(paginatedData, rowIndex, 'feeder')}
                                         >
                                             {formatValue(row.mw)}
                                         </td>
@@ -355,6 +390,92 @@ export default function TableHMI() {
                     </table>
                 </CardContent>
             </Card>
+
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-between px-4 py-2">
+                <div className="text-muted-foreground text-sm">
+                    Showing{" "}
+                    <strong>
+                        {(currentPage - 1) * itemsPerPage + 1} -{" "}
+                        {Math.min(currentPage * itemsPerPage, filteredData.length)}
+                    </strong>{" "}
+                    of <strong>{filteredData.length}</strong> data
+                </div>
+                <Pagination>
+                    <PaginationContent>
+                        <PaginationItem>
+                            <PaginationPrevious
+                                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                                className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
+                            />
+                        </PaginationItem>
+                        {/* Render first page */}
+                        {totalPages > 0 && (
+                            <PaginationItem>
+                                <PaginationLink
+                                    onClick={() => handlePageChange(1)}
+                                    isActive={currentPage === 1}
+                                >
+                                    1
+                                </PaginationLink>
+                            </PaginationItem>
+                        )}
+
+                        {/* Render ellipsis if needed after first page */}
+                        {currentPage > 3 && totalPages > 5 && (
+                            <PaginationItem>
+                                <span className="px-2 py-1.5 text-sm">...</span>
+                            </PaginationItem>
+                        )}
+
+                        {/* Render pages around current page */}
+                        {Array.from({ length: totalPages }, (_, i) => i + 1)
+                            .filter((pageNumber) => {
+                                if (totalPages <= 5) return true; // Show all if 5 or less pages
+                                if (pageNumber === 1 || pageNumber === totalPages) return false; // Already handled
+                                return (
+                                    pageNumber >= currentPage - 1 &&
+                                    pageNumber <= currentPage + 1
+                                );
+                            })
+                            .map((pageNumber) => (
+                                <PaginationItem key={pageNumber}>
+                                    <PaginationLink
+                                        onClick={() => handlePageChange(pageNumber)}
+                                        isActive={currentPage === pageNumber}
+                                    >
+                                        {pageNumber}
+                                    </PaginationLink>
+                                </PaginationItem>
+                            ))}
+
+                        {/* Render ellipsis if needed before last page */}
+                        {currentPage < totalPages - 2 && totalPages > 5 && (
+                            <PaginationItem>
+                                <span className="px-2 py-1.5 text-sm">...</span>
+                            </PaginationItem>
+                        )}
+
+                        {/* Render last page */}
+                        {totalPages > 1 && (
+                            <PaginationItem>
+                                <PaginationLink
+                                    onClick={() => handlePageChange(totalPages)}
+                                    isActive={currentPage === totalPages}
+                                >
+                                    {totalPages}
+                                </PaginationLink>
+                            </PaginationItem>
+                        )}
+                        <PaginationItem>
+                            <PaginationNext
+                                onClick={() => handlePageChange(currentPage + 1)}
+                                className={currentPage === totalPages ? "pointer-events-none opacity-50" : undefined}
+                            />
+                        </PaginationItem>
+                    </PaginationContent>
+                </Pagination>
+            </div>
         </div>
     );
 }

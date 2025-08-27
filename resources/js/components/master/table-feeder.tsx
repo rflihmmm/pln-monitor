@@ -1,6 +1,6 @@
 import { router } from "@inertiajs/react";
 import { Edit, MoreHorizontal, Plus, Search, Trash } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +12,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import {
   Select,
   SelectContent,
@@ -50,23 +58,47 @@ export default function TableFeeder({
   const [isEditFeederOpen, setIsEditFeederOpen] = useState(false);
   const [editingFeeder, setEditingFeeder] = useState<Feeder | null>(null);
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 25; // Maksimal 25 data per halaman
+
   // Filter feeders based on search term and substation filter
-  const filteredFeeders = initialFeeders.filter((feeder) => {
-    const matchesSearch =
-      feeder.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (feeder.description &&
-        feeder.description.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredFeeders = useMemo(() => {
+    return initialFeeders.filter((feeder) => {
+      const matchesSearch =
+        feeder.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (feeder.description &&
+          feeder.description.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    const matchesGardu =
-      garduFilter === "all" ||
-      feeder.gardu_induk_id.toString() === garduFilter;
+      const matchesGardu =
+        garduFilter === "all" ||
+        feeder.gardu_induk_id.toString() === garduFilter;
 
-    return matchesSearch && matchesGardu;
-  });
+      return matchesSearch && matchesGardu;
+    });
+  }, [initialFeeders, searchTerm, garduFilter]);
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredFeeders.length / itemsPerPage);
+  const paginatedFeeders = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredFeeders.slice(startIndex, endIndex);
+  }, [filteredFeeders, currentPage, itemsPerPage]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
 
   // Format date to "MMM DD, YYYY"
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) {
+      return "-";
+    }
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return "-";
+    }
     return new Intl.DateTimeFormat("en-US", {
       year: "numeric",
       month: "short",
@@ -204,7 +236,7 @@ export default function TableFeeder({
               <TableRow>
                 <TableHead>ID</TableHead>
                 <TableHead>Name</TableHead>
-                <TableHead>Description</TableHead>
+                <TableHead className="max-w-[300px]">Description</TableHead>
                 <TableHead>Keyword</TableHead>
                 <TableHead>Substation</TableHead>
                 <TableHead>Keypoints</TableHead>
@@ -214,20 +246,24 @@ export default function TableFeeder({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredFeeders.length === 0 ? (
+              {paginatedFeeders.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-muted-foreground py-8 text-center">
                     No feeders found matching your filters
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredFeeders.map((feeder) => (
+                paginatedFeeders.map((feeder) => (
                   <TableRow key={feeder.id}>
                     <TableCell>{feeder.id}</TableCell>
                     <TableCell>
                       <div className="font-medium">{feeder.name}</div>
                     </TableCell>
-                    <TableCell>{feeder.description || "-"}</TableCell>
+                    <TableCell className="max-w-[300px]">
+                      <div className="truncate" title={feeder.description || "-"}>
+                        {feeder.description || "-"}
+                      </div>
+                    </TableCell>
                     <TableCell>{feeder.keyword_analogs || "-"}</TableCell>
                     <TableCell>{getGarduName(feeder.gardu_induk_id)}</TableCell>
                     <TableCell>
@@ -268,7 +304,7 @@ export default function TableFeeder({
                           "-"}
                       </div>
                     </TableCell>
-                    <TableCell>{formatDate(feeder.created_at ?? "")}</TableCell>
+                    <TableCell>{formatDate(feeder.created_at)}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -306,9 +342,87 @@ export default function TableFeeder({
 
         <div className="flex items-center justify-between">
           <div className="text-muted-foreground text-sm">
-            Showing <strong>{filteredFeeders.length}</strong> of{" "}
-            <strong>{initialFeeders.length}</strong> feeders
+            Showing{" "}
+            <strong>
+              {(currentPage - 1) * itemsPerPage + 1} -{" "}
+              {Math.min(currentPage * itemsPerPage, filteredFeeders.length)}
+            </strong>{" "}
+            of <strong>{filteredFeeders.length}</strong> feeders
           </div>
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
+                />
+              </PaginationItem>
+              {/* Render first page */}
+              {totalPages > 0 && (
+                <PaginationItem>
+                  <PaginationLink
+                    onClick={() => handlePageChange(1)}
+                    isActive={currentPage === 1}
+                  >
+                    1
+                  </PaginationLink>
+                </PaginationItem>
+              )}
+
+              {/* Render ellipsis if needed after first page */}
+              {currentPage > 3 && totalPages > 5 && (
+                <PaginationItem>
+                  <span className="px-2 py-1.5 text-sm">...</span>
+                </PaginationItem>
+              )}
+
+              {/* Render pages around current page */}
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((pageNumber) => {
+                  if (totalPages <= 5) return true; // Show all if 5 or less pages
+                  if (pageNumber === 1 || pageNumber === totalPages) return false; // Already handled
+                  return (
+                    pageNumber >= currentPage - 1 &&
+                    pageNumber <= currentPage + 1
+                  );
+                })
+                .map((pageNumber) => (
+                  <PaginationItem key={pageNumber}>
+                    <PaginationLink
+                      onClick={() => handlePageChange(pageNumber)}
+                      isActive={currentPage === pageNumber}
+                    >
+                      {pageNumber}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+
+              {/* Render ellipsis if needed before last page */}
+              {currentPage < totalPages - 2 && totalPages > 5 && (
+                <PaginationItem>
+                  <span className="px-2 py-1.5 text-sm">...</span>
+                </PaginationItem>
+              )}
+
+              {/* Render last page */}
+              {totalPages > 1 && (
+                <PaginationItem>
+                  <PaginationLink
+                    onClick={() => handlePageChange(totalPages)}
+                    isActive={currentPage === totalPages}
+                  >
+                    {totalPages}
+                  </PaginationLink>
+                </PaginationItem>
+              )}
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : undefined}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       </div>
 
