@@ -19,12 +19,24 @@ class FeederController extends Controller
 {
     public function index()
     {
-        // Eager loading dan pagination
-        $feeders = Feeder::with(['garduInduk', 'keypoints', 'statusPoints'])
-            ->select(['id', 'name', 'keyword_analogs', 'description', 'gardu_induk_id', 'created_at', 'updated_at'])
-            ->paginate(25); // Ubah 25 sesuai kebutuhan
+        $search = request('search');
+        $substation = request('substation');
+        $perPage = request('per_page', 25);
+        $query = Feeder::with(['garduInduk', 'keypoints', 'statusPoints'])
+            ->select(['id', 'name', 'keyword_analogs', 'description', 'gardu_induk_id', 'created_at', 'updated_at']);
 
-        // Transform data agar frontend tetap kompatibel
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'LIKE', "%$search%")
+                    ->orWhere('description', 'LIKE', "%$search%");
+            });
+        }
+        if ($substation && $substation !== 'all') {
+            $query->where('gardu_induk_id', $substation);
+        }
+
+        $feeders = $query->paginate($perPage)->appends(request()->query());
+
         $feeders->getCollection()->transform(function ($feeder) {
             return [
                 'id' => $feeder->id,

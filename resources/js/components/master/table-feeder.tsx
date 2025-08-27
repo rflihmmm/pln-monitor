@@ -58,38 +58,66 @@ export default function TableFeeder({
   keypointsList,
   statusPointsList,
 }: TableFeederProps) {
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState<string>("");
   const [garduFilter, setGarduFilter] = useState<string>("all");
   const [isAddFeederOpen, setIsAddFeederOpen] = useState(false);
   const [isEditFeederOpen, setIsEditFeederOpen] = useState(false);
   const [editingFeeder, setEditingFeeder] = useState<Feeder | null>(null);
 
-  // Pagination states
-  const [currentPage, setCurrentPage] = useState(feederList.current_page || 1);
+  // Ambil state dari backend
+  const currentPage = feederList.current_page || 1;
   const itemsPerPage = feederList.per_page || 25;
-
-  // Filter feeders based on search term and substation filter
-  const filteredFeeders = useMemo(() => {
-    return feederList.data.filter((feeder) => {
-      const matchesSearch =
-        feeder.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (feeder.description &&
-          feeder.description.toLowerCase().includes(searchTerm.toLowerCase()));
-
-      const matchesGardu =
-        garduFilter === "all" ||
-        feeder.gardu_induk_id.toString() === garduFilter;
-
-      return matchesSearch && matchesGardu;
-    });
-  }, [feederList, searchTerm, garduFilter]);
-
-  // Pagination logic
   const totalPages = feederList.last_page || 1;
-  const paginatedFeeders = filteredFeeders; // Sudah dipaginasi di backend
+  const paginatedFeeders = feederList.data;
 
+  // Handler untuk search
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    router.visit(route("master.feeder.index"), {
+      method: "get",
+      data: {
+        search: e.target.value,
+        substation: garduFilter,
+        page: 1,
+        per_page: itemsPerPage,
+      },
+      preserveState: true,
+      preserveScroll: true,
+      only: ["feederList"],
+    });
+  };
+
+  // Handler untuk filter substation
+  const handleFilterSubstation = (value: string) => {
+    setGarduFilter(value);
+    router.visit(route("master.feeder.index"), {
+      method: "get",
+      data: {
+        search: searchTerm,
+        substation: value,
+        page: 1,
+        per_page: itemsPerPage,
+      },
+      preserveState: true,
+      preserveScroll: true,
+      only: ["feederList"],
+    });
+  };
+
+  // Handler untuk pagination
   const handlePageChange = (page: number) => {
-    setCurrentPage(page);
+    router.visit(route("master.feeder.index"), {
+      method: "get",
+      data: {
+        search: searchTerm,
+        substation: garduFilter,
+        page,
+        per_page: itemsPerPage,
+      },
+      preserveState: true,
+      preserveScroll: true,
+      only: ["feederList"],
+    });
   };
 
   // Format date to "MMM DD, YYYY"
@@ -205,11 +233,11 @@ export default function TableFeeder({
               placeholder="Search feeders..."
               className="w-full pl-8"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={handleSearch}
             />
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Select value={garduFilter} onValueChange={setGarduFilter}>
+            <Select value={garduFilter} onValueChange={handleFilterSubstation}>
               <SelectTrigger className="w-full sm:w-[200px]">
                 <SelectValue placeholder="Filter by substation" />
               </SelectTrigger>

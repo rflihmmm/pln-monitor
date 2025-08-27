@@ -1,6 +1,7 @@
 import { router } from "@inertiajs/react"
 import { Edit, MoreHorizontal, Plus, Search, Trash } from "lucide-react"
 import { useState, useMemo } from "react"
+import { useEffect } from "react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -45,32 +46,53 @@ interface TableGarduIndukProps {
 }
 
 export default function TableGarduInduk({ garduIndukList }: TableGarduIndukProps) {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [isAddGarduOpen, setIsAddGarduOpen] = useState(false)
-  const [isEditGarduOpen, setIsEditGarduOpen] = useState(false)
-  const [editingGardu, setEditingGardu] = useState<GarduInduk | null>(null)
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // Pagination states
-  const [currentPage, setCurrentPage] = useState(garduIndukList.current_page || 1)
-  const itemsPerPage = garduIndukList.per_page || 25
+  // Sinkronkan searchTerm dengan query backend
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setSearchTerm(params.get("search") || "");
+  }, [garduIndukList]);
+  const [isAddGarduOpen, setIsAddGarduOpen] = useState(false);
+  const [isEditGarduOpen, setIsEditGarduOpen] = useState(false);
+  const [editingGardu, setEditingGardu] = useState<GarduInduk | null>(null);
 
-  // Filter gardu induk based on search term
-  const filteredGarduInduk = useMemo(() => {
-    return garduIndukList.data.filter((gardu) => {
-      return (
-        gardu.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (gardu.description && gardu.description.toLowerCase().includes(searchTerm.toLowerCase()))
-      )
-    })
-  }, [garduIndukList, searchTerm])
+  // Ambil state dari backend
+  const currentPage = garduIndukList.current_page || 1;
+  const itemsPerPage = garduIndukList.per_page || 25;
+  const totalPages = garduIndukList.last_page || 1;
+  const paginatedGarduInduk = garduIndukList.data;
 
-  // Pagination logic
-  const totalPages = garduIndukList.last_page || 1
-  const paginatedGarduInduk = filteredGarduInduk // Sudah dipaginasi di backend
+  // Handler untuk search
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    router.visit(route("master.gardu-induk.index"), {
+      method: "get",
+      data: {
+        search: e.target.value,
+        page: 1,
+        per_page: itemsPerPage,
+      },
+      preserveState: true,
+      preserveScroll: true,
+      only: ["garduIndukList"],
+    });
+  };
 
+  // Handler untuk pagination
   const handlePageChange = (page: number) => {
-    setCurrentPage(page)
-  }
+    router.visit(route("master.gardu-induk.index"), {
+      method: "get",
+      data: {
+        search: searchTerm,
+        page,
+        per_page: itemsPerPage,
+      },
+      preserveState: true,
+      preserveScroll: true,
+      only: ["garduIndukList"],
+    });
+  };
 
   // Format date to readable format
   const formatDate = (dateString: string | null | undefined) => {
@@ -151,7 +173,7 @@ export default function TableGarduInduk({ garduIndukList }: TableGarduIndukProps
               placeholder="Search substations..."
               className="w-full pl-8"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={handleSearch}
             />
           </div>
           <Button className="flex items-center gap-1" onClick={() => setIsAddGarduOpen(true)}>
@@ -174,7 +196,7 @@ export default function TableGarduInduk({ garduIndukList }: TableGarduIndukProps
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredGarduInduk.length === 0 ? (
+              {paginatedGarduInduk.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-muted-foreground py-8 text-center">
                     No substations found matching your search
@@ -242,19 +264,7 @@ export default function TableGarduInduk({ garduIndukList }: TableGarduIndukProps
                   className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
                 />
               </PaginationItem>
-              {/* Render first page */}
-              {totalPages > 0 && (
-                <PaginationItem>
-                  <PaginationLink
-                    onClick={() => handlePageChange(1)}
-                    isActive={currentPage === 1}
-                  >
-                    1
-                  </PaginationLink>
-                </PaginationItem>
-              )}
-
-              {/* Render ellipsis if needed after first page */}
+              {/* Render ellipsis if needed before current page */}
               {currentPage > 3 && totalPages > 5 && (
                 <PaginationItem>
                   <span className="px-2 py-1.5 text-sm">...</span>
@@ -265,41 +275,40 @@ export default function TableGarduInduk({ garduIndukList }: TableGarduIndukProps
               {Array.from({ length: totalPages }, (_, i) => i + 1)
                 .filter((pageNumber) => {
                   if (totalPages <= 5) return true; // Show all if 5 or less pages
-                  if (pageNumber === 1 || pageNumber === totalPages) return false; // Already handled
                   return (
-                    pageNumber >= currentPage - 1 &&
-                    pageNumber <= currentPage + 1
+                    pageNumber === 1 ||
+                    pageNumber === totalPages ||
+                    (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1)
                   );
                 })
-                .map((pageNumber) => (
-                  <PaginationItem key={pageNumber}>
-                    <PaginationLink
-                      onClick={() => handlePageChange(pageNumber)}
-                      isActive={currentPage === pageNumber}
-                    >
-                      {pageNumber}
-                    </PaginationLink>
-                  </PaginationItem>
-                ))}
-
-              {/* Render ellipsis if needed before last page */}
-              {currentPage < totalPages - 2 && totalPages > 5 && (
-                <PaginationItem>
-                  <span className="px-2 py-1.5 text-sm">...</span>
-                </PaginationItem>
-              )}
-
-              {/* Render last page */}
-              {totalPages > 1 && (
-                <PaginationItem>
-                  <PaginationLink
-                    onClick={() => handlePageChange(totalPages)}
-                    isActive={currentPage === totalPages}
-                  >
-                    {totalPages}
-                  </PaginationLink>
-                </PaginationItem>
-              )}
+                .map((pageNumber, idx, arr) => {
+                  // Render ellipsis after first page if needed
+                  if (pageNumber === 2 && currentPage > 4 && totalPages > 5) {
+                    return (
+                      <PaginationItem key="start-ellipsis">
+                        <span className="px-2 py-1.5 text-sm">...</span>
+                      </PaginationItem>
+                    );
+                  }
+                  // Render ellipsis before last page if needed
+                  if (pageNumber === totalPages - 1 && currentPage < totalPages - 3 && totalPages > 5) {
+                    return (
+                      <PaginationItem key="end-ellipsis">
+                        <span className="px-2 py-1.5 text-sm">...</span>
+                      </PaginationItem>
+                    );
+                  }
+                  return (
+                    <PaginationItem key={pageNumber}>
+                      <PaginationLink
+                        onClick={() => handlePageChange(pageNumber)}
+                        isActive={currentPage === pageNumber}
+                      >
+                        {pageNumber}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
               <PaginationItem>
                 <PaginationNext
                   onClick={() => handlePageChange(currentPage + 1)}

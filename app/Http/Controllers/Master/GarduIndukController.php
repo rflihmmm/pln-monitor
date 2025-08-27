@@ -12,15 +12,28 @@ class GarduIndukController extends Controller
 {
     public function index()
     {
-        // Pagination, eager loading, dan hanya field yang dibutuhkan
-        $garduInduks = GarduInduk::select(['id', 'name', 'coordinate', 'keypoint_id', 'description'])
-            ->with(['keypoint:NAME,PKEY'])
-            ->paginate(50); // Ubah 50 sesuai kebutuhan
+        $search = request('search');
+        $keypoint = request('keypoint');
+        $perPage = request('per_page', 25);
+        $query = GarduInduk::select(['id', 'name', 'coordinate', 'keypoint_id', 'description'])
+            ->with(['keypoint:NAME,PKEY']);
 
-        // Map data agar keypoint_name langsung tersedia
+        if ($search) {
+            $search = strtolower($search);
+            $query->where(function ($q) use ($search) {
+                $q->whereRaw('LOWER(name) LIKE ?', ["%$search%"])
+                    ->orWhereRaw('LOWER(description) LIKE ?', ["%$search%"]);
+            });
+        }
+        if ($keypoint && $keypoint !== 'all') {
+            $query->where('keypoint_id', $keypoint);
+        }
+
+        $garduInduks = $query->paginate($perPage)->appends(request()->query());
+
         $garduInduks->getCollection()->transform(function ($gi) {
             $gi->keypoint_name = $gi->keypoint && $gi->keypoint->NAME ? $gi->keypoint->NAME : null;
-            unset($gi->keypoint); // Hilangkan relasi agar payload lebih kecil
+            unset($gi->keypoint);
             return $gi;
         });
 
