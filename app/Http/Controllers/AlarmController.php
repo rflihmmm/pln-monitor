@@ -191,10 +191,22 @@ class AlarmController extends Controller
             $alarms = $results->map(function ($alarm) use ($primaryKey) {
                 $alarmArray = (array) $alarm;
 
+                // Konversi TIME dari GMT+0 ke GMT+8
+                $time = $alarmArray['TIME'] ?? '';
+                if ($time) {
+                    try {
+                        $dt = new \DateTime($time, new \DateTimeZone('UTC'));
+                        $dt->setTimezone(new \DateTimeZone('Asia/Makassar'));
+                        $time = $dt->format('Y-m-d H:i:s');
+                    } catch (\Exception $e) {
+                        // fallback ke value asli jika gagal
+                    }
+                }
+
                 return [
                     'id' => $alarmArray['PKEY'] ?? $alarmArray['id'] ?? uniqid(), // Use PKEY, generated id, or unique id
                     'TEXT' => $alarmArray['TEXT'] ?? '',
-                    'TIME' => $alarmArray['TIME'] ?? '',
+                    'TIME' => $time,
                     'PRIORITY' => $alarmArray['PRIORITY'] ?? 0,
                     'STATIONPID' => $alarmArray['STATIONPID'] ?? 0,
                     'station_name' => $alarmArray['station_name'] ?? null
