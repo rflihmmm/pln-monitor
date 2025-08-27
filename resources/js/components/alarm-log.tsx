@@ -248,7 +248,7 @@ export default function AlarmLog() {
                 setError('Realtime connection failed. Please refresh the page.');
                 setRealtimeError(true);
             }
-        }, 5000);
+        }, 30000);
 
         // Set up real-time subscription
         let channel: any;

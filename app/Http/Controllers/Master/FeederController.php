@@ -22,7 +22,7 @@ class FeederController extends Controller
         // Eager loading dan pagination
         $feeders = Feeder::with(['garduInduk', 'keypoints', 'statusPoints'])
             ->select(['id', 'name', 'keyword_analogs', 'description', 'gardu_induk_id', 'created_at', 'updated_at'])
-            ->paginate(50); // Ubah 50 sesuai kebutuhan
+            ->paginate(25); // Ubah 25 sesuai kebutuhan
 
         // Transform data agar frontend tetap kompatibel
         $feeders->getCollection()->transform(function ($feeder) {
