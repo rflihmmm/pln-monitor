@@ -1,6 +1,6 @@
 import { router } from "@inertiajs/react"
 import { MoreHorizontal, Plus, Search, Trash, UserCog } from "lucide-react"
-import { useState } from "react"
+import { useState, useMemo } from "react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -13,6 +13,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import UserDialog from "@/components/master/users-dialog"
@@ -39,16 +47,34 @@ export default function TableUsers({ users: initialUsers }: TableUsersProps) {
   const [isEditUserOpen, setIsEditUserOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 15 // Maksimal 15 data per halaman
+
   // Filter users based on search term and filters
-  const filteredUsers = initialUsers.filter((user) => {
-    const matchesSearch =
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredUsers = useMemo(() => {
+    return initialUsers.filter((user) => {
+      const matchesSearch =
+        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchTerm.toLowerCase())
 
-    const matchesRole = roleFilter === "all" || user.role === roleFilter
+      const matchesRole = roleFilter === "all" || user.role === roleFilter
 
-    return matchesSearch && matchesRole
-  })
+      return matchesSearch && matchesRole
+    })
+  }, [initialUsers, searchTerm, roleFilter])
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage)
+  const paginatedUsers = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    return filteredUsers.slice(startIndex, endIndex)
+  }, [filteredUsers, currentPage, itemsPerPage])
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
 
   // Format date to readable format
   const formatDate = (dateString: string) => {
@@ -159,14 +185,14 @@ export default function TableUsers({ users: initialUsers }: TableUsersProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredUsers.length === 0 ? (
+              {paginatedUsers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-muted-foreground py-8 text-center">
                     No users found matching your filters
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredUsers.map((user) => (
+                paginatedUsers.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -221,8 +247,87 @@ export default function TableUsers({ users: initialUsers }: TableUsersProps) {
 
         <div className="flex items-center justify-between">
           <div className="text-muted-foreground text-sm">
-            Showing <strong>{filteredUsers.length}</strong> of <strong>{initialUsers.length}</strong> users
+            Showing{" "}
+            <strong>
+              {(currentPage - 1) * itemsPerPage + 1} -{" "}
+              {Math.min(currentPage * itemsPerPage, filteredUsers.length)}
+            </strong>{" "}
+            of <strong>{filteredUsers.length}</strong> users
           </div>
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
+                />
+              </PaginationItem>
+              {/* Render first page */}
+              {totalPages > 0 && (
+                <PaginationItem>
+                  <PaginationLink
+                    onClick={() => handlePageChange(1)}
+                    isActive={currentPage === 1}
+                  >
+                    1
+                  </PaginationLink>
+                </PaginationItem>
+              )}
+
+              {/* Render ellipsis if needed after first page */}
+              {currentPage > 3 && totalPages > 5 && (
+                <PaginationItem>
+                  <span className="px-2 py-1.5 text-sm">...</span>
+                </PaginationItem>
+              )}
+
+              {/* Render pages around current page */}
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((pageNumber) => {
+                  if (totalPages <= 5) return true; // Show all if 5 or less pages
+                  if (pageNumber === 1 || pageNumber === totalPages) return false; // Already handled
+                  return (
+                    pageNumber >= currentPage - 1 &&
+                    pageNumber <= currentPage + 1
+                  );
+                })
+                .map((pageNumber) => (
+                  <PaginationItem key={pageNumber}>
+                    <PaginationLink
+                      onClick={() => handlePageChange(pageNumber)}
+                      isActive={currentPage === pageNumber}
+                    >
+                      {pageNumber}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+
+              {/* Render ellipsis if needed before last page */}
+              {currentPage < totalPages - 2 && totalPages > 5 && (
+                <PaginationItem>
+                  <span className="px-2 py-1.5 text-sm">...</span>
+                </PaginationItem>
+              )}
+
+              {/* Render last page */}
+              {totalPages > 1 && (
+                <PaginationItem>
+                  <PaginationLink
+                    onClick={() => handlePageChange(totalPages)}
+                    isActive={currentPage === totalPages}
+                  >
+                    {totalPages}
+                  </PaginationLink>
+                </PaginationItem>
+              )}
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : undefined}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       </div>
 
@@ -240,4 +345,3 @@ export default function TableUsers({ users: initialUsers }: TableUsersProps) {
     </div>
   )
 }
-
