@@ -19,11 +19,13 @@ class FeederController extends Controller
 {
     public function index()
     {
-        // Load feeders dengan relasi keypoints dan statusPoints
-        $feeders = Feeder::with(['garduInduk', 'keypoints', 'statusPoints'])->get();
+        // Eager loading dan pagination
+        $feeders = Feeder::with(['garduInduk', 'keypoints', 'statusPoints'])
+            ->select(['id', 'name', 'keyword_analogs', 'description', 'gardu_induk_id', 'created_at', 'updated_at'])
+            ->paginate(50); // Ubah 50 sesuai kebutuhan
 
-        // Transform data untuk menyesuaikan dengan frontend
-        $feedersTransformed = $feeders->map(function ($feeder) {
+        // Transform data agar frontend tetap kompatibel
+        $feeders->getCollection()->transform(function ($feeder) {
             return [
                 'id' => $feeder->id,
                 'name' => $feeder->name,
@@ -49,15 +51,15 @@ class FeederController extends Controller
             ];
         });
 
-        $garduInduks = GarduInduk::all();
-        $keypoints = FeederKeypoint::all();
-        $statuspoints = FeederStatusPoint::all();
+        $garduInduks = GarduInduk::select(['id', 'name'])->get();
+        $keypoints = FeederKeypoint::select(['id', 'feeder_id', 'keypoint_id', 'name'])->get();
+        $statuspoints = FeederStatusPoint::select(['id', 'feeder_id', 'type', 'status_id', 'name'])->get();
 
         return Inertia::render('master/feeder', [
-            'feederList' => $feedersTransformed,
+            'feederList' => $feeders,
             'garduIndukList' => $garduInduks,
-            'keypointsList' => $keypoints, // Fix: ubah dari 'keypointList' ke 'keypointsList'
-            'statusPointsList' => $statuspoints // Fix: ubah dari 'statusPointList' ke 'statusPointsList'
+            'keypointsList' => $keypoints,
+            'statusPointsList' => $statuspoints
         ]);
     }
 

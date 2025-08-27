@@ -35,7 +35,13 @@ interface GarduInduk {
 }
 
 interface TableGarduIndukProps {
-  garduIndukList: GarduInduk[]
+  garduIndukList: {
+    data: GarduInduk[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+  }
 }
 
 export default function TableGarduInduk({ garduIndukList }: TableGarduIndukProps) {
@@ -45,12 +51,12 @@ export default function TableGarduInduk({ garduIndukList }: TableGarduIndukProps
   const [editingGardu, setEditingGardu] = useState<GarduInduk | null>(null)
 
   // Pagination states
-  const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 25 // Maksimal 25 data per halaman
+  const [currentPage, setCurrentPage] = useState(garduIndukList.current_page || 1)
+  const itemsPerPage = garduIndukList.per_page || 25
 
   // Filter gardu induk based on search term
   const filteredGarduInduk = useMemo(() => {
-    return garduIndukList.filter((gardu) => {
+    return garduIndukList.data.filter((gardu) => {
       return (
         gardu.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (gardu.description && gardu.description.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -59,12 +65,8 @@ export default function TableGarduInduk({ garduIndukList }: TableGarduIndukProps
   }, [garduIndukList, searchTerm])
 
   // Pagination logic
-  const totalPages = Math.ceil(filteredGarduInduk.length / itemsPerPage)
-  const paginatedGarduInduk = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage
-    const endIndex = startIndex + itemsPerPage
-    return filteredGarduInduk.slice(startIndex, endIndex)
-  }, [filteredGarduInduk, currentPage, itemsPerPage])
+  const totalPages = garduIndukList.last_page || 1
+  const paginatedGarduInduk = filteredGarduInduk // Sudah dipaginasi di backend
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
@@ -227,10 +229,10 @@ export default function TableGarduInduk({ garduIndukList }: TableGarduIndukProps
           <div className="text-muted-foreground text-sm">
             Showing{" "}
             <strong>
-              {(currentPage - 1) * itemsPerPage + 1} -{" "}
-              {Math.min(currentPage * itemsPerPage, filteredGarduInduk.length)}
+              {(garduIndukList.current_page - 1) * itemsPerPage + 1} -{" "}
+              {Math.min(garduIndukList.current_page * itemsPerPage, garduIndukList.total)}
             </strong>{" "}
-            of <strong>{filteredGarduInduk.length}</strong> substations
+            of <strong>{garduIndukList.total}</strong> substations
           </div>
           <Pagination>
             <PaginationContent>

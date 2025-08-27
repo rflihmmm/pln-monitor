@@ -12,21 +12,15 @@ class GarduIndukController extends Controller
 {
     public function index()
     {
-        $garduInduks = GarduInduk::all();
+        // Pagination, eager loading, dan hanya field yang dibutuhkan
+        $garduInduks = GarduInduk::select(['id', 'name', 'coordinate', 'keypoint_id', 'description'])
+            ->with(['keypoint:NAME,PKEY'])
+            ->paginate(50); // Ubah 50 sesuai kebutuhan
 
-        // Ambil semua keypoint_id unik dari GarduInduk
-        $keypointIds = $garduInduks->pluck('keypoint_id')->filter()->unique()->toArray();
-        $keypointNames = [];
-        if (!empty($keypointIds)) {
-            $keypoints = StationPointSkada::whereIn('PKEY', $keypointIds)->pluck('NAME', 'PKEY');
-            $keypointNames = $keypoints->toArray();
-        }
-
-        // Tambahkan properti keypoint_name ke setiap GarduInduk
-        $garduInduks = $garduInduks->map(function ($gi) use ($keypointNames) {
-            $gi->keypoint_name = $gi->keypoint_id && isset($keypointNames[$gi->keypoint_id])
-                ? $keypointNames[$gi->keypoint_id]
-                : null;
+        // Map data agar keypoint_name langsung tersedia
+        $garduInduks->getCollection()->transform(function ($gi) {
+            $gi->keypoint_name = $gi->keypoint && $gi->keypoint->NAME ? $gi->keypoint->NAME : null;
+            unset($gi->keypoint); // Hilangkan relasi agar payload lebih kecil
             return $gi;
         });
 
@@ -46,7 +40,7 @@ class GarduIndukController extends Controller
             }
 
             $keypoints = StationPointSkada::select("PKEY", "NAME")
-                ->where('NAME', 'LIKE', '%'  . '%' . $filter . '%')
+                ->where('NAME', 'LIKE', '%' . $filter . '%')
                 ->get()
                 ->map(function ($query) {
                     return [

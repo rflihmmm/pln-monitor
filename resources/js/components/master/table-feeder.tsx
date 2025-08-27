@@ -40,14 +40,20 @@ import FeederDialog from "@/components/master/feeder-dialog";
 import { type GarduInduk, Keypoint, StatusPoint, Feeder } from "@/types";
 
 interface TableFeederProps {
-  feederList: Feeder[];
+  feederList: {
+    data: Feeder[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+  };
   garduIndukList: GarduInduk[];
   keypointsList: Keypoint[];
   statusPointsList: StatusPoint[];
 }
 
 export default function TableFeeder({
-  feederList: initialFeeders,
+  feederList,
   garduIndukList,
   keypointsList,
   statusPointsList,
@@ -59,12 +65,12 @@ export default function TableFeeder({
   const [editingFeeder, setEditingFeeder] = useState<Feeder | null>(null);
 
   // Pagination states
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 25; // Maksimal 25 data per halaman
+  const [currentPage, setCurrentPage] = useState(feederList.current_page || 1);
+  const itemsPerPage = feederList.per_page || 25;
 
   // Filter feeders based on search term and substation filter
   const filteredFeeders = useMemo(() => {
-    return initialFeeders.filter((feeder) => {
+    return feederList.data.filter((feeder) => {
       const matchesSearch =
         feeder.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (feeder.description &&
@@ -76,15 +82,11 @@ export default function TableFeeder({
 
       return matchesSearch && matchesGardu;
     });
-  }, [initialFeeders, searchTerm, garduFilter]);
+  }, [feederList, searchTerm, garduFilter]);
 
   // Pagination logic
-  const totalPages = Math.ceil(filteredFeeders.length / itemsPerPage);
-  const paginatedFeeders = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return filteredFeeders.slice(startIndex, endIndex);
-  }, [filteredFeeders, currentPage, itemsPerPage]);
+  const totalPages = feederList.last_page || 1;
+  const paginatedFeeders = filteredFeeders; // Sudah dipaginasi di backend
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -344,10 +346,10 @@ export default function TableFeeder({
           <div className="text-muted-foreground text-sm">
             Showing{" "}
             <strong>
-              {(currentPage - 1) * itemsPerPage + 1} -{" "}
-              {Math.min(currentPage * itemsPerPage, filteredFeeders.length)}
+              {(feederList.current_page - 1) * itemsPerPage + 1} -{" "}
+              {Math.min(feederList.current_page * itemsPerPage, feederList.total)}
             </strong>{" "}
-            of <strong>{filteredFeeders.length}</strong> feeders
+            of <strong>{feederList.total}</strong> feeders
           </div>
           <Pagination>
             <PaginationContent>
