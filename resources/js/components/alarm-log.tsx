@@ -236,19 +236,23 @@ export default function AlarmLog() {
         fetchUserKeypoints();
     }, []);
 
+    // State untuk menandai apakah timeout error sudah aktif
+    const [timeoutTriggered, setTimeoutTriggered] = useState(false);
+
     useEffect(() => {
         if (keypointsLoading) return;
 
         let isMounted = true;
         fetchAlarms();
 
-        // PERBAIKAN 4: Tambahkan timeout untuk fallback jika realtime gagal
+        // Timeout untuk fallback jika realtime gagal
         const realtimeTimeout = setTimeout(() => {
             if (alarms.length === 0 && !error) {
                 setError('Realtime connection failed. Please refresh the page.');
                 setRealtimeError(true);
+                setTimeoutTriggered(true);
             }
-        }, 30000);
+        }, 60000);
 
         // Set up real-time subscription
         let channel: any;
@@ -292,7 +296,6 @@ export default function AlarmLog() {
                     }
                 )
                 .subscribe((status, err) => {
-                    // PERBAIKAN 5: Tangani status subscribe
                     if (status === 'CHANNEL_ERROR') {
                         setRealtimeError(true);
                         setError('Realtime connection failed. Data may not update automatically.');
@@ -311,7 +314,16 @@ export default function AlarmLog() {
                 supabase.removeChannel(channel);
             }
         };
-    }, [keypointsLoading, isAdmin, userKeypoints, filterAlarmsByPermissions]);
+    }, [keypointsLoading, isAdmin, userKeypoints, filterAlarmsByPermissions, alarms, error]);
+
+    // Hilangkan pesan error jika data alarm berubah setelah timeout aktif
+    useEffect(() => {
+        if (timeoutTriggered && alarms.length > 0) {
+            setError(null);
+            setRealtimeError(false);
+            setTimeoutTriggered(false);
+        }
+    }, [alarms, timeoutTriggered]);
 
     // PERBAIKAN 6: Fallback polling jika realtime gagal
     useEffect(() => {
@@ -324,13 +336,15 @@ export default function AlarmLog() {
         return () => clearInterval(intervalId);
     }, [realtimeError, keypointsLoading]);
 
-    // Format timestamp for display
+    // Format timestamp for display (convert GMT+0 to GMT+8)
     const formatTimestamp = (timestamp: string) => {
         if (!timestamp) return '';
 
         try {
             const date = new Date(timestamp);
-            return date.toLocaleString('en-US', {
+            // Add 8 hours (8 * 60 * 60 * 1000 ms)
+            const gmt8Date = new Date(date.getTime() + 8 * 60 * 60 * 1000);
+            return gmt8Date.toLocaleString('en-US', {
                 year: 'numeric',
                 month: '2-digit',
                 day: '2-digit',
