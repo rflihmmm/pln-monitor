@@ -215,6 +215,16 @@ export default function AlarmLog() {
         fetchAlarms();
     };
 
+    // Helper to format date to YYYY-MM-DDTHH:MM in local time
+    const formatLocalDatetime = (date: Date) => {
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+    };
+
     // Set quick date filters
     const setQuickDateFilter = (hours: number) => {
         const endDate = new Date();
@@ -222,8 +232,8 @@ export default function AlarmLog() {
 
         const newFilters = {
             ...searchFilters,
-            startDate: startDate.toISOString().slice(0, 16), // Format: YYYY-MM-DDTHH:MM
-            endDate: endDate.toISOString().slice(0, 16)
+            startDate: formatLocalDatetime(startDate),
+            endDate: formatLocalDatetime(endDate)
         };
 
         setSearchFilters(newFilters);
