@@ -342,9 +342,7 @@ export default function AlarmLog() {
 
         try {
             const date = new Date(timestamp);
-            // Add 8 hours (8 * 60 * 60 * 1000 ms)
-            const gmt8Date = new Date(date.getTime() + 8 * 60 * 60 * 1000);
-            return gmt8Date.toLocaleString('en-US', {
+            return date.toLocaleString('en-US', {
                 year: 'numeric',
                 month: '2-digit',
                 day: '2-digit',
