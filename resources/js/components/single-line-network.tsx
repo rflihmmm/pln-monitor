@@ -212,14 +212,14 @@ export function SingleLineNetwork() {
     }
 
     // Tentukan pusat peta awal
-    const defaultCenter: [number, number] = data?.[0]?.coordinate ?? [-5.1181, 119.5269]
+    const defaultCenter: [number, number] = [-1.980379, 120.512788]
 
     return (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_360px]">
             <div className="relative h-[600px]">
                 <MapContainer
                     center={defaultCenter}
-                    zoom={12}
+                    zoom={7}
                     zoomControl={false}
                     style={{ height: "100%", width: "100%", zIndex: 1 }}
                     whenCreated={(m) => {
