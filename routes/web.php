@@ -54,17 +54,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Routes untuk mendapatkan data single line
     Route::get('/api/single-line', [SingleLineController::class, 'getSingleLineDataBasedOnRole']);
 
-    // Route for getting user's keypoints
-    Route::get('/api/user-keypoints', [\App\Http\Controllers\AlarmController::class, 'getKeypoints'])->name('api.user-keypoints');
-
     // Routes for alarm functionality
     Route::get('/api/user-keypoints', [AlarmController::class, 'getKeypoints'])->name('api.user-keypoints');
     Route::get('/api/search-alarms', [AlarmController::class, 'searchAlarms'])->name('api.search-alarms');
     Route::get('/api/filtered-keypoints', [AlarmController::class, 'getFilteredKeypoints'])->name('api.filtered-keypoints');
 
-    // Routes dinamis (opsional, jika ingin lebih fleksibel)
-    Route::get('/maps/keypoints/{dcc}', [MapsController::class, 'getKeypointsByDcc']);
-    Route::get('/maps/summary/{dcc}', [MapsController::class, 'getSummaryByDcc']);
+    // API Dropdown Data
+    Route::get('/api/dropdown/feeders', [\App\Http\Controllers\DropDownData::class, 'getFeeders'])->name('api.dropdown.feeders');
+    Route::get('/api/dropdown/keypoints', [\App\Http\Controllers\DropDownData::class, 'getKeypointNames'])->name('api.dropdown.keypoints');
 });
 
 require __DIR__ . '/settings.php';

@@ -207,6 +207,9 @@ class SingleLineController extends Controller
     /**
      * Preload all required data with optimized queries
      */
+    /**
+     * Preload all required data with optimized queries
+     */
     private function preloadAllRequiredData(\Illuminate\Support\Collection $keypointIds)
     {
         // 1. Get local keypoint data with single query
@@ -246,14 +249,14 @@ class SingleLineController extends Controller
             ->get()
             ->keyBy('keypoint_id');
 
-        // 3. Get analog points for non-GI keypoints
-        $analogPointsNonGi = DB::connection('sqlsrv_main')
-            ->table('ANALOGPOINTS')
-            ->whereIn('STATIONPID', $keypointIds)
-            ->whereIn('NAME', ['IR', 'IS', 'IT', 'KV-AB', 'KV-BC', 'KV-AC'])
-            ->select('STATIONPID', 'NAME', 'VALUE', 'UPDATETIME')
-            ->get()
-            ->groupBy('STATIONPID');
+        // 3. Get analog points for non-GI keypoints in batches
+        $analogPointsNonGi = $keypointIds->isNotEmpty()
+            ? $this->fetchAnalogPointsInBatches(
+                $keypointIds,
+                'STATIONPID',
+                ['IR', 'IS', 'IT', 'KV-AB', 'KV-BC', 'KV-AC']
+            )->groupBy('STATIONPID')
+            : collect();
 
         // 4. Get GI-specific data with optimized eager loading
         $giKeypointIds = $allKeypointData->where('source', 'gardu_induk')->pluck('keypoint_id');
@@ -279,14 +282,12 @@ class SingleLineController extends Controller
 
             $allFeederStatusIds = $allFeederStatusIds->unique()->filter();
 
-            if ($allFeederStatusIds->isNotEmpty()) {
-                $analogPointsForGis = DB::connection('sqlsrv_main')
-                    ->table('ANALOGPOINTS')
-                    ->whereIn('PKEY', $allFeederStatusIds)
-                    ->select('PKEY', 'VALUE', 'UPDATETIME')
-                    ->get()
-                    ->keyBy('PKEY');
-            }
+            $analogPointsForGis = $allFeederStatusIds->isNotEmpty()
+                ? $this->fetchAnalogPointsInBatches(
+                    $allFeederStatusIds,
+                    'PKEY'
+                )->keyBy('PKEY')
+                : collect();
         }
 
         // 5. Get feeder data for non-GI keypoints
@@ -315,14 +316,12 @@ class SingleLineController extends Controller
                 }
                 $allFeederStatusIdsNonGi = $allFeederStatusIdsNonGi->unique()->filter();
 
-                if ($allFeederStatusIdsNonGi->isNotEmpty()) {
-                    $analogPointsForNonGiFeeders = DB::connection('sqlsrv_main')
-                        ->table('ANALOGPOINTS')
-                        ->whereIn('PKEY', $allFeederStatusIdsNonGi)
-                        ->select('PKEY', 'VALUE', 'UPDATETIME')
-                        ->get()
-                        ->keyBy('PKEY');
-                }
+                $analogPointsForNonGiFeeders = $allFeederStatusIdsNonGi->isNotEmpty()
+                    ? $this->fetchAnalogPointsInBatches(
+                        $allFeederStatusIdsNonGi,
+                        'PKEY'
+                    )->keyBy('PKEY')
+                    : collect();
             }
         }
 
@@ -635,5 +634,29 @@ class SingleLineController extends Controller
         }
 
         return [$lat, $lng];
+    }
+
+    /**
+     * Helper to fetch ANALOGPOINTS in batches
+     */
+    private function fetchAnalogPointsInBatches(\Illuminate\Support\Collection $ids, string $idColumn, array $names = [])
+    {
+        $allAnalogPoints = collect();
+        $idBatches = $ids->chunk(self::BATCH_SIZE); // Use the class's BATCH_SIZE
+
+        foreach ($idBatches as $batch) {
+            $query = DB::connection('sqlsrv_main')
+                ->table('ANALOGPOINTS')
+                ->whereIn($idColumn, $batch)
+                ->select('PKEY', 'VALUE', 'UPDATETIME');
+
+            if (!empty($names)) {
+                $query->whereIn('NAME', $names);
+            }
+
+            $allAnalogPoints = $allAnalogPoints->concat($query->get());
+        }
+
+        return $allAnalogPoints;
     }
 }

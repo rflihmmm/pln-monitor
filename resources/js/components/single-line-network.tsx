@@ -16,6 +16,25 @@ import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
+import axios from "axios"
+import { useDebounce } from "use-debounce"
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Check, ChevronsUpDown, Loader2 } from "lucide-react"
+import { cn } from "@/lib/utils"
+
+type DropdownBase = {
+    id: number
+    name: string
+    feeder?: number // Add feeder_id to DropdownBase
+}
 
 type NodeType = "GI" | "REC" | "LBS" | "GH"
 
@@ -160,6 +179,35 @@ export function SingleLineNetwork() {
 
     const [visible, setVisible] = useState<Visibility>({ GI: true, REC: true, LBS: true, GH: true })
 
+    // State for new filters
+    // State for selected values in dropdowns (not yet applied)
+    const [tempSelectedFeeder, setTempSelectedFeeder] = useState<number | null>(null)
+    const [tempSelectedKeypoint, setTempSelectedKeypoint] = useState<number | null>(null)
+
+    // State for applied filter values (used for actual filtering)
+    const [appliedFeeder, setAppliedFeeder] = useState<number | null>(null)
+    const [appliedKeypoint, setAppliedKeypoint] = useState<number | null>(null)
+
+    // State for dropdown lists
+    const [feedersList, setFeedersList] = useState<DropdownBase[]>([])
+    const [keypointsList, setKeypointsList] = useState<DropdownBase[]>([])
+
+    // State for combobox
+    const [feederOpen, setFeederOpen] = useState(false)
+    const [keypointOpen, setKeypointOpen] = useState(false)
+
+    // State for search terms
+    const [feederSearchTerm, setFeederSearchTerm] = useState("")
+    const [keypointSearchTerm, setKeypointSearchTerm] = useState("")
+
+    // Debounced search terms
+    const [debouncedFeederSearch] = useDebounce(feederSearchTerm, 500)
+    const [debouncedKeypointSearch] = useDebounce(keypointSearchTerm, 500)
+
+    // Loading states
+    const [isFeederLoading, setIsFeederLoading] = useState(false)
+    const [isKeypointLoading, setIsKeypointLoading] = useState(false)
+
     // Simpan ref marker agar bisa openPopup saat klik garis
     const markerRefs = useRef<Map<number, L.Marker>>(new Map())
     const registerMarkerRef = (code: number) => (ref: L.Marker | null) => {
@@ -170,6 +218,101 @@ export function SingleLineNetwork() {
         }
     }
 
+    // Effect for search feeders
+    useEffect(() => {
+        if (debouncedFeederSearch.length >= 3) {
+            fetchFeeders(debouncedFeederSearch)
+        } else {
+            setFeedersList([])
+        }
+    }, [debouncedFeederSearch])
+
+    // Reset keypoint selection and list when feeder changes
+    useEffect(() => {
+        setTempSelectedKeypoint(null)
+        setKeypointsList([])
+        setKeypointSearchTerm("") // Clear keypoint search term
+    }, [tempSelectedFeeder])
+
+    // Effect for search keypoints
+    useEffect(() => {
+        if (tempSelectedFeeder !== null && (debouncedKeypointSearch.length >= 3 || debouncedKeypointSearch.length === 0)) {
+            fetchKeypoints(debouncedKeypointSearch, tempSelectedFeeder)
+        } else if (tempSelectedFeeder === null) {
+            setKeypointsList([])
+        }
+    }, [debouncedKeypointSearch, tempSelectedFeeder])
+
+    // Fetch functions
+    const fetchFeeders = async (search: string) => {
+        setIsFeederLoading(true)
+        try {
+            const response = await axios.get("/api/dropdown/feeders", {
+                params: { filter: search },
+            })
+
+            if (response.data && Array.isArray(response.data)) {
+                setFeedersList(response.data)
+            } else {
+                console.warn("Unexpected response format:", response.data)
+                setFeedersList([])
+            }
+        } catch (error) {
+            console.error("Error fetching feeders:", error)
+            setFeedersList([])
+        } finally {
+            setIsFeederLoading(false)
+        }
+    }
+
+    const fetchKeypoints = async (search: string, feederId: number | null) => {
+        setIsKeypointLoading(true)
+        try {
+            const response = await axios.get("/api/dropdown/keypoints", {
+                params: { filter: search, feeder_id: feederId },
+            })
+
+            if (response.data && Array.isArray(response.data)) {
+                setKeypointsList(response.data)
+            } else {
+                console.warn("Unexpected response format:", response.data)
+                setKeypointsList([])
+            }
+        } catch (error) {
+            console.error("Error fetching keypoints:", error)
+            setKeypointsList([])
+        } finally {
+            setIsKeypointLoading(false)
+        }
+    }
+
+    // Helper functions to get name by ID
+    const getFeederName = (id: number | null) => {
+        if (id === null || id === 0) return "Select Feeder"
+        const feeder = feedersList.find((f) => f.id === id)
+        return feeder ? feeder.name : "Select Feeder"
+    }
+
+    const getKeypointName = (id: number | null) => {
+        if (id === null || id === 0) return "Select Keypoint"
+        const keypoint = keypointsList.find((k) => k.id === id)
+        return keypoint ? keypoint.name : "Select Keypoint"
+    }
+
+    // Handler functions for search
+    const handleOnSearchFeeder = (search: string) => {
+        setFeederSearchTerm(search)
+    }
+
+    const handleOnSearchKeypoint = (search: string) => {
+        setKeypointSearchTerm(search)
+    }
+
+    const handleApplyFilter = () => {
+        setAppliedFeeder(tempSelectedFeeder)
+        setAppliedKeypoint(tempSelectedKeypoint)
+    }
+
     const byCode = useMemo(() => {
         const m = new Map<number, NodeItem>()
         for (const n of data ?? []) m.set(n.code, n)
@@ -178,8 +321,32 @@ export function SingleLineNetwork() {
 
     const filteredNodes = useMemo(() => {
         if (!data) return []
-        return data.filter((n) => visible[n.type])
-    }, [data, visible])
+        return data.filter((n) => {
+            const typeVisible = visible[n.type]
+            const feederMatch = appliedFeeder === null || n.feeder?.some(f => f.id === appliedFeeder)
+
+            let keypointMatch = true; // Assume true if no keypoint is applied
+
+            if (appliedKeypoint !== null) {
+                const selectedKeypointData = keypointsList.find(k => k.id === appliedKeypoint);
+                if (selectedKeypointData) {
+                    // Match node name with selected keypoint name
+                    keypointMatch = n.name === selectedKeypointData.name;
+
+                    // If a feeder is also selected, ensure the selected keypoint belongs to that feeder
+                    if (keypointMatch && appliedFeeder !== null) {
+                        keypointMatch = selectedKeypointData.feeder === appliedFeeder;
+                    }
+                } else {
+                    // If the selected keypoint is not found in the list (e.g., stale data),
+                    // then it shouldn't match.
+                    keypointMatch = false;
+                }
+            }
+
+            return typeVisible && feederMatch && keypointMatch
+        })
+    }, [data, visible, appliedFeeder, appliedKeypoint, keypointsList])
 
     const lines = useMemo(() => {
         if (!data) return []
@@ -406,13 +573,205 @@ export function SingleLineNetwork() {
 
                         <Separator className="my-4" />
 
-                        <div className="flex items-center gap-2">
+                        {/* Feeder Filter */}
+                        <div className="grid gap-2 mb-4">
+                            <Label htmlFor="feeder_filter">Feeder</Label>
+                            <Popover open={feederOpen} onOpenChange={setFeederOpen}>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        role="combobox"
+                                        aria-expanded={feederOpen}
+                                        className="justify-between"
+                                        id="feeder_filter"
+                                    >
+                                        {getFeederName(tempSelectedFeeder)}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[300px] p-0">
+                                    <Command>
+                                        <CommandInput
+                                            placeholder="Search feeder..."
+                                            onValueChange={handleOnSearchFeeder}
+                                        />
+                                        <CommandList>
+                                            {feederSearchTerm === "" ? (
+                                                <div className="py-5 text-sm text-muted-foreground text-center">
+                                                    Type to search...
+                                                </div>
+                                            ) : (
+                                                <CommandEmpty>
+                                                    {isFeederLoading ? (
+                                                        <div className="flex items-center justify-center p-2">
+                                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                            Loading...
+                                                        </div>
+                                                    ) : (
+                                                        <div className="p-2 text-muted-foreground text-center">
+                                                            No feeder found
+                                                        </div>
+                                                    )}
+                                                </CommandEmpty>
+                                            )}
+                                            <CommandGroup className="max-h-[200px] overflow-y-auto">
+                                                <CommandItem
+                                                    value="none"
+                                                    onSelect={() => {
+                                                        setTempSelectedFeeder(null)
+                                                        setTempSelectedKeypoint(null) // Clear keypoint selection
+                                                        setFeederOpen(false)
+                                                    }}
+                                                >
+                                                    <Check
+                                                        className={cn(
+                                                            "mr-2 h-4 w-4",
+                                                            tempSelectedFeeder === null
+                                                                ? "opacity-100"
+                                                                : "opacity-0"
+                                                        )}
+                                                    />
+                                                    None
+                                                </CommandItem>
+                                                {feedersList.map((feeder) => (
+                                                    <CommandItem
+                                                        key={feeder.id}
+                                                        value={feeder.name}
+                                                        onSelect={() => {
+                                                            setTempSelectedFeeder(feeder.id)
+                                                            setTempSelectedKeypoint(null) // Clear keypoint selection
+                                                            setFeederOpen(false)
+                                                        }}
+                                                    >
+                                                        <Check
+                                                            className={cn(
+                                                                "mr-2 h-4 w-4",
+                                                                tempSelectedFeeder === feeder.id
+                                                                    ? "opacity-100"
+                                                                    : "opacity-0"
+                                                            )}
+                                                        />
+                                                        {feeder.name}
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+                        </div>
 
+                        {/* Keypoint Filter */}
+                        <div className="grid gap-2 mb-4">
+                            <Label htmlFor="keypoint_filter">Keypoint</Label>
+                            <Popover open={keypointOpen} onOpenChange={setKeypointOpen}>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        role="combobox"
+                                        aria-expanded={keypointOpen}
+                                        className="justify-between"
+                                        id="keypoint_filter"
+                                        disabled={tempSelectedFeeder === null} // Disable if no feeder is selected
+                                    >
+                                        {getKeypointName(tempSelectedKeypoint)}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[300px] p-0">
+                                    <Command>
+                                        <CommandInput
+                                            placeholder="Search keypoint..."
+                                            onValueChange={handleOnSearchKeypoint}
+                                            disabled={tempSelectedFeeder === null} // Disable if no feeder is selected
+                                        />
+                                        <CommandList>
+                                            {tempSelectedFeeder === null ? (
+                                                <div className="py-5 text-sm text-muted-foreground text-center">
+                                                    Select a feeder first to enable keypoint search.
+                                                </div>
+                                            ) : keypointSearchTerm === "" ? (
+                                                <div className="py-5 text-sm text-muted-foreground text-center">
+                                                    Type to search...
+                                                </div>
+                                            ) : (
+                                                <CommandEmpty>
+                                                    {isKeypointLoading ? (
+                                                        <div className="flex items-center justify-center p-2">
+                                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                            Loading...
+                                                        </div>
+                                                    ) : (
+                                                        <div className="p-2 text-muted-foreground text-center">
+                                                            No keypoint found
+                                                        </div>
+                                                    )}
+                                                </CommandEmpty>
+                                            )}
+                                            <CommandGroup className="max-h-[200px] overflow-y-auto">
+                                                <CommandItem
+                                                    value="none"
+                                                    onSelect={() => {
+                                                        setTempSelectedKeypoint(null)
+                                                        setKeypointOpen(false)
+                                                    }}
+                                                    disabled={tempSelectedFeeder === null} // Disable if no feeder is selected
+                                                >
+                                                    <Check
+                                                        className={cn(
+                                                            "mr-2 h-4 w-4",
+                                                            tempSelectedKeypoint === null
+                                                                ? "opacity-100"
+                                                                : "opacity-0"
+                                                        )}
+                                                    />
+                                                    None
+                                                </CommandItem>
+                                                {keypointsList.map((keypoint) => (
+                                                    <CommandItem
+                                                        key={keypoint.id}
+                                                        value={keypoint.name}
+                                                        onSelect={() => {
+                                                            setTempSelectedKeypoint(keypoint.id)
+                                                            setKeypointOpen(false)
+                                                        }}
+                                                        disabled={tempSelectedFeeder === null} // Disable if no feeder is selected
+                                                    >
+                                                        <Check
+                                                            className={cn(
+                                                                "mr-2 h-4 w-4",
+                                                                tempSelectedKeypoint === keypoint.id
+                                                                    ? "opacity-100"
+                                                                    : "opacity-0"
+                                                            )}
+                                                        />
+                                                        {keypoint.name}
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+
+                        <div className="flex items-center gap-2">
                             <Button
                                 size="sm"
-                                variant="default" // ubah agar tidak terlihat seperti disabled
+                                variant="default"
+                                onClick={handleApplyFilter}
+                            >
+                                Search
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="outline"
                                 onClick={() => {
                                     setVisible({ GI: true, REC: true, LBS: true, GH: true })
+                                    setTempSelectedFeeder(null)
+                                    setTempSelectedKeypoint(null)
+                                    setAppliedFeeder(null)
+                                    setAppliedKeypoint(null)
                                 }}
                             >
                                 Reset filter
