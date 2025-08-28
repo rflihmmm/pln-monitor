@@ -39,6 +39,6 @@ class GarduInduk extends Model
      */
     public function getKeypointNameAttribute()
     {
-        return optional($this->stationPointSkada)->NAME;
+        return optional($this->keypoint)->NAME;
     }
 }

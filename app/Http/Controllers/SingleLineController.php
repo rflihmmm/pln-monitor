@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use App\Models\OrganizationKeypoint;
+use App\Models\FeederKeypoint; // Added this line
 use App\Http\Controllers\Traits\HasOrganizationHierarchy;
 
 class SingleLineController extends Controller
@@ -288,6 +289,43 @@ class SingleLineController extends Controller
             }
         }
 
+        // 5. Get feeder data for non-GI keypoints
+        $nonGiKeypointIds = $allKeypointData->where('source', 'keypoint_ext')->pluck('keypoint_id');
+
+        $feederKeypointsNonGi = collect();
+        $feedersNonGi = collect();
+        $analogPointsForNonGiFeeders = collect();
+
+        if ($nonGiKeypointIds->isNotEmpty()) {
+            $feederKeypointsNonGi = FeederKeypoint::whereIn('keypoint_id', $nonGiKeypointIds)
+                ->get(['keypoint_id', 'feeder_id'])
+                ->groupBy('keypoint_id');
+
+            $feederIdsNonGi = $feederKeypointsNonGi->flatten()->pluck('feeder_id')->unique();
+
+            if ($feederIdsNonGi->isNotEmpty()) {
+                $feedersNonGi = Feeder::whereIn('id', $feederIdsNonGi)
+                    ->with(['statusPoints:id,feeder_id,status_id,type'])
+                    ->get(['id', 'name'])
+                    ->keyBy('id');
+
+                $allFeederStatusIdsNonGi = collect();
+                foreach ($feedersNonGi as $feeder) {
+                    $allFeederStatusIdsNonGi = $allFeederStatusIdsNonGi->concat($feeder->statusPoints->pluck('status_id'));
+                }
+                $allFeederStatusIdsNonGi = $allFeederStatusIdsNonGi->unique()->filter();
+
+                if ($allFeederStatusIdsNonGi->isNotEmpty()) {
+                    $analogPointsForNonGiFeeders = DB::connection('sqlsrv_main')
+                        ->table('ANALOGPOINTS')
+                        ->whereIn('PKEY', $allFeederStatusIdsNonGi)
+                        ->select('PKEY', 'VALUE', 'UPDATETIME')
+                        ->get()
+                        ->keyBy('PKEY');
+                }
+            }
+        }
+
         return [
             'keypoint_data' => $allKeypointData,
             'station_points' => $stationPoints,
@@ -295,6 +333,9 @@ class SingleLineController extends Controller
             'analog_points_non_gi' => $analogPointsNonGi,
             'gardu_induks' => $garduInduks,
             'analog_points_for_gis' => $analogPointsForGis,
+            'feeder_keypoints_non_gi' => $feederKeypointsNonGi,
+            'feeders_non_gi' => $feedersNonGi,
+            'analog_points_for_non_gi_feeders' => $analogPointsForNonGiFeeders,
         ];
     }
 
@@ -340,6 +381,14 @@ class SingleLineController extends Controller
                     $keypointId,
                     $preloadedData['gardu_induks'],
                     $preloadedData['analog_points_for_gis']
+                );
+            } else {
+                // For non-GI keypoints, check if they are related to any feeders via FeederKeypoint
+                $feederData = $this->getFeederDataForNonGiKeypointOptimized(
+                    $keypointId,
+                    $preloadedData['feeder_keypoints_non_gi'],
+                    $preloadedData['feeders_non_gi'],
+                    $preloadedData['analog_points_for_non_gi_feeders']
                 );
             }
 
@@ -495,6 +544,55 @@ class SingleLineController extends Controller
             return empty($feederData) ? null : $feederData;
         } catch (\Exception $e) {
             Log::error('Error getting feeder data for keypoint ' . $keypointId . ': ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Optimized feeder data retrieval for non-GI keypoints
+     */
+    private function getFeederDataForNonGiKeypointOptimized($keypointId, $feederKeypointsNonGi, $feedersNonGi, $analogPointsForNonGiFeeders)
+    {
+        try {
+            if (!$keypointId || !$feederKeypointsNonGi->has($keypointId)) {
+                return null;
+            }
+
+            $relatedFeederKeypoints = $feederKeypointsNonGi->get($keypointId);
+            $feederData = [];
+
+            foreach ($relatedFeederKeypoints as $feederKeypoint) {
+                $feeder = $feedersNonGi->get($feederKeypoint->feeder_id);
+
+                if (!$feeder || $feeder->statusPoints->isEmpty()) {
+                    continue;
+                }
+
+                $feederLoadIs = 0;
+                $feederLoadMw = 0;
+
+                foreach ($feeder->statusPoints as $statusPoint) {
+                    $analogPoint = $analogPointsForNonGiFeeders->get($statusPoint->status_id);
+                    if ($analogPoint && is_numeric($analogPoint->VALUE)) {
+                        if ($statusPoint->type === 'AMP') {
+                            $feederLoadIs += floatval($analogPoint->VALUE);
+                        } elseif ($statusPoint->type === 'MW') {
+                            $feederLoadMw += floatval($analogPoint->VALUE);
+                        }
+                    }
+                }
+
+                $feederData[] = [
+                    'id' => $feeder->id,
+                    'name' => $feeder->name,
+                    'load-is' => round($feederLoadIs, 2) . ' A',
+                    'load-mw' => round($feederLoadMw, 2) . ' MW',
+                ];
+            }
+
+            return empty($feederData) ? null : $feederData;
+        } catch (\Exception $e) {
+            Log::error('Error getting feeder data for non-GI keypoint ' . $keypointId . ': ' . $e->getMessage());
             return null;
         }
     }

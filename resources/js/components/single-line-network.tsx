@@ -104,9 +104,12 @@ export function SingleLineNetwork() {
     const recIconUrl =
         "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgY2xhc3M9Imx1Y2lkZSBsdWNpZGUtY2lyY2xlIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIgZmlsbD0iIzNiODJmNiIvPjwvc3ZnPg=="
     const lbsIconUrl =
-        "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgY2xhc3M9Imx1Y2lkZSBsdWNpZGUtY2lyY2xlIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIgZmlsbD0iI2VmNDQ0NCIvPjwvc3ZnPg=="
+        "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgY2xhc3M9Imx1Y2lkZSBsdWNpZGUtY2lyY2xlIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIgZmlsbD0iIzc1MzU5OSIvPjwvc3ZnPg=="
+
     const ghIconUrl =
         "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgY2xhc3M9Imx1Y2lkZSBsdWNpZGUtY2lyY2xlIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIgZmlsbD0iI2Y5NzMxNiIvPjwvc3ZnPg=="
+    const inactiveIconUrl =
+        "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgY2xhc3M9Imx1Y2lkZSBsdWNpZGUtY2lyY2xlIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIgZmlsbD0iI2VmNDQ0NCIvPjwvc3ZnPg=="
 
     // Hitung ukuran ikon mengikuti zoom:
     // - Saat zoom out (z kecil), ukuran minimum 12px agar tidak terlihat membesar relatif peta
@@ -120,25 +123,31 @@ export function SingleLineNetwork() {
     }
 
     const buildIcon = useCallback(
-        (type: NodeType, z: number) => {
+        (node: NodeItem, z: number) => {
             const s = sizeForZoom(z)
             let iconUrl: string
-            switch (type) {
-                case "GI":
-                    iconUrl = giIconUrl
-                    break
-                case "REC":
-                    iconUrl = recIconUrl
-                    break
-                case "LBS":
-                    iconUrl = lbsIconUrl
-                    break
-                case "GH":
-                    iconUrl = ghIconUrl
-                    break
-                default:
-                    iconUrl = giIconUrl // Fallback
+
+            if (node.status === "inactive") {
+                iconUrl = inactiveIconUrl
+            } else {
+                switch (node.type) {
+                    case "GI":
+                        iconUrl = giIconUrl
+                        break
+                    case "REC":
+                        iconUrl = recIconUrl
+                        break
+                    case "LBS":
+                        iconUrl = lbsIconUrl
+                        break
+                    case "GH":
+                        iconUrl = ghIconUrl
+                        break
+                    default:
+                        iconUrl = giIconUrl // Fallback
+                }
             }
+
             return new L.Icon({
                 iconUrl: iconUrl,
                 iconSize: [s, s],
@@ -146,7 +155,7 @@ export function SingleLineNetwork() {
                 popupAnchor: [0, -s / 2],
             })
         },
-        [giIconUrl, recIconUrl, lbsIconUrl, ghIconUrl]
+        [giIconUrl, recIconUrl, lbsIconUrl, ghIconUrl, inactiveIconUrl]
     )
 
     const [visible, setVisible] = useState<Visibility>({ GI: true, REC: true, LBS: true, GH: true })
@@ -271,7 +280,7 @@ export function SingleLineNetwork() {
                         <Marker
                             key={n.id}
                             position={n.coordinate}
-                            icon={buildIcon(n.type, zoom)}
+                            icon={buildIcon(n, zoom)}
                             ref={registerMarkerRef(n.code)}
                         >
                             <Popup>
@@ -372,7 +381,7 @@ export function SingleLineNetwork() {
 
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <span className="inline-block size-2 rounded-full bg-red-500" />
+                                    <span className="inline-block size-2 rounded-full bg-violet-500" />
                                     <Label htmlFor="lbs">LBS</Label>
                                 </div>
                                 <Switch
