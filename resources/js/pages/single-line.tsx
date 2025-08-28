@@ -17,7 +17,7 @@ export default function TableMonitor() {
             <main className="flex min-h-screen flex-col items-center justify-between p-4">
                 <div className="w-full max-w-7xl">
 
-                    <div className="w-full rounded-lg border bg-white p-2 shadow-sm">
+                    <div className="w-full rounded-lg border bg-white p-2 shadow-sm overflow-hidden">
 
 
                         <SingleLineNetwork />

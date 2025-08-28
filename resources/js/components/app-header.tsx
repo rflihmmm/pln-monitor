@@ -15,7 +15,6 @@ import { Link, usePage } from '@inertiajs/react';
 import { Bell, ChevronsUpDown, Database, LayoutGrid, Menu, Spline, Table2, User, UtilityPole, Cable, Map, Group } from 'lucide-react';
 import { useState } from 'react';
 import AppLogo from './app-logo';
-import AppLogoIcon from './app-logo-icon';
 
 interface ExtendedNavItem extends NavItem {
     children?: NavItem[];
@@ -118,7 +117,7 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                                     <Menu className="h-5 w-5" />
                                 </Button>
                             </SheetTrigger>
-                            <SheetContent side="left" className="bg-sidebar flex h-full w-64 flex-col items-stretch justify-between">
+                            <SheetContent side="left" className="bg-sidebar flex h-full w-64 flex-col items-stretch justify-between z-[9999]">
                                 <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
                                 <SheetHeader className="mt-3 flex h-32 justify-start text-left">
                                     <AppLogo />

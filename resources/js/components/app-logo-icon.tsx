@@ -7,7 +7,7 @@ interface AppLogoIconProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'sr
 export default function AppLogoIcon({ alt = "App Logo", ...props }: AppLogoIconProps) {
     return (
         <img
-            src="/favicon.png"
+            src="/logo.png"
             alt={alt}
             {...props}
         />
