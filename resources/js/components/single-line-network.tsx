@@ -325,23 +325,11 @@ export function SingleLineNetwork() {
             const typeVisible = visible[n.type]
             const feederMatch = appliedFeeder === null || n.feeder?.some(f => f.id === appliedFeeder)
 
-            let keypointMatch = true; // Assume true if no keypoint is applied
+            let keypointMatch = true // Assume true if no keypoint is applied
 
             if (appliedKeypoint !== null) {
-                const selectedKeypointData = keypointsList.find(k => k.id === appliedKeypoint);
-                if (selectedKeypointData) {
-                    // Match node name with selected keypoint name
-                    keypointMatch = n.name === selectedKeypointData.name;
-
-                    // If a feeder is also selected, ensure the selected keypoint belongs to that feeder
-                    if (keypointMatch && appliedFeeder !== null) {
-                        keypointMatch = selectedKeypointData.feeder === appliedFeeder;
-                    }
-                } else {
-                    // If the selected keypoint is not found in the list (e.g., stale data),
-                    // then it shouldn't match.
-                    keypointMatch = false;
-                }
+                // Per user feedback, the keypoint ID from the dropdown is the same as the node's 'code'.
+                keypointMatch = n.code === appliedKeypoint
             }
 
             return typeVisible && feederMatch && keypointMatch
@@ -349,21 +337,59 @@ export function SingleLineNetwork() {
     }, [data, visible, appliedFeeder, appliedKeypoint, keypointsList])
 
     const lines = useMemo(() => {
-        if (!data) return []
+        // When a keypoint is selected, hide all lines.
+        if (appliedKeypoint !== null) {
+            return []
+        }
+
+        // If no data or filtered nodes, no lines.
+        if (!filteredNodes) return []
+
         const ls: { parent: NodeItem; child: NodeItem; color: string; weight: number }[] = []
-        for (const node of data) {
-            if (node.parent == null) continue
-            const parent = byCode.get(node.parent)
-            if (!parent) continue
-            // Hanya gambar garis jika kedua tipe terlihat
-            if (!visible[parent.type] || !visible[node.type]) continue
-            const isGiRec = parent.type === "GI" && node.type === "REC"
-            const color = isGiRec ? "#ef4444" : "#10b981"
-            const weight = isGiRec ? 4 : 3
-            ls.push({ parent, child: node, color, weight })
+
+        // Create a set of codes from the filtered nodes for efficient lookup.
+        const filteredNodeCodes = new Set(filteredNodes.map((n) => n.code))
+
+        // Iterate over the currently visible (filtered) nodes.
+        for (const node of filteredNodes) {
+            // If a node has a parent, and that parent is also in the visible set, draw a line.
+            if (node.parent !== null && filteredNodeCodes.has(node.parent)) {
+                const parent = byCode.get(node.parent)
+                if (parent) {
+                    // Ensure parent exists in the main data map
+                    const isGiRec = parent.type === "GI" && node.type === "REC"
+                    const color = isGiRec ? "#ef4444" : "#10b981"
+                    const weight = isGiRec ? 4 : 3
+                    ls.push({ parent, child: node, color, weight })
+                }
+            }
         }
         return ls
-    }, [data, byCode, visible])
+    }, [byCode, filteredNodes, appliedKeypoint])
+
+    // Effect to open popup when a keypoint is filtered
+    useEffect(() => {
+        if (appliedKeypoint !== null) {
+            // Find the target node directly using the appliedKeypoint (which is the node's code)
+            const targetNode = filteredNodes.find((n) => n.code === appliedKeypoint)
+
+            if (targetNode) {
+                const marker = markerRefs.current.get(targetNode.code)
+                const map = mapRef.current
+
+                if (marker && map) {
+                    map.flyTo(targetNode.coordinate, 16, { animate: true, duration: 1 })
+
+                    // Use a timeout to ensure the popup opens after the map pans
+                    const timer = setTimeout(() => {
+                        marker.openPopup()
+                    }, 1000) // Adjust delay as needed
+
+                    return () => clearTimeout(timer)
+                }
+            }
+        }
+    }, [appliedKeypoint, filteredNodes])
 
     if (loading) {
         return (
