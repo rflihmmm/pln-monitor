@@ -27,10 +27,11 @@ class FeederController extends Controller
 
         if ($search) {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'LIKE', "%$search%")
-                    ->orWhere('description', 'LIKE', "%$search%");
+                $q->whereRaw('LOWER(name) LIKE ?', ['%' . strtolower($search) . '%'])
+                    ->orWhereRaw('LOWER(description) LIKE ?', ['%' . strtolower($search) . '%']);
             });
         }
+
         if ($substation && $substation !== 'all') {
             $query->where('gardu_induk_id', $substation);
         }

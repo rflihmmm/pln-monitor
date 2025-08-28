@@ -80,7 +80,7 @@ class DropDownData extends Controller
         }
 
         if ($search) {
-            $query->where('name', 'LIKE', '%' . $search . '%');
+            $query->whereRaw('LOWER(name) LIKE ?', ['%' . strtolower($search) . '%']);
         }
 
         return response()->json(
@@ -118,7 +118,7 @@ class DropDownData extends Controller
         }
 
         if ($search) {
-            $query->where('name', 'LIKE', '%' . $search . '%');
+            $query->whereRaw('LOWER(name) LIKE ?', ['%' . strtolower($search) . '%']);
         }
 
         return response()->json(
