@@ -29,6 +29,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Check, ChevronsUpDown, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import MapFilter from "@/components/map-filter"
 
 type DropdownBase = {
     id: number
@@ -178,6 +179,7 @@ export function SingleLineNetwork() {
     )
 
     const [visible, setVisible] = useState<Visibility>({ GI: true, REC: true, LBS: true, GH: true })
+    const [statusFilter, setStatusFilter] = useState<'Active' | 'Inactive' | 'ALL'>('ALL');
 
     // State for new filters
     // State for selected values in dropdowns (not yet applied)
@@ -332,9 +334,14 @@ export function SingleLineNetwork() {
                 keypointMatch = n.code === appliedKeypoint
             }
 
-            return typeVisible && feederMatch && keypointMatch
+            const statusMatch =
+                statusFilter === 'ALL' ||
+                (statusFilter === 'Active' && n.status === 'active') ||
+                (statusFilter === 'Inactive' && n.status === 'inactive');
+
+            return typeVisible && feederMatch && keypointMatch && statusMatch
         })
-    }, [data, visible, appliedFeeder, appliedKeypoint, keypointsList])
+    }, [data, visible, appliedFeeder, appliedKeypoint, keypointsList, statusFilter])
 
     const lines = useMemo(() => {
         // When a keypoint is selected, hide all lines.
@@ -419,6 +426,9 @@ export function SingleLineNetwork() {
     return (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_360px]">
             <div className="relative h-[600px]">
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000]">
+                    <MapFilter currentFilter={statusFilter} onFilterChange={setStatusFilter} />
+                </div>
                 <MapContainer
                     center={defaultCenter}
                     zoom={7}
@@ -798,6 +808,7 @@ export function SingleLineNetwork() {
                                     setTempSelectedKeypoint(null)
                                     setAppliedFeeder(null)
                                     setAppliedKeypoint(null)
+                                    setStatusFilter('ALL')
                                 }}
                             >
                                 Reset filter
