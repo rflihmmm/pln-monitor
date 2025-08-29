@@ -22,22 +22,22 @@ interface KeypointData {
     id: string;
     garduInduk: string;
     feeder: string;
-    pmt1: string | null;
-    amp: string | null;
-    mw: string | null;
+    pmt1: [string, string] | null; // Changed to array
+    amp: [string, string] | null; // Changed to array
+    mw: [string, string] | null; // Changed to array
     keypoint: string;
     pmt2: { CB: string | null; LR: string | null };
     hotlineTag: string | null;
-    ir: number | null;
-    is: number | null;
-    it: number | null;
-    ifR: number | null;
-    ifS: number | null;
-    ifT: number | null;
-    ifN: number | null;
-    kvAB: number | null;
-    kvBC: number | null;
-    kvAC: number | null;
+    iR: [string, string] | null; // Changed to array
+    iS: [string, string] | null; // Changed to array
+    iT: [string, string] | null; // Changed to array
+    iFR: [string, string] | null; // Changed to array
+    iFS: [string, string] | null; // Changed to array
+    iFT: [string, string] | null; // Changed to array
+    iFN: [string, string] | null; // Changed to array
+    kVAB: [string, string] | null; // Changed to array
+    kVBC: [string, string] | null; // Changed to array
+    kVAC: [string, string] | null; // Changed to array
 }
 
 export default function TableHMI() {
@@ -147,7 +147,7 @@ export default function TableHMI() {
     };
 
     // Helper function to render PMT1 status
-    const renderPmt1Status = (value: string | null) => {
+    const renderPmt1Status = (value: [string, string] | null) => {
         if (value === null) return null;
 
         return (
@@ -155,7 +155,7 @@ export default function TableHMI() {
                 <Circle
                     className={cn(
                         "h-4 w-4",
-                        value === "1" ? "fill-red-500 text-green-500" : "text-green-500"
+                        value[0] === "1" ? "fill-red-500 text-green-500" : "text-green-500"
                     )}
                 />
             </div>
@@ -181,16 +181,29 @@ export default function TableHMI() {
                 ) : (
                     <span className="text-blue-600 font-medium">R</span>
                 )}
+            </div>
+        );
+    };
 
+    const formatValue = (value: [string, string] | string | null, decimals: number = 2): string => {
+        if (value === null) return '-';
+        if (Array.isArray(value)) {
+            return Number(value[0]).toFixed(decimals);
+        }
+        return Number(value).toFixed(decimals);
+    };
+
+    const renderArrayAnalogValue = (values: [string, string] | null | undefined) => {
+        if (values === null || values === undefined) return null;
+        return (
+            <div className="flex items-center justify-center">
+                {formatValue(values[0])} {values[1] === "1" ? 'F' : ''}
             </div>
         );
     };
 
     // Helper function to format numeric values
-    const formatValue = (value: number | null | string, decimals: number = 2): string => {
-        if (value === null) return '-';
-        return Number(value).toFixed(decimals);
-    };
+
 
     if (isLoading) {
         return (
@@ -299,7 +312,7 @@ export default function TableHMI() {
                                             className="border border-gray-300 p-2 text-center align-middle"
                                             rowSpan={calculateRowSpan(paginatedData, rowIndex, 'feeder')}
                                         >
-                                            {formatValue(row.amp)}
+                                            {renderArrayAnalogValue(row.amp)}
                                         </td>
                                     )}
 
@@ -309,7 +322,7 @@ export default function TableHMI() {
                                             className="border border-gray-300 p-2 text-center align-middle"
                                             rowSpan={calculateRowSpan(paginatedData, rowIndex, 'feeder')}
                                         >
-                                            {formatValue(row.mw)}
+                                            {renderArrayAnalogValue(row.mw)}
                                         </td>
                                     )}
 
@@ -325,8 +338,8 @@ export default function TableHMI() {
 
                                     {/* HOTLINE TAG */}
                                     <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {row.hotlineTag === "0" && <Badge variant="destructive">ON</Badge>}
-                                        {row.hotlineTag === "1" && (
+                                        {row.hotlineTag === "1" && <Badge variant="destructive">ON</Badge>}
+                                        {row.hotlineTag === "0" && (
                                             <Badge variant="outline" className="bg-green-100 text-green-800">
                                                 OFF
                                             </Badge>
@@ -336,52 +349,52 @@ export default function TableHMI() {
 
                                     {/* IR */}
                                     <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {formatValue(row.ir)}
+                                        {renderArrayAnalogValue(row.iR)}
                                     </td>
 
                                     {/* IS */}
                                     <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {formatValue(row.is)}
+                                        {renderArrayAnalogValue(row.iS)}
                                     </td>
 
                                     {/* IT */}
                                     <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {formatValue(row.it)}
+                                        {renderArrayAnalogValue(row.iT)}
                                     </td>
 
                                     {/* IF-R */}
                                     <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {formatValue(row.ifR)}
+                                        {renderArrayAnalogValue(row.iFR)}
                                     </td>
 
                                     {/* IF-S */}
                                     <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {formatValue(row.ifS)}
+                                        {renderArrayAnalogValue(row.iFS)}
                                     </td>
 
                                     {/* IF-T */}
                                     <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {formatValue(row.ifT)}
+                                        {renderArrayAnalogValue(row.iFT)}
                                     </td>
 
                                     {/* IF-N */}
                                     <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {formatValue(row.ifN)}
+                                        {renderArrayAnalogValue(row.iFN)}
                                     </td>
 
                                     {/* KV-AB */}
                                     <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {formatValue(row.kvAB)}
+                                        {renderArrayAnalogValue(row.kVAB)}
                                     </td>
 
                                     {/* KV BC */}
                                     <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {formatValue(row.kvBC)}
+                                        {renderArrayAnalogValue(row.kVBC)}
                                     </td>
 
                                     {/* KV AC */}
                                     <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {formatValue(row.kvAC)}
+                                        {renderArrayAnalogValue(row.kVAC)}
                                     </td>
 
                                 </tr>
