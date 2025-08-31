@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Gauge, Zap, Loader2, AlertCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -9,24 +10,25 @@ interface RegionData {
     name: string;
     power: string;
     current: string;
+    source: string; // Added source property
+}
+
+interface TotalData {
+    power: string;
+    current: string;
+    source: string; // Added source property
 }
 
 interface SystemData {
     name: string;
     regions: RegionData[];
-    total: {
-        power: string;
-        current: string;
-    };
+    total: TotalData[]; // Changed to array of TotalData
 }
 
 interface ApiResponse {
     success: boolean;
     data: SystemData[];
-    grandTotal: {
-        power: string;
-        current: string;
-    };
+    grandTotal: TotalData[]; // Changed to array of TotalData
     message?: string;
     error?: string;
 }
@@ -34,7 +36,8 @@ interface ApiResponse {
 export default function LoadData() {
     const [systemsData, setSystemsData] = useState<SystemData[]>([]);
     const [selectedSystem, setSelectedSystem] = useState<string>('');
-    const [grandTotal, setGrandTotal] = useState({ power: '0.00 MW', current: '0.00 A' });
+    const [selectedSource, setSelectedSource] = useState<string>('by LBS'); // New state for tab selection
+    const [grandTotal, setGrandTotal] = useState<TotalData[]>([]); // Updated to array
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -50,7 +53,7 @@ export default function LoadData() {
 
                 if (result.success && result.data) {
                     setSystemsData(result.data);
-                    setGrandTotal(result.grandTotal || { power: '0.00 MW', current: '0.00 A' });
+                    setGrandTotal(result.grandTotal || []); // Set grandTotal as array
 
                     // Set default selected system to first system if none selected
                     if (result.data.length > 0 && !selectedSystem) {
@@ -76,6 +79,12 @@ export default function LoadData() {
     }, [selectedSystem]);
 
     const currentSystem = systemsData.find((system) => system.name === selectedSystem) || systemsData[0];
+
+    // Filter regions and total based on selectedSource
+    const filteredRegions = currentSystem?.regions.filter(region => region.source === selectedSource) || [];
+    const filteredTotal = currentSystem?.total.find(total => total.source === selectedSource);
+    const filteredGrandTotal = grandTotal.find(total => total.source === selectedSource);
+
 
     if (loading) {
         return (
@@ -137,6 +146,18 @@ export default function LoadData() {
                         </SelectContent>
                     </Select>
                 </div>
+                <Tabs value={selectedSource} onValueChange={setSelectedSource} className="mt-4">
+                    <TabsList>
+                        <TabsTrigger value="by LBS">by LBS</TabsTrigger>
+                        <TabsTrigger value="by Feeder">by Feeder</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="by LBS">
+                        {/* Content for by LBS tab */}
+                    </TabsContent>
+                    <TabsContent value="by Feeder">
+                        {/* Content for by Feeder tab */}
+                    </TabsContent>
+                </Tabs>
             </CardHeader>
             <CardContent>
                 {currentSystem && (
@@ -150,20 +171,22 @@ export default function LoadData() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {currentSystem.regions.map((region) => (
+                                {filteredRegions.map((region) => (
                                     <TableRow key={region.name}>
                                         <TableCell>{region.name}</TableCell>
                                         <TableCell className="text-right font-medium">{region.power}</TableCell>
                                         <TableCell className="text-right">{region.current}</TableCell>
                                     </TableRow>
                                 ))}
-                                <TableRow className="bg-muted/50">
-                                    <TableCell className="font-bold">
-                                        Total {currentSystem.name.split(' ').pop()}
-                                    </TableCell>
-                                    <TableCell className="text-right font-bold">{currentSystem.total.power}</TableCell>
-                                    <TableCell className="text-right font-bold">{currentSystem.total.current}</TableCell>
-                                </TableRow>
+                                {filteredTotal && (
+                                    <TableRow className="bg-muted/50">
+                                        <TableCell className="font-bold">
+                                            Total {currentSystem.name.split(' ').pop()}
+                                        </TableCell>
+                                        <TableCell className="text-right font-bold">{filteredTotal.power}</TableCell>
+                                        <TableCell className="text-right font-bold">{filteredTotal.current}</TableCell>
+                                    </TableRow>
+                                )}
                             </TableBody>
                         </Table>
 
@@ -174,12 +197,12 @@ export default function LoadData() {
                                     <span className="font-bold">Total SulSelBar</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xl font-bold">{grandTotal.power}</span>
+                                    <span className="text-xl font-bold">{filteredGrandTotal?.power || '0.00 MW'}</span>
                                     <Gauge className="text-primary h-5 w-5" />
                                 </div>
                             </div>
                             <div className="mt-2 text-sm text-muted-foreground">
-                                Total Current: {grandTotal.current}
+                                Total Current: {filteredGrandTotal?.current || '0.00 A'}
                             </div>
                         </div>
                     </>

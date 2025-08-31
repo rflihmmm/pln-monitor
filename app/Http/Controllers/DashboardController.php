@@ -6,6 +6,7 @@ use App\Models\Feeder;
 use App\Models\GarduInduk;
 use App\Models\Organization;
 use Illuminate\Http\Request;
+use App\Models\FeederKeypoint;
 use App\Models\AnalogPointSkada;
 use App\Models\StatusPointSkada;
 use App\Models\FeederStatusPoint;
@@ -261,8 +262,14 @@ class DashboardController extends Controller
     public function getSystemLoadData()
     {
         try {
-            // STEP 1: Get the organizational hierarchy and all associated keypoint IDs from PostgreSQL.
-            $orgStructureWithKeypoints = DB::connection('pgsql')
+            // Get all organization IDs for the entire system
+            $allOrganizationIds = Organization::pluck('id')->all();
+
+            // Get calculated loads for LBS and Feeders
+            $allLoads = $this->calculateAllSystemLoads($allOrganizationIds);
+
+            // Get the organizational structure for aggregation
+            $orgStructure = DB::connection('pgsql')
                 ->table('organization as dcc')
                 ->join('organization as up3', 'up3.parent_id', '=', 'dcc.id')
                 ->join('organization as ulp', 'ulp.parent_id', '=', 'up3.id')
@@ -270,145 +277,16 @@ class DashboardController extends Controller
                 ->where('dcc.level', 1)
                 ->where('up3.level', 2)
                 ->where('ulp.level', 3)
-                ->select(
-                    'dcc.id as dcc_id',
-                    'dcc.name as dcc_name',
-                    'up3.id as up3_id',
-                    'up3.name as up3_name',
-                    'okp.keypoint_id'
-                )
+                ->select('dcc.name as dcc_name', 'up3.id as up3_id', 'up3.name as up3_name', 'okp.keypoint_id')
                 ->get();
 
-            if ($orgStructureWithKeypoints->isEmpty()) {
-                return response()->json([
-                    'success' => true,
-                    'data' => [],
-                    'grandTotal' => ['power' => '0.00 MW', 'current' => '0.00 A']
-                ]);
-            }
-
-            $keypointIds = $orgStructureWithKeypoints->pluck('keypoint_id')->unique()->filter()->all();
-
-            // STEP 2: Get analog data for load calculation from SQL Server
-            // Get IR, IS, IT for current calculation and KV-AB, KV-BC, KV-AC for voltage calculation
-            $analogData = DB::connection('sqlsrv_main')
-                ->table('ANALOGPOINTS as ap')
-                ->join('STATIONPOINTS as sp', 'ap.STATIONPID', '=', 'sp.PKEY')
-                ->whereIn('ap.STATIONPID', $keypointIds)
-                ->whereIn('ap.NAME', ['IR', 'IS', 'IT', 'KV-AB', 'KV-BC', 'KV-AC'])
-                ->where('sp.NAME', 'LIKE', 'LBS-%') // Filter by keypoint name
-                ->select('ap.STATIONPID', 'ap.NAME', 'ap.VALUE')
-                ->get();
-
-            // Create analog value map grouped by keypoint and parameter name
-            $analogValueMap = [];
-            foreach ($analogData as $point) {
-                $keypointId = $point->STATIONPID;
-                $paramName = $point->NAME;
-                $value = (float)$point->VALUE;
-
-                if (!isset($analogValueMap[$keypointId])) {
-                    $analogValueMap[$keypointId] = [
-                        'current' => ['IR' => 0, 'IS' => 0, 'IT' => 0],
-                        'voltage' => ['KV-AB' => 0, 'KV-BC' => 0, 'KV-AC' => 0]
-                    ];
-                }
-
-                if (in_array($paramName, ['IR', 'IS', 'IT'])) {
-                    $analogValueMap[$keypointId]['current'][$paramName] = $value;
-                } elseif (in_array($paramName, ['KV-AB', 'KV-BC', 'KV-AC'])) {
-                    $analogValueMap[$keypointId]['voltage'][$paramName] = $value;
-                }
-            }
-
-            // STEP 3: Calculate load-is and load-mw for each keypoint
-            $processedValues = [];
-            foreach ($analogValueMap as $keypointId => $data) {
-                // Calculate load-is: average of IR, IS, IT
-                $currentValues = array_values($data['current']);
-                $currentCount = count(array_filter($currentValues, function ($val) {
-                    return $val > 0;
-                }));
-                $loadIs = $currentCount > 0 ? array_sum($currentValues) / $currentCount : 0;
-
-                // Calculate load-mw: average of KV-AB, KV-BC, KV-AC multiplied by load-is
-                $voltageValues = array_values($data['voltage']);
-                $voltageCount = count(array_filter($voltageValues, function ($val) {
-                    return $val > 0;
-                }));
-                $avgVoltage = $voltageCount > 0 ? array_sum($voltageValues) / $voltageCount : 0;
-
-                // Convert to MW: (voltage_kV * current_A) / 1000 = MW
-                $loadMw = ($avgVoltage * $loadIs) / 1000;
-
-                $processedValues[$keypointId] = [
-                    'power' => $loadMw,
-                    'current' => $loadIs
-                ];
-            }
-
-            // STEP 4: Process and aggregate the data
-            $aggregatedData = [];
-            foreach ($orgStructureWithKeypoints as $orgLink) {
-                $values = $processedValues[$orgLink->keypoint_id] ?? ['power' => 0, 'current' => 0];
-                $dccName = $orgLink->dcc_name;
-                $up3Id = $orgLink->up3_id;
-
-                if (!isset($aggregatedData[$dccName])) {
-                    $aggregatedData[$dccName] = [];
-                }
-                if (!isset($aggregatedData[$dccName][$up3Id])) {
-                    $aggregatedData[$dccName][$up3Id] = [
-                        'name' => $orgLink->up3_name,
-                        'power' => 0,
-                        'current' => 0
-                    ];
-                }
-
-                $aggregatedData[$dccName][$up3Id]['power'] += $values['power'];
-                $aggregatedData[$dccName][$up3Id]['current'] += $values['current'];
-            }
-
-            // STEP 5: Format the final response
-            $systemLoadData = [];
-            $grandTotalPower = 0;
-            $grandTotalCurrent = 0;
-
-            foreach ($aggregatedData as $dccName => $up3s) {
-                $regions = [];
-                $dccTotalPower = 0;
-                $dccTotalCurrent = 0;
-
-                foreach ($up3s as $up3) {
-                    $regions[] = [
-                        'name' => $up3['name'],
-                        'power' => number_format($up3['power'], 2) . ' MW',
-                        'current' => number_format($up3['current'], 2) . ' A'
-                    ];
-                    $dccTotalPower += $up3['power'];
-                    $dccTotalCurrent += $up3['current'];
-                }
-
-                $systemLoadData[] = [
-                    'name' => 'Beban Sistem ' . $dccName,
-                    'regions' => $regions,
-                    'total' => [
-                        'power' => number_format($dccTotalPower, 2) . ' MW',
-                        'current' => number_format($dccTotalCurrent, 2) . ' A'
-                    ]
-                ];
-
-                $grandTotalPower += $dccTotalPower;
-                $grandTotalCurrent += $dccTotalCurrent;
-            }
+            // Aggregate and format the data
+            $result = $this->aggregateAndFormatLoadData($orgStructure, $allLoads['lbs'], $allLoads['feeder']);
 
             return response()->json([
                 'success' => true,
-                'data' => $systemLoadData,
-                'grandTotal' => [
-                    'power' => number_format($grandTotalPower, 2) . ' MW',
-                    'current' => number_format($grandTotalCurrent, 2) . ' A'
-                ]
+                'data' => $result['data'],
+                'grandTotal' => $result['grandTotal']
             ]);
         } catch (\Exception $e) {
             Log::error('Error fetching system load data: ' . $e->getMessage());
@@ -488,158 +366,46 @@ class DashboardController extends Controller
         try {
             $user = $request->user();
             if (!$user || !$user->unit) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User not authenticated or no unit assigned'
-                ], 401);
+                return response()->json(['success' => false, 'message' => 'User not authenticated or no unit assigned'], 401);
             }
 
-            $userOrganizationId = $user->unit;
-
-            // 1. Cek apakah organization ID ada di table organization
-            $userOrganization = Organization::find($userOrganizationId);
+            $userOrganization = Organization::find($user->unit);
             if (!$userOrganization) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Organization not found',
-                ], 404);
+                return response()->json(['success' => false, 'message' => 'Organization not found'], 404);
             }
 
-            // 2. Dapatkan semua ID organisasi yang relevan
-            $ancestorIds = $this->getOrganizationAncestorsAndSelf($userOrganizationId);
-            $authorizedDescendantIds = $this->getAuthorizedOrganizationIds($userOrganization);
-            $organizationIds = array_unique(array_merge($ancestorIds, $authorizedDescendantIds));
-
-            if (empty($organizationIds)) {
-                return response()->json([
-                    'success' => true,
-                    'data' => [],
-                    'grandTotal' => ['power' => '0.00 MW', 'current' => '0.00 A']
-                ]);
+            // Get all organization IDs the user is authorized to see
+            $authorizedOrganizationIds = $this->getAuthorizedOrganizationIds($userOrganization);
+            if (empty($authorizedOrganizationIds)) {
+                return response()->json(['success' => true, 'data' => [], 'grandTotal' => []]);
             }
 
-            // 3. Dapatkan keypoint_ids yang authorized berdasarkan organization_keypoint
-            $authorizedKeypointIds = OrganizationKeypoint::whereIn('organization_id', $organizationIds)
-                ->pluck('keypoint_id')
-                ->unique()
-                ->filter()
-                ->values()
-                ->toArray();
+            // Get calculated loads for the authorized organizations
+            $allLoads = $this->calculateAllSystemLoads($authorizedOrganizationIds);
 
-            if (empty($authorizedKeypointIds)) {
-                return response()->json([
-                    'success' => true,
-                    'data' => [],
-                    'grandTotal' => ['power' => '0.00 MW', 'current' => '0.00 A']
-                ]);
-            }
-
-            // 4. Get analog data for load calculation from SQL Server
-            $analogData = DB::connection('sqlsrv_main')
-                ->table('ANALOGPOINTS as ap')
-                ->join('STATIONPOINTS as sp', 'ap.STATIONPID', '=', 'sp.PKEY')
-                ->whereIn('ap.STATIONPID', $authorizedKeypointIds)
-                ->whereIn('ap.NAME', ['IR', 'IS', 'IT', 'KV-AB', 'KV-BC', 'KV-AC'])
-                ->where('sp.NAME', 'LIKE', 'LBS-%') // Filter by keypoint name
-                ->select('ap.STATIONPID', 'ap.NAME', 'ap.VALUE')
+            // Get the organizational structure filtered for the authorized entities
+            $orgStructure = DB::connection('pgsql')
+                ->table('organization as dcc')
+                ->join('organization as up3', 'up3.parent_id', '=', 'dcc.id')
+                ->join('organization as ulp', 'ulp.parent_id', '=', 'up3.id')
+                ->join('organization_keypoint as okp', 'okp.organization_id', '=', 'ulp.id')
+                ->whereIn('okp.organization_id', $authorizedOrganizationIds)
+                ->select('dcc.name as dcc_name', 'up3.id as up3_id', 'up3.name as up3_name', 'okp.keypoint_id')
                 ->get();
 
-            // 5. Create analog value map grouped by keypoint and parameter name
-            $analogValueMap = [];
-            foreach ($analogData as $point) {
-                $keypointId = $point->STATIONPID;
-                $paramName = $point->NAME;
-                $value = (float)$point->VALUE;
-
-                if (!isset($analogValueMap[$keypointId])) {
-                    $analogValueMap[$keypointId] = [
-                        'current' => ['IR' => 0, 'IS' => 0, 'IT' => 0],
-                        'voltage' => ['KV-AB' => 0, 'KV-BC' => 0, 'KV-AC' => 0]
-                    ];
-                }
-
-                if (in_array($paramName, ['IR', 'IS', 'IT'])) {
-                    $analogValueMap[$keypointId]['current'][$paramName] = $value;
-                } elseif (in_array($paramName, ['KV-AB', 'KV-BC', 'KV-AC'])) {
-                    $analogValueMap[$keypointId]['voltage'][$paramName] = $value;
-                }
-            }
-
-            // 6. Calculate load-is and load-mw for each keypoint
-            $processedValues = [];
-            foreach ($analogValueMap as $keypointId => $data) {
-                // Calculate load-is: average of IR, IS, IT
-                $currentValues = array_values($data['current']);
-                $currentCount = count(array_filter($currentValues, function ($val) {
-                    return $val > 0;
-                }));
-                $loadIs = $currentCount > 0 ? array_sum($currentValues) / $currentCount : 0;
-
-                // Calculate load-mw: average of KV-AB, KV-BC, KV-AC multiplied by load-is
-                $voltageValues = array_values($data['voltage']);
-                $voltageCount = count(array_filter($voltageValues, function ($val) {
-                    return $val > 0;
-                }));
-                $avgVoltage = $voltageCount > 0 ? array_sum($voltageValues) / $voltageCount : 0;
-
-                // Convert to MW: (voltage_kV * current_A) / 1000 = MW
-                $loadMw = ($avgVoltage * $loadIs) / 1000;
-
-                $processedValues[$keypointId] = [
-                    'power' => $loadMw,
-                    'current' => $loadIs
-                ];
-            }
-
-            // 7. Dapatkan organization structure dengan keypoints
-            $organizationStructure = $this->buildOrganizationStructureWithKeypoints($organizationIds, $processedValues);
-
-            // 8. Aggregate data berdasarkan hierarchy
-            $systemLoadData = [];
-            $grandTotalPower = 0;
-            $grandTotalCurrent = 0;
-
-            foreach ($organizationStructure as $dccData) {
-                $regions = [];
-                $dccTotalPower = 0;
-                $dccTotalCurrent = 0;
-
-                foreach ($dccData['up3s'] as $up3Data) {
-                    $regions[] = [
-                        'name' => $up3Data['name'],
-                        'power' => number_format($up3Data['total_power'], 2) . ' MW',
-                        'current' => number_format($up3Data['total_current'], 2) . ' A'
-                    ];
-                    $dccTotalPower += $up3Data['total_power'];
-                    $dccTotalCurrent += $up3Data['total_current'];
-                }
-
-                $systemLoadData[] = [
-                    'name' => 'Beban Sistem ' . $dccData['name'],
-                    'regions' => $regions,
-                    'total' => [
-                        'power' => number_format($dccTotalPower, 2) . ' MW',
-                        'current' => number_format($dccTotalCurrent, 2) . ' A'
-                    ]
-                ];
-
-                $grandTotalPower += $dccTotalPower;
-                $grandTotalCurrent += $dccTotalCurrent;
-            }
+            // Aggregate and format the data
+            $result = $this->aggregateAndFormatLoadData($orgStructure, $allLoads['lbs'], $allLoads['feeder']);
 
             return response()->json([
                 'success' => true,
-                'data' => $systemLoadData,
-                'grandTotal' => [
-                    'power' => number_format($grandTotalPower, 2) . ' MW',
-                    'current' => number_format($grandTotalCurrent, 2) . ' A'
-                ]
+                'data' => $result['data'],
+                'grandTotal' => $result['grandTotal']
             ]);
         } catch (\Exception $e) {
             Log::error('Error fetching system load data by user: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Error fetching system load data',
+                'message' => 'Error fetching system load data for user',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -848,5 +614,257 @@ class DashboardController extends Controller
         } else {
             return $this->getSystemLoadDataByUser($request);
         }
+    }
+
+    private function calculateAllSystemLoads($organizationIds)
+    {
+        if (empty($organizationIds)) {
+            return [
+                'lbs' => [],
+                'feeder' => [],
+            ];
+        }
+
+        // --- LBS Load Calculation ---
+
+        // 1. Get authorized keypoint IDs for LBS from organization_keypoint
+        $lbsKeypointIds = OrganizationKeypoint::whereIn('organization_id', $organizationIds)
+            ->pluck('keypoint_id')
+            ->unique()
+            ->filter()
+            ->all();
+
+        $processedLbsValues = [];
+        if (!empty($lbsKeypointIds)) {
+            // 2. Get analog data for LBS keypoints
+            $analogLbsData = DB::connection('sqlsrv_main')
+                ->table('ANALOGPOINTS as ap')
+                ->join('STATIONPOINTS as sp', 'ap.STATIONPID', '=', 'sp.PKEY')
+                ->whereIn('ap.STATIONPID', $lbsKeypointIds)
+                ->whereIn('ap.NAME', ['IR', 'IS', 'IT', 'KV-AB', 'KV-BC', 'KV-AC'])
+                ->where('sp.NAME', 'LIKE', 'LBS-%')
+                ->select('ap.STATIONPID', 'ap.NAME', 'ap.VALUE')
+                ->get();
+
+            // 3. Create analog value map
+            $analogLbsValueMap = [];
+            foreach ($analogLbsData as $point) {
+                $keypointId = $point->STATIONPID;
+                $paramName = $point->NAME;
+                $value = (float)$point->VALUE;
+
+                if (!isset($analogLbsValueMap[$keypointId])) {
+                    $analogLbsValueMap[$keypointId] = [
+                        'current' => ['IR' => 0, 'IS' => 0, 'IT' => 0],
+                        'voltage' => ['KV-AB' => 0, 'KV-BC' => 0, 'KV-AC' => 0]
+                    ];
+                }
+
+                if (in_array($paramName, ['IR', 'IS', 'IT'])) {
+                    $analogLbsValueMap[$keypointId]['current'][$paramName] = $value;
+                } elseif (in_array($paramName, ['KV-AB', 'KV-BC', 'KV-AC'])) {
+                    $analogLbsValueMap[$keypointId]['voltage'][$paramName] = $value;
+                }
+            }
+
+            // 4. Calculate power and current for each LBS keypoint
+            foreach ($analogLbsValueMap as $keypointId => $data) {
+                $currentValues = array_values($data['current']);
+                $currentCount = count(array_filter($currentValues, function ($val) {
+                    return $val > 0;
+                }));
+                $loadIs = $currentCount > 0 ? array_sum($currentValues) / $currentCount : 0;
+
+                $voltageValues = array_values($data['voltage']);
+                $voltageCount = count(array_filter($voltageValues, function ($val) {
+                    return $val > 0;
+                }));
+                $avgVoltage = $voltageCount > 0 ? array_sum($voltageValues) / $voltageCount : 0;
+
+                $loadMw = ($avgVoltage * $loadIs) / 1000;
+
+                $processedLbsValues[$keypointId] = [
+                    'power' => $loadMw,
+                    'current' => $loadIs
+                ];
+            }
+        }
+
+        // --- Feeder Load Calculation ---
+        $processedFeederValues = [];
+        $authorizedKeypointIds = $lbsKeypointIds; // Use the same keypoints from LBS
+
+        if (!empty($authorizedKeypointIds)) {
+            // 1. Get Feeder -> Keypoint mappings
+            $feederKeypoints = FeederKeypoint::whereIn('keypoint_id', $authorizedKeypointIds)->get(['feeder_id', 'keypoint_id']);
+            $feederIds = $feederKeypoints->pluck('feeder_id')->unique()->all();
+
+            if (!empty($feederIds)) {
+                // 2. Get status points for these feeders
+                $feederStatusPoints = FeederStatusPoint::whereIn('feeder_id', $feederIds)
+                    ->whereIn('type', ['AMP', 'MW'])
+                    ->get();
+
+                $statusIds = $feederStatusPoints->pluck('status_id')->unique()->all();
+
+                if (!empty($statusIds)) {
+                    // 3. Fetch all analog values for these status points
+                    $analogValues = AnalogPointSkada::whereIn('PKEY', $statusIds)
+                        ->pluck('VALUE', 'PKEY');
+
+                    // 4. Calculate total load per feeder_id
+                    $feederLoads = [];
+                    foreach ($feederStatusPoints as $statusPoint) {
+                        $feederId = $statusPoint->feeder_id;
+                        if (!isset($feederLoads[$feederId])) {
+                            $feederLoads[$feederId] = ['power' => 0, 'current' => 0];
+                        }
+
+                        $value = floatval($analogValues->get($statusPoint->status_id) ?? 0);
+                        if ($statusPoint->type === 'AMP') {
+                            $feederLoads[$feederId]['current'] += $value;
+                        } elseif ($statusPoint->type === 'MW') {
+                            $feederLoads[$feederId]['power'] += $value;
+                        }
+                    }
+
+                    // 5. Distribute feeder loads to keypoints to avoid double counting
+                    // Count how many authorized keypoints each feeder is linked to
+                    $feederKeypointCounts = $feederKeypoints->groupBy('feeder_id')->map(function ($item) {
+                        return $item->count();
+                    });
+
+                    // Distribute the load of each feeder among its keypoints
+                    foreach ($feederKeypoints as $fkp) {
+                        $keypointId = $fkp->keypoint_id;
+                        $feederId = $fkp->feeder_id;
+                        $count = $feederKeypointCounts[$feederId] ?? 1;
+                        $load = $feederLoads[$feederId] ?? ['power' => 0, 'current' => 0];
+
+                        if (!isset($processedFeederValues[$keypointId])) {
+                            $processedFeederValues[$keypointId] = ['power' => 0, 'current' => 0];
+                        }
+
+                        $processedFeederValues[$keypointId]['power'] += $load['power'] / $count;
+                        $processedFeederValues[$keypointId]['current'] += $load['current'] / $count;
+                    }
+                }
+            }
+        }
+
+        return [
+            'lbs' => $processedLbsValues,
+            'feeder' => $processedFeederValues,
+        ];
+    }
+
+    private function aggregateAndFormatLoadData($orgStructure, $lbsLoads, $feederLoads)
+    {
+        // Aggregate data by UP3
+        $aggregatedData = [];
+        foreach ($orgStructure as $orgLink) {
+            $dccName = $orgLink->dcc_name;
+            $up3Id = $orgLink->up3_id;
+            $keypointId = $orgLink->keypoint_id;
+
+            if (!isset($aggregatedData[$dccName])) {
+                $aggregatedData[$dccName] = ['up3s' => []];
+            }
+            if (!isset($aggregatedData[$dccName]['up3s'][$up3Id])) {
+                $aggregatedData[$dccName]['up3s'][$up3Id] = [
+                    'name' => $orgLink->up3_name,
+                    'lbs_power' => 0,
+                    'lbs_current' => 0,
+                    'feeder_power' => 0,
+                    'feeder_current' => 0,
+                ];
+            }
+
+            $lbsValues = $lbsLoads[$keypointId] ?? ['power' => 0, 'current' => 0];
+            $aggregatedData[$dccName]['up3s'][$up3Id]['lbs_power'] += $lbsValues['power'];
+            $aggregatedData[$dccName]['up3s'][$up3Id]['lbs_current'] += $lbsValues['current'];
+
+            $feederValues = $feederLoads[$keypointId] ?? ['power' => 0, 'current' => 0];
+            $aggregatedData[$dccName]['up3s'][$up3Id]['feeder_power'] += $feederValues['power'];
+            $aggregatedData[$dccName]['up3s'][$up3Id]['feeder_current'] += $feederValues['current'];
+        }
+
+        // Format the final response
+        $systemLoadData = [];
+        $grandTotalLbsPower = 0;
+        $grandTotalLbsCurrent = 0;
+        $grandTotalFeederPower = 0;
+        $grandTotalFeederCurrent = 0;
+
+        foreach ($aggregatedData as $dccName => $dccData) {
+            $regions = [];
+            $dccTotalLbsPower = 0;
+            $dccTotalLbsCurrent = 0;
+            $dccTotalFeederPower = 0;
+            $dccTotalFeederCurrent = 0;
+
+            foreach ($dccData['up3s'] as $up3) {
+                // Add LBS data for the region
+                $regions[] = [
+                    'name' => $up3['name'],
+                    'power' => number_format($up3['lbs_power'], 2) . ' MW',
+                    'current' => number_format($up3['lbs_current'], 2) . ' A',
+                    'source' => 'by LBS'
+                ];
+
+                // Add Feeder data for the region
+                $regions[] = [
+                    'name' => $up3['name'],
+                    'power' => number_format($up3['feeder_power'], 2) . ' MW',
+                    'current' => number_format($up3['feeder_current'], 2) . ' A',
+                    'source' => 'by Feeder'
+                ];
+
+                $dccTotalLbsPower += $up3['lbs_power'];
+                $dccTotalLbsCurrent += $up3['lbs_current'];
+                $dccTotalFeederPower += $up3['feeder_power'];
+                $dccTotalFeederCurrent += $up3['feeder_current'];
+            }
+
+            $systemLoadData[] = [
+                'name' => 'Beban Sistem ' . $dccName,
+                'regions' => $regions,
+                'total' => [
+                    [
+                        'power' => number_format($dccTotalLbsPower, 2) . ' MW',
+                        'current' => number_format($dccTotalLbsCurrent, 2) . ' A',
+                        'source' => 'by LBS'
+                    ],
+                    [
+                        'power' => number_format($dccTotalFeederPower, 2) . ' MW',
+                        'current' => number_format($dccTotalFeederCurrent, 2) . ' A',
+                        'source' => 'by Feeder'
+                    ]
+                ]
+            ];
+
+            $grandTotalLbsPower += $dccTotalLbsPower;
+            $grandTotalLbsCurrent += $dccTotalLbsCurrent;
+            $grandTotalFeederPower += $dccTotalFeederPower;
+            $grandTotalFeederCurrent += $dccTotalFeederCurrent;
+        }
+
+        $grandTotal = [
+            [
+                'power' => number_format($grandTotalLbsPower, 2) . ' MW',
+                'current' => number_format($grandTotalLbsCurrent, 2) . ' A',
+                'source' => 'by LBS'
+            ],
+            [
+                'power' => number_format($grandTotalFeederPower, 2) . ' MW',
+                'current' => number_format($grandTotalFeederCurrent, 2) . ' A',
+                'source' => 'by Feeder'
+            ]
+        ];
+
+        return [
+            'data' => $systemLoadData,
+            'grandTotal' => $grandTotal
+        ];
     }
 }

@@ -197,7 +197,7 @@ export default function TableHMI() {
         if (values === null || values === undefined) return null;
         return (
             <div className="flex items-center justify-center">
-                {formatValue(values[0])} {values[1] === "1" ? 'F' : ''}
+                {formatValue(values[0])} <span className='text-red-500 font-bold'>{values[1] === "1" ? 'F' : ''}</span>
             </div>
         );
     };
@@ -422,64 +422,56 @@ export default function TableHMI() {
                                 className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
                             />
                         </PaginationItem>
-                        {/* Render first page */}
-                        {totalPages > 0 && (
-                            <PaginationItem>
-                                <PaginationLink
-                                    onClick={() => handlePageChange(1)}
-                                    isActive={currentPage === 1}
-                                >
-                                    1
-                                </PaginationLink>
-                            </PaginationItem>
-                        )}
-
-                        {/* Render ellipsis if needed after first page */}
-                        {currentPage > 3 && totalPages > 5 && (
-                            <PaginationItem>
-                                <span className="px-2 py-1.5 text-sm">...</span>
-                            </PaginationItem>
-                        )}
-
-                        {/* Render pages around current page */}
-                        {Array.from({ length: totalPages }, (_, i) => i + 1)
-                            .filter((pageNumber) => {
-                                if (totalPages <= 5) return true; // Show all if 5 or less pages
-                                if (pageNumber === 1 || pageNumber === totalPages) return false; // Already handled
+                        {/* Render page numbers */}
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNumber) => {
+                            // Always show first and last page
+                            if (pageNumber === 1 || pageNumber === totalPages) {
                                 return (
-                                    pageNumber >= currentPage - 1 &&
-                                    pageNumber <= currentPage + 1
+                                    <PaginationItem key={pageNumber}>
+                                        <PaginationLink
+                                            onClick={() => handlePageChange(pageNumber)}
+                                            isActive={currentPage === pageNumber}
+                                        >
+                                            {pageNumber}
+                                        </PaginationLink>
+                                    </PaginationItem>
                                 );
-                            })
-                            .map((pageNumber) => (
-                                <PaginationItem key={pageNumber}>
-                                    <PaginationLink
-                                        onClick={() => handlePageChange(pageNumber)}
-                                        isActive={currentPage === pageNumber}
-                                    >
-                                        {pageNumber}
-                                    </PaginationLink>
-                                </PaginationItem>
-                            ))}
+                            }
 
-                        {/* Render ellipsis if needed before last page */}
-                        {currentPage < totalPages - 2 && totalPages > 5 && (
-                            <PaginationItem>
-                                <span className="px-2 py-1.5 text-sm">...</span>
-                            </PaginationItem>
-                        )}
+                            // Show ellipsis if there's a gap between the first page and the current page
+                            if (pageNumber === 2 && currentPage > 3) {
+                                return (
+                                    <PaginationItem key="ellipsis-start">
+                                        <span className="px-2 py-1.5 text-sm">...</span>
+                                    </PaginationItem>
+                                );
+                            }
 
-                        {/* Render last page */}
-                        {totalPages > 1 && (
-                            <PaginationItem>
-                                <PaginationLink
-                                    onClick={() => handlePageChange(totalPages)}
-                                    isActive={currentPage === totalPages}
-                                >
-                                    {totalPages}
-                                </PaginationLink>
-                            </PaginationItem>
-                        )}
+                            // Show ellipsis if there's a gap between the current page and the last page
+                            if (pageNumber === totalPages - 1 && currentPage < totalPages - 2) {
+                                return (
+                                    <PaginationItem key="ellipsis-end">
+                                        <span className="px-2 py-1.5 text-sm">...</span>
+                                    </PaginationItem>
+                                );
+                            }
+
+                            // Show pages immediately around the current page
+                            if (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1) {
+                                return (
+                                    <PaginationItem key={pageNumber}>
+                                        <PaginationLink
+                                            onClick={() => handlePageChange(pageNumber)}
+                                            isActive={currentPage === pageNumber}
+                                        >
+                                            {pageNumber}
+                                        </PaginationLink>
+                                    </PaginationItem>
+                                );
+                            }
+
+                            return null;
+                        })}
                         <PaginationItem>
                             <PaginationNext
                                 onClick={() => handlePageChange(currentPage + 1)}
