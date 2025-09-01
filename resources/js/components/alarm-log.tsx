@@ -95,18 +95,22 @@ export default function AlarmLog() {
 
     const fetchAlarms = async () => {
         try {
-            const { data, error } = await supabase
+            let query = supabase
                 .from('alarms')
                 .select('id, TEXT, TIME, PRIORITY, STATIONPID')
-                .order('id', { ascending: false })
-                .limit(30);
+                .order('id', { ascending: false });
+
+            if (!isAdmin && userKeypoints.length > 0) {
+                query = query.in('STATIONPID', userKeypoints);
+            }
+
+            const { data, error } = await query.limit(30);
 
             if (error) {
                 throw error;
             }
 
-            const filteredData = filterAlarmsByPermissions(data || []);
-            setAlarms(filteredData);
+            setAlarms(data || []);
             setLoading(false);
         } catch (err) {
             console.error('Error fetching alarms:', err);

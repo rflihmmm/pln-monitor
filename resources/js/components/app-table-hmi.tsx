@@ -197,7 +197,7 @@ export default function TableHMI() {
         if (values === null || values === undefined) return null;
         return (
             <div className="flex items-center justify-center">
-                {formatValue(values[0])} <span className='text-red-500 font-bold'>{values[1] === "1" ? 'F' : ''}</span>
+                {formatValue(values[0])} <span className='text-red-500 font-bold'>{values[1] === "2" ? 'F' : ''}</span>
             </div>
         );
     };
