@@ -98,18 +98,21 @@ export default function AlarmLog() {
             let query = supabase
                 .from('alarms')
                 .select('id, TEXT, TIME, PRIORITY, STATIONPID')
-                .order('id', { ascending: false });
+                .order('id', { ascending: false })
+                .limit(30);
 
+            // Apply server-side filtering if not admin and userKeypoints exist
             if (!isAdmin && userKeypoints.length > 0) {
                 query = query.in('STATIONPID', userKeypoints);
             }
 
-            const { data, error } = await query.limit(30);
+            const { data, error } = await query;
 
             if (error) {
                 throw error;
             }
 
+            // No client-side filtering needed here as it's done server-side
             setAlarms(data || []);
             setLoading(false);
         } catch (err) {
@@ -261,7 +264,12 @@ export default function AlarmLog() {
 
         // Timeout untuk fallback jika realtime gagal
         const realtimeTimeout = setTimeout(() => {
-            if (alarms.length === 0 && !error) {
+            // Check current alarms and error state at the time of timeout
+            // This closure captures the initial state, but the functional update for alarms
+            // and the direct setError call will work correctly.
+            // We need to ensure we're not re-running the effect due to these states.
+            if (alarms.length === 0 && !error) { // This check uses the state from the render cycle when the effect was set up.
+                // It's acceptable for a timeout that fires once.
                 setError('Realtime connection failed. Please refresh the page.');
                 setRealtimeError(true);
                 setTimeoutTriggered(true);
@@ -328,7 +336,7 @@ export default function AlarmLog() {
                 supabase.removeChannel(channel);
             }
         };
-    }, [keypointsLoading, isAdmin, userKeypoints, filterAlarmsByPermissions, alarms, error]);
+    }, [keypointsLoading, isAdmin, userKeypoints, filterAlarmsByPermissions]);
 
     // Hilangkan pesan error jika data alarm berubah setelah timeout aktif
     useEffect(() => {
