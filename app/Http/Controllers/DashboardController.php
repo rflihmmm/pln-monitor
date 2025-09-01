@@ -98,63 +98,45 @@ class DashboardController extends Controller
     {
         $results = [];
         if ($garduInduks->isEmpty()) {
-            return $results;
+            return [];
         }
 
-        // Initialize results with 0
         foreach ($garduInduks as $garduInduk) {
-            $results[$garduInduk->id] = ['load_is' => 0, 'load_mw' => 0];
-        }
+            $load_is = 0;
+            $load_mw = 0;
 
-        $feederIds = $garduInduks->pluck('feeders')->flatten()->pluck('id')->unique()->all();
+            // The 'feeders' relationship must be eager-loaded before calling this function.
+            $feederIds = $garduInduk->feeders->pluck('id')->all();
 
-        if (empty($feederIds)) {
-            return $results;
-        }
+            if (!empty($feederIds)) {
+                // Get status points for the feeders of this specific Gardu Induk.
+                $feederStatusPoints = FeederStatusPoint::whereIn('feeder_id', $feederIds)
+                    ->whereIn('type', ['AMP', 'MW'])
+                    ->get();
 
-        // Fetch all status points for all feeders at once
-        $feederStatusPoints = FeederStatusPoint::whereIn('feeder_id', $feederIds)
-            ->whereIn('type', ['AMP', 'MW'])
-            ->get();
+                if (!$feederStatusPoints->isEmpty()) {
+                    $statusIds = $feederStatusPoints->pluck('status_id')->unique()->all();
 
-        $statusIds = $feederStatusPoints->pluck('status_id')->unique()->all();
+                    // Get analog values for these status points.
+                    $analogValues = AnalogPointSkada::whereIn('PKEY', $statusIds)
+                        ->pluck('VALUE', 'PKEY');
 
-        if (empty($statusIds)) {
-            return $results;
-        }
-
-        // Fetch all analog values at once
-        $analogValues = AnalogPointSkada::whereIn('PKEY', $statusIds)
-            ->select('PKEY', 'VALUE')
-            ->get()
-            ->pluck('VALUE', 'PKEY');
-
-        // Map feeder IDs to their Gardu Induk ID
-        $feederToGarduMap = [];
-        foreach ($garduInduks as $garduInduk) {
-            foreach ($garduInduk->feeders as $feeder) {
-                $feederToGarduMap[$feeder->id] = $garduInduk->id;
-            }
-        }
-
-        // Calculate loads in memory
-        foreach ($feederStatusPoints as $statusPoint) {
-            $value = floatval($analogValues->get($statusPoint->status_id) ?? 0);
-            $garduIndukId = $feederToGarduMap[$statusPoint->feeder_id] ?? null;
-
-            if ($garduIndukId) {
-                if ($statusPoint->type === 'AMP') {
-                    $results[$garduIndukId]['load_is'] += $value;
-                } elseif ($statusPoint->type === 'MW') {
-                    $results[$garduIndukId]['load_mw'] += $value;
+                    // Sum the values for this Gardu Induk.
+                    foreach ($feederStatusPoints as $statusPoint) {
+                        $value = floatval($analogValues->get($statusPoint->status_id) ?? 0);
+                        if ($statusPoint->type === 'AMP') {
+                            $load_is += $value;
+                        } elseif ($statusPoint->type === 'MW') {
+                            $load_mw += $value;
+                        }
+                    }
                 }
             }
-        }
 
-        // Round the final values
-        foreach ($results as $garduIndukId => $loads) {
-            $results[$garduIndukId]['load_is'] = round($loads['load_is'], 2);
-            $results[$garduIndukId]['load_mw'] = round($loads['load_mw'], 2);
+            $results[$garduInduk->id] = [
+                'load_is' => round($load_is, 2),
+                'load_mw' => round($load_mw, 2),
+            ];
         }
 
         return $results;
