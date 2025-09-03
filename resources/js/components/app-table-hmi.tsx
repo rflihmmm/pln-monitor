@@ -241,166 +241,168 @@ export default function TableHMI() {
                 </CardContent>
             </Card>
 
-            {/* Table Container with horizontal scroll */}
-            <Card className="bg-background overflow-x-auto">
-                <CardContent className="min-w-max">
-                    <table className="w-full border-collapse">
-                        <thead>
-                            <tr>
-                                {[
-                                    'GARDU INDUK',
-                                    'FEEDER',
-                                    'PMT',
-                                    'AMP',
-                                    'MW',
-                                    'KEYPOINT',
-                                    'PMT',
-                                    'HOTLINE TAG',
-                                    'IR',
-                                    'IS',
-                                    'IT',
-                                    'IF-R',
-                                    'IF-S',
-                                    'IF-T',
-                                    'IF-N',
-                                    'KV-AB',
-                                    'KV-BC',
-                                    'KV-AC',
-                                ].map((header, index) => (
-                                    <th key={index} className="bg-gray-100 border border-gray-300 p-2 text-center font-bold text-sm">
-                                        {header}
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {paginatedData.map((row, rowIndex) => (
-                                <tr key={row.id} className={rowIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                                    {/* GARDU INDUK - Merged cells */}
-                                    {shouldRenderCell(paginatedData, rowIndex, 'garduInduk') && (
-                                        <td
-                                            className="border border-gray-300 p-2 text-center align-middle font-medium"
-                                            rowSpan={calculateRowSpan(paginatedData, rowIndex, 'garduInduk')}
-                                        >
-                                            {row.garduInduk}
-                                        </td>
-                                    )}
-
-                                    {/* FEEDER - Merged cells */}
-                                    {shouldRenderCell(paginatedData, rowIndex, 'feeder') && (
-                                        <td
-                                            className="border border-gray-300 p-2 text-center align-middle font-medium"
-                                            rowSpan={calculateRowSpan(paginatedData, rowIndex, 'feeder')}
-                                        >
-                                            {row.feeder}
-                                        </td>
-                                    )}
-
-                                    {/* PMT1 - Merged cells per feeder */}
-                                    {shouldRenderCell(paginatedData, rowIndex, 'feeder') && (
-                                        <td
-                                            className="border border-gray-300 p-2 text-center align-middle"
-                                            rowSpan={calculateRowSpan(paginatedData, rowIndex, 'feeder')}
-                                        >
-                                            {renderPmt1Status(row.pmt1)}
-                                        </td>
-                                    )}
-
-                                    {/* AMP - Merged cells per feeder */}
-                                    {shouldRenderCell(paginatedData, rowIndex, 'feeder') && (
-                                        <td
-                                            className="border border-gray-300 p-2 text-center align-middle"
-                                            rowSpan={calculateRowSpan(paginatedData, rowIndex, 'feeder')}
-                                        >
-                                            {renderArrayAnalogValue(row.amp)}
-                                        </td>
-                                    )}
-
-                                    {/* MW - Merged cells per feeder */}
-                                    {shouldRenderCell(paginatedData, rowIndex, 'feeder') && (
-                                        <td
-                                            className="border border-gray-300 p-2 text-center align-middle"
-                                            rowSpan={calculateRowSpan(paginatedData, rowIndex, 'feeder')}
-                                        >
-                                            {renderArrayAnalogValue(row.mw)}
-                                        </td>
-                                    )}
-
-                                    {/* KEYPOINT */}
-                                    <td className="border border-gray-300 p-2 text-center align-middle font-medium">
-                                        {row.keypoint}
-                                    </td>
-
-                                    {/* PMT2 */}
-                                    <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {renderPmt2Status(row.pmt2)}
-                                    </td>
-
-                                    {/* HOTLINE TAG */}
-                                    <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {row.hotlineTag === "1" && <Badge variant="destructive">ON</Badge>}
-                                        {row.hotlineTag === "0" && (
-                                            <Badge variant="outline" className="bg-green-100 text-green-800">
-                                                OFF
-                                            </Badge>
-                                        )}
-                                    </td>
-
-
-                                    {/* IR */}
-                                    <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {renderArrayAnalogValue(row.iR)}
-                                    </td>
-
-                                    {/* IS */}
-                                    <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {renderArrayAnalogValue(row.iS)}
-                                    </td>
-
-                                    {/* IT */}
-                                    <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {renderArrayAnalogValue(row.iT)}
-                                    </td>
-
-                                    {/* IF-R */}
-                                    <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {renderArrayAnalogValue(row.iFR)}
-                                    </td>
-
-                                    {/* IF-S */}
-                                    <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {renderArrayAnalogValue(row.iFS)}
-                                    </td>
-
-                                    {/* IF-T */}
-                                    <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {renderArrayAnalogValue(row.iFT)}
-                                    </td>
-
-                                    {/* IF-N */}
-                                    <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {renderArrayAnalogValue(row.iFN)}
-                                    </td>
-
-                                    {/* KV-AB */}
-                                    <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {renderArrayAnalogValue(row.kVAB)}
-                                    </td>
-
-                                    {/* KV BC */}
-                                    <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {renderArrayAnalogValue(row.kVBC)}
-                                    </td>
-
-                                    {/* KV AC */}
-                                    <td className="border border-gray-300 p-2 text-center align-middle">
-                                        {renderArrayAnalogValue(row.kVAC)}
-                                    </td>
-
+            {/* Table Container with horizontal and vertical scroll */}
+            <Card className="bg-background">
+                <CardContent className="p-0"> {/* Remove padding to allow table to fill */}
+                    <div className="relative overflow-x-auto overflow-y-auto max-h-[calc(100vh-250px)]"> {/* Added max-h and overflow-y-auto */}
+                        <table className="w-full border-separate border-spacing-0"> {/* Changed border-collapse to border-separate and added border-spacing-0 */}
+                            <thead className="sticky top-0 z-10"> {/* Moved sticky, top-0, z-10 to thead */}
+                                <tr>
+                                    {[
+                                        'GARDU INDUK',
+                                        'FEEDER',
+                                        'PMT',
+                                        'AMP',
+                                        'MW',
+                                        'KEYPOINT',
+                                        'PMT',
+                                        'HOTLINE TAG',
+                                        'IR',
+                                        'IS',
+                                        'IT',
+                                        'IF-R',
+                                        'IF-S',
+                                        'IF-T',
+                                        'IF-N',
+                                        'KV-AB',
+                                        'KV-BC',
+                                        'KV-AC',
+                                    ].map((header, index) => (
+                                        <th key={index} className="bg-gray-100 border border-gray-300 p-2 text-center font-bold text-sm"> {/* Removed sticky, top-0, z-10 from th */}
+                                            {header}
+                                        </th>
+                                    ))}
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {paginatedData.map((row, rowIndex) => (
+                                    <tr key={row.id} className={rowIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                                        {/* GARDU INDUK - Merged cells */}
+                                        {shouldRenderCell(paginatedData, rowIndex, 'garduInduk') && (
+                                            <td
+                                                className="border border-gray-300 p-2 text-center align-middle font-medium"
+                                                rowSpan={calculateRowSpan(paginatedData, rowIndex, 'garduInduk')}
+                                            >
+                                                {row.garduInduk}
+                                            </td>
+                                        )}
+
+                                        {/* FEEDER - Merged cells */}
+                                        {shouldRenderCell(paginatedData, rowIndex, 'feeder') && (
+                                            <td
+                                                className="border border-gray-300 p-2 text-center align-middle font-medium"
+                                                rowSpan={calculateRowSpan(paginatedData, rowIndex, 'feeder')}
+                                            >
+                                                {row.feeder}
+                                            </td>
+                                        )}
+
+                                        {/* PMT1 - Merged cells per feeder */}
+                                        {shouldRenderCell(paginatedData, rowIndex, 'feeder') && (
+                                            <td
+                                                className="border border-gray-300 p-2 text-center align-middle"
+                                                rowSpan={calculateRowSpan(paginatedData, rowIndex, 'feeder')}
+                                            >
+                                                {renderPmt1Status(row.pmt1)}
+                                            </td>
+                                        )}
+
+                                        {/* AMP - Merged cells per feeder */}
+                                        {shouldRenderCell(paginatedData, rowIndex, 'feeder') && (
+                                            <td
+                                                className="border border-gray-300 p-2 text-center align-middle"
+                                                rowSpan={calculateRowSpan(paginatedData, rowIndex, 'feeder')}
+                                            >
+                                                {renderArrayAnalogValue(row.amp)}
+                                            </td>
+                                        )}
+
+                                        {/* MW - Merged cells per feeder */}
+                                        {shouldRenderCell(paginatedData, rowIndex, 'feeder') && (
+                                            <td
+                                                className="border border-gray-300 p-2 text-center align-middle"
+                                                rowSpan={calculateRowSpan(paginatedData, rowIndex, 'feeder')}
+                                            >
+                                                {renderArrayAnalogValue(row.mw)}
+                                            </td>
+                                        )}
+
+                                        {/* KEYPOINT */}
+                                        <td className="border border-gray-300 p-2 text-center align-middle font-medium">
+                                            {row.keypoint}
+                                        </td>
+
+                                        {/* PMT2 */}
+                                        <td className="border border-gray-300 p-2 text-center align-middle">
+                                            {renderPmt2Status(row.pmt2)}
+                                        </td>
+
+                                        {/* HOTLINE TAG */}
+                                        <td className="border border-gray-300 p-2 text-center align-middle">
+                                            {row.hotlineTag === "1" && <Badge variant="destructive">ON</Badge>}
+                                            {row.hotlineTag === "0" && (
+                                                <Badge variant="outline" className="bg-green-100 text-green-800">
+                                                    OFF
+                                                </Badge>
+                                            )}
+                                        </td>
+
+
+                                        {/* IR */}
+                                        <td className="border border-gray-300 p-2 text-center align-middle">
+                                            {renderArrayAnalogValue(row.iR)}
+                                        </td>
+
+                                        {/* IS */}
+                                        <td className="border border-gray-300 p-2 text-center align-middle">
+                                            {renderArrayAnalogValue(row.iS)}
+                                        </td>
+
+                                        {/* IT */}
+                                        <td className="border border-gray-300 p-2 text-center align-middle">
+                                            {renderArrayAnalogValue(row.iT)}
+                                        </td>
+
+                                        {/* IF-R */}
+                                        <td className="border border-gray-300 p-2 text-center align-middle">
+                                            {renderArrayAnalogValue(row.iFR)}
+                                        </td>
+
+                                        {/* IF-S */}
+                                        <td className="border border-gray-300 p-2 text-center align-middle">
+                                            {renderArrayAnalogValue(row.iFS)}
+                                        </td>
+
+                                        {/* IF-T */}
+                                        <td className="border border-gray-300 p-2 text-center align-middle">
+                                            {renderArrayAnalogValue(row.iFT)}
+                                        </td>
+
+                                        {/* IF-N */}
+                                        <td className="border border-gray-300 p-2 text-center align-middle">
+                                            {renderArrayAnalogValue(row.iFN)}
+                                        </td>
+
+                                        {/* KV-AB */}
+                                        <td className="border border-gray-300 p-2 text-center align-middle">
+                                            {renderArrayAnalogValue(row.kVAB)}
+                                        </td>
+
+                                        {/* KV BC */}
+                                        <td className="border border-gray-300 p-2 text-center align-middle">
+                                            {renderArrayAnalogValue(row.kVBC)}
+                                        </td>
+
+                                        {/* KV AC */}
+                                        <td className="border border-gray-300 p-2 text-center align-middle">
+                                            {renderArrayAnalogValue(row.kVAC)}
+                                        </td>
+
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </CardContent>
             </Card>
 

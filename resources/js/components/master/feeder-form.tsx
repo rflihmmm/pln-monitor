@@ -88,12 +88,7 @@ export default function FeederForm({
   const [isPmtLoading, setIsPmtLoading] = useState(false);
   const [isAmpLoading, setIsAmpLoading] = useState(false);
   const [isMwLoading, setIsMwLoading] = useState(false);
-
-  // Helper function untuk mendapatkan status point berdasarkan type dari feeder data
-  // const getStatusPointFromFeeder = (statusPoints: any[], type: string) => {
-  //   if (!statusPoints || !Array.isArray(statusPoints)) return null;
-  //   return statusPoints.find(sp => sp.type === type);
-  // };
+  const [errorMessage, setErrorMessage] = useState<string | null>(null); // State for error message
 
   // Inisialisasi data form - PENTING: Hanya sekali saat component mount atau feeder berubah
   useEffect(() => {
@@ -261,6 +256,15 @@ export default function FeederForm({
   const getMwStatusName = () => getMwStatus()?.name || "None";
 
   const handleSubmit = () => {
+    const pmtStatus = getPmtStatus();
+    const ampStatus = getAmpStatus();
+    const mwStatus = getMwStatus();
+
+    if (pmtStatus.status_id === 0 || ampStatus.status_id === 0 || mwStatus.status_id === 0) {
+      setErrorMessage("PMT, AMP, and MW status points are required.");
+      return;
+    }
+    setErrorMessage(null); // Clear error message if validation passes
     onSubmit(feederData);
   };
 
@@ -538,7 +542,7 @@ export default function FeederForm({
         <div className="grid grid-cols-1 gap-4">
           {/* PMT */}
           <div className="grid gap-2">
-            <Label htmlFor="pmt_status">PMT</Label>
+            <Label htmlFor="pmt_status">PMT <span className="text-red-500">*</span></Label>
             <Popover open={pmtStatusOpen} onOpenChange={setPmtStatusOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -575,21 +579,6 @@ export default function FeederForm({
                       </CommandEmpty>
                     )}
                     <CommandGroup className="max-h-[200px] overflow-y-auto">
-                      <CommandItem
-                        value="none"
-                        onSelect={() => {
-                          handleStatusPointChange("PMT", 0, "None");
-                          setPmtStatusOpen(false);
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            getPmtStatus()?.status_id === 0 ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                        None
-                      </CommandItem>
                       {pmtStatusList.map((status) => (
                         <CommandItem
                           key={status.id}
@@ -619,7 +608,7 @@ export default function FeederForm({
 
           {/* AMP */}
           <div className="grid gap-2">
-            <Label htmlFor="amp_status">AMP</Label>
+            <Label htmlFor="amp_status">AMP <span className="text-red-500">*</span></Label>
             <Popover open={ampStatusOpen} onOpenChange={setAmpStatusOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -656,21 +645,6 @@ export default function FeederForm({
                       </CommandEmpty>
                     )}
                     <CommandGroup className="max-h-[200px] overflow-y-auto">
-                      <CommandItem
-                        value="none"
-                        onSelect={() => {
-                          handleStatusPointChange("AMP", 0, "None");
-                          setAmpStatusOpen(false);
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            getAmpStatus()?.status_id === 0 ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                        None
-                      </CommandItem>
                       {ampStatusList.map((status) => (
                         <CommandItem
                           key={status.id}
@@ -679,6 +653,7 @@ export default function FeederForm({
                             handleStatusPointChange("AMP", status.id ?? 0, status.name);
                             setAmpStatusOpen(false);
                           }}
+
                         >
                           <Check
                             className={cn(
@@ -700,7 +675,7 @@ export default function FeederForm({
 
           {/* MW */}
           <div className="grid gap-2">
-            <Label htmlFor="mw_status">MW</Label>
+            <Label htmlFor="mw_status">MW <span className="text-red-500">*</span></Label>
             <Popover open={mwStatusOpen} onOpenChange={setMwStatusOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -737,21 +712,6 @@ export default function FeederForm({
                       </CommandEmpty>
                     )}
                     <CommandGroup className="max-h-[200px] overflow-y-auto">
-                      <CommandItem
-                        value="none"
-                        onSelect={() => {
-                          handleStatusPointChange("MW", 0, "None");
-                          setMwStatusOpen(false);
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            getMwStatus()?.status_id === 0 ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                        None
-                      </CommandItem>
                       {mwStatusList.map((status) => (
                         <CommandItem
                           key={status.id}
@@ -781,6 +741,13 @@ export default function FeederForm({
         </div>
       </div>
 
+      {/* Display error message */}
+      {errorMessage && (
+        <div className="text-red-500 text-sm mt-2 text-center">
+          {errorMessage}
+        </div>
+      )}
+
       {/* Tombol Cancel & Submit */}
       <DialogFooter>
         <Button variant="outline" onClick={onCancel}>
@@ -788,6 +755,7 @@ export default function FeederForm({
         </Button>
         <Button onClick={handleSubmit}>{isEdit ? "Save Changes" : "Add Feeder"}</Button>
       </DialogFooter>
+
     </div>
   );
 }

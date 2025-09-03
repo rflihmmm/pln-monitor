@@ -210,7 +210,6 @@ export default function UserForm({ user, onSubmit, onCancel, isEdit = false }: U
               placeholder={isLoadingOrganizations ? "Loading organizations..." : "Search unit organization..."}
               className="pr-20"
               disabled={isLoadingOrganizations}
-              required
             />
             {selectedUnitName && (
               <Button

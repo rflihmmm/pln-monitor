@@ -786,20 +786,11 @@ class DashboardController extends Controller
             $dccTotalFeederCurrent = 0;
 
             foreach ($dccData['up3s'] as $up3) {
-                // Add LBS data for the region
-                $regions[] = [
-                    'name' => $up3['name'],
-                    'power' => number_format($up3['lbs_power'], 2) . ' MW',
-                    'current' => number_format($up3['lbs_current'], 2) . ' A',
-                    'source' => 'by LBS'
-                ];
-
                 // Add Feeder data for the region
                 $regions[] = [
                     'name' => $up3['name'],
                     'power' => number_format($up3['feeder_power'], 2) . ' MW',
                     'current' => number_format($up3['feeder_current'], 2) . ' A',
-                    'source' => 'by Feeder'
                 ];
 
                 $dccTotalLbsPower += $up3['lbs_power'];
@@ -813,14 +804,8 @@ class DashboardController extends Controller
                 'regions' => $regions,
                 'total' => [
                     [
-                        'power' => number_format($dccTotalLbsPower, 2) . ' MW',
-                        'current' => number_format($dccTotalLbsCurrent, 2) . ' A',
-                        'source' => 'by LBS'
-                    ],
-                    [
                         'power' => number_format($dccTotalFeederPower, 2) . ' MW',
                         'current' => number_format($dccTotalFeederCurrent, 2) . ' A',
-                        'source' => 'by Feeder'
                     ]
                 ]
             ];
@@ -833,14 +818,8 @@ class DashboardController extends Controller
 
         $grandTotal = [
             [
-                'power' => number_format($grandTotalLbsPower, 2) . ' MW',
-                'current' => number_format($grandTotalLbsCurrent, 2) . ' A',
-                'source' => 'by LBS'
-            ],
-            [
                 'power' => number_format($grandTotalFeederPower, 2) . ' MW',
                 'current' => number_format($grandTotalFeederCurrent, 2) . ' A',
-                'source' => 'by Feeder'
             ]
         ];
 

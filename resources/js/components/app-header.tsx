@@ -107,7 +107,7 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
     const [isOpen, setIsOpen] = useState(false);
     return (
         <>
-            <div className="border-sidebar-border/80 border-b">
+            <div className="border-sidebar-border/80 border-b bg-sky-100">
                 <div className="mx-auto flex h-16 items-center px-4 md:max-w-7xl">
                     {/* Mobile Menu */}
                     <div className="lg:hidden">
@@ -211,7 +211,7 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                                                             className={cn(
                                                                 navigationMenuTriggerStyle(),
                                                                 page.url === item.children.href && activeItemStyles,
-                                                                'h-9 cursor-pointer px-3',
+                                                                'h-9 cursor-pointer px-3 bg-transparent',
                                                             )}
                                                         >
                                                             {item.icon && <Icon iconNode={item.icon} className="mr-2 h-4 w-4" />}
@@ -240,7 +240,7 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                                                     className={cn(
                                                         navigationMenuTriggerStyle(),
                                                         page.url === item.href && activeItemStyles,
-                                                        'h-9 cursor-pointer px-3',
+                                                        'h-9 cursor-pointer px-3 bg-transparent',
                                                     )}
                                                 >
                                                     {item.icon && <Icon iconNode={item.icon} className="mr-2 h-4 w-4" />}

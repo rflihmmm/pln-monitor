@@ -385,10 +385,10 @@ export default function AlarmLog() {
         // 0 = hitam, 1 = cyan, 2 = ungu, 3 = kuning dan 4 = merah
         const colors = [
             'text-black',
-            'text-blue-400',
-            'text-purple-400',
-            'text-yellow-400',
-            'text-red-400',
+            'text-blue-600',
+            'text-[#FF00FF]',
+            'text-yellow-500',
+            'text-red-600',
         ];
         return colors[priority] || colors[0];
     };

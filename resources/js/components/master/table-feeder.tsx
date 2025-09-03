@@ -204,6 +204,19 @@ export default function TableFeeder({
         onSuccess: () => {
           setIsEditFeederOpen(false);
           setEditingFeeder(null);
+          // Redirect to the index page with current filters preserved
+          router.visit(route("master.feeder.index"), {
+            method: "get",
+            data: {
+              search: searchTerm,
+              substation: garduFilter,
+              page: currentPage,
+              per_page: itemsPerPage,
+            },
+            preserveState: true,
+            preserveScroll: true,
+            only: ["feederList"],
+          });
         },
       }
     );
