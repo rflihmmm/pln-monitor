@@ -58,10 +58,69 @@ class SingleLineController extends Controller
                 $organizationIds = $this->getOrganizationDescendantsOptimized($userOrganizationId);
                 $organizationIds[] = $userOrganizationId;
 
-                $allowedKeypointIds = OrganizationKeypoint::whereIn('organization_id', $organizationIds)
+                // 2. Get keypoints directly associated with these organizations
+                $directlyAllowedKeypointIds = OrganizationKeypoint::whereIn('organization_id', $organizationIds)
                     ->pluck('keypoint_id')
                     ->unique()
                     ->filter()
+                    ->values();
+
+                // 3. Get GarduInduk keypoints that are directly associated with these organizations
+                $directlyAssociatedGarduIndukIds = GarduInduk::whereIn('keypoint_id', $directlyAllowedKeypointIds)
+                    ->pluck('keypoint_id')
+                    ->unique()
+                    ->filter()
+                    ->values();
+
+                // 4. Identify KeypointExts among the directly allowed keypoints that have a parent
+                $allowedKeypointExtParents = KeypointExt::whereIn('keypoint_id', $directlyAllowedKeypointIds)
+                    ->whereNotNull('parent_stationpoints')
+                    ->pluck('parent_stationpoints')
+                    ->unique()
+                    ->filter()
+                    ->values();
+
+                // 5. Get GarduInduk keypoints that are parents of these allowed KeypointExts
+                $parentGarduIndukIds = GarduInduk::whereIn('keypoint_id', $allowedKeypointExtParents)
+                    ->pluck('keypoint_id')
+                    ->unique()
+                    ->filter()
+                    ->values();
+
+                // 6. Identify FeederKeypoint entries among the directly allowed keypoints
+                $feederIdsFromAllowedKeypoints = FeederKeypoint::whereIn('keypoint_id', $directlyAllowedKeypointIds)
+                    ->pluck('feeder_id')
+                    ->unique()
+                    ->filter()
+                    ->values();
+
+                // 7. Get GarduInduk IDs from these feeders
+                $garduIndukModelIdsFromFeeders = collect();
+                if ($feederIdsFromAllowedKeypoints->isNotEmpty()) {
+                    $garduIndukModelIdsFromFeeders = Feeder::whereIn('id', $feederIdsFromAllowedKeypoints)
+                        ->whereNotNull('gardu_induk_id')
+                        ->pluck('gardu_induk_id')
+                        ->unique()
+                        ->filter()
+                        ->values();
+                }
+
+                // 8. Map GarduInduk model IDs to their actual keypoint_id
+                $garduIndukKeypointIdsFromFeeders = collect();
+                if ($garduIndukModelIdsFromFeeders->isNotEmpty()) {
+                    $garduIndukKeypointIdsFromFeeders = GarduInduk::whereIn('id', $garduIndukModelIdsFromFeeders)
+                        ->pluck('keypoint_id')
+                        ->unique()
+                        ->filter()
+                        ->values();
+                }
+
+                // 9. Combine all allowed keypoints
+                $allowedKeypointIds = $directlyAllowedKeypointIds
+                    ->concat($directlyAssociatedGarduIndukIds)
+                    ->concat($parentGarduIndukIds)
+                    ->concat($garduIndukKeypointIdsFromFeeders)
+                    ->unique()
                     ->values();
 
                 return $this->buildAndRespondWithSingleLineDataOptimized($allowedKeypointIds);
@@ -355,7 +414,7 @@ class SingleLineController extends Controller
             }
 
             $name = $stationPoint->NAME;
-            $type = $this->extractTypeFromName($name);
+            $type = $this->extractTypeFromName($name, $keypointId); // Pass keypointId here
             $coordinate = $this->parseCoordinate($keypointData->coordinate ?? null);
 
             if (!$coordinate) {
@@ -469,8 +528,9 @@ class SingleLineController extends Controller
                     ];
 
                     foreach ($analogPoints as $point) {
-                        if (is_numeric($point->VALUE) && isset($values[$point->NAME])) {
-                            $values[$point->NAME][] = floatval($point->VALUE);
+                        $pointNameUpper = strtoupper($point->NAME);
+                        if (is_numeric($point->VALUE) && isset($values[$pointNameUpper])) {
+                            $values[$pointNameUpper][] = floatval($point->VALUE);
 
                             if (!$lastUpdate || $point->UPDATETIME > $lastUpdate) {
                                 $lastUpdate = $point->UPDATETIME;
@@ -598,11 +658,17 @@ class SingleLineController extends Controller
 
     /**
      * Extract type from name (ambil kata sebelum tanda -)
+     * Also, explicitly check if the keypoint is a Gardu Induk.
      */
-    private function extractTypeFromName($name)
+    private function extractTypeFromName($name, $keypointId = null)
     {
         if (empty($name)) {
             return 'UNKNOWN';
+        }
+
+        // Check if it's a Gardu Induk based on keypoint_id
+        if ($keypointId && GarduInduk::where('keypoint_id', $keypointId)->exists()) {
+            return 'GI';
         }
 
         $parts = explode('-', $name);
@@ -648,10 +714,12 @@ class SingleLineController extends Controller
             $query = DB::connection('sqlsrv_main')
                 ->table('ANALOGPOINTS')
                 ->whereIn($idColumn, $batch)
-                ->select('PKEY', 'VALUE', 'UPDATETIME');
+                ->select('PKEY', 'STATIONPID', 'NAME', 'VALUE', 'UPDATETIME');
 
             if (!empty($names)) {
-                $query->whereIn('NAME', $names);
+                $upperNames = array_map('strtoupper', $names);
+                $placeholders = implode(',', array_fill(0, count($upperNames), '?'));
+                $query->whereRaw("UPPER(NAME) IN ({$placeholders})", $upperNames);
             }
 
             $allAnalogPoints = $allAnalogPoints->concat($query->get());
