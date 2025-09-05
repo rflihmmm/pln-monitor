@@ -88,7 +88,7 @@ export default function FeederForm({
   const [isPmtLoading, setIsPmtLoading] = useState(false);
   const [isAmpLoading, setIsAmpLoading] = useState(false);
   const [isMwLoading, setIsMwLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null); // State for error message
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Inisialisasi data form - PENTING: Hanya sekali saat component mount atau feeder berubah
   useEffect(() => {
@@ -197,12 +197,34 @@ export default function FeederForm({
     });
   };
 
+  // FIXED: Menggabungkan keypoints yang sudah dipilih dengan hasil pencarian
+  // dan menghindari duplikasi
+  const getCombinedKeypointsList = () => {
+    const searchResults = keypointsList || [];
+    const selectedKeypointsAsDropdown = selectedKeypoints.map(kp => ({
+      id: kp.keypoint_id,
+      name: kp.name
+    }));
+
+    // Gabungkan dan hapus duplikasi berdasarkan id
+    const combined = [...selectedKeypointsAsDropdown];
+
+    searchResults.forEach(searchResult => {
+      // Hanya tambahkan jika belum ada dalam combined
+      if (!combined.some(item => item.id === searchResult.id)) {
+        combined.push(searchResult);
+      }
+    });
+
+    return combined;
+  };
+
   const handleKeypointSelect = (keypoint: DropdownBase) => {
-    const isSelected = selectedKeypoints.some((kp) => kp.id === keypoint.id);
+    const isSelected = selectedKeypoints.some((kp) => kp.keypoint_id === keypoint.id);
 
     if (isSelected) {
       // Hapus dari selectedKeypoints untuk UI
-      setSelectedKeypoints((prev) => prev.filter((kp) => kp.id !== keypoint.id));
+      setSelectedKeypoints((prev) => prev.filter((kp) => kp.keypoint_id !== keypoint.id));
       // Hapus dari feederData.keypoints
       setFeederData({
         ...feederData,
@@ -368,7 +390,6 @@ export default function FeederForm({
   };
 
   return (
-
     <div className="grid gap-4 py-4">
       {/* Name */}
       <div className="grid gap-2">
@@ -454,7 +475,7 @@ export default function FeederForm({
         </Popover>
       </div>
 
-      {/* Keypoints Multi‐select */}
+      {/* FIXED: Keypoints Multi‐select dengan penanganan duplikasi yang lebih baik */}
       <div className="grid gap-2">
         <Label htmlFor="keypoints">Keypoints</Label>
         <Popover open={keypointsOpen} onOpenChange={setKeypointsOpen}>
@@ -479,27 +500,43 @@ export default function FeederForm({
                 onValueChange={handleOnSearchKeypoint}
               />
               <CommandList>
-                <CommandEmpty>No keypoints found.</CommandEmpty>
+                <CommandEmpty>
+                  {keypointSearchTerm.length < 3 ? (
+                    <div className="py-5 text-sm text-muted-foreground text-center">
+                      Type at least 3 characters to search...
+                    </div>
+                  ) : (
+                    <div className="py-5 text-sm text-muted-foreground text-center">
+                      No keypoints found.
+                    </div>
+                  )}
+                </CommandEmpty>
                 <CommandGroup className="max-h-[200px] overflow-y-auto">
-                  {keypointsList.map((keypoint) => (
-                    <CommandItem
-                      key={keypoint.id}
-                      value={keypoint.name}
-                      onSelect={() => handleKeypointSelect(keypoint)}
-                    >
-                      <div className="flex items-center space-x-2 w-full">
-                        <Check
-                          className={cn(
-                            "h-4 w-4",
-                            selectedKeypoints.some((kp) => kp.id === keypoint.id)
-                              ? "opacity-100"
-                              : "opacity-0"
+                  {getCombinedKeypointsList().map((keypoint) => {
+                    const isSelected = selectedKeypoints.some((kp) => kp.keypoint_id === keypoint.id);
+                    return (
+                      <CommandItem
+                        key={keypoint.id}
+                        value={keypoint.name}
+                        onSelect={() => handleKeypointSelect(keypoint)}
+                      >
+                        <div className="flex items-center space-x-2 w-full">
+                          <Check
+                            className={cn(
+                              "h-4 w-4",
+                              isSelected ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          <span>{keypoint.name}</span>
+                          {isSelected && (
+                            <Badge variant="secondary" className="ml-auto text-xs">
+                              Selected
+                            </Badge>
                           )}
-                        />
-                        <span>{keypoint.name}</span>
-                      </div>
-                    </CommandItem>
-                  ))}
+                        </div>
+                      </CommandItem>
+                    );
+                  })}
                 </CommandGroup>
               </CommandList>
               <div className="border-t p-2">
