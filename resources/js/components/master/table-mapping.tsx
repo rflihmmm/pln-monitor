@@ -1,6 +1,6 @@
 import { router } from "@inertiajs/react"
 import { ChevronDown, ChevronRight, Users, Package, DollarSign, Building, UserCheck, Zap, MapPin, Edit, MoreHorizontal, Plus, Search, Trash } from 'lucide-react'
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
     DropdownMenu,
@@ -53,6 +53,22 @@ export default function TableMapping({ datas, keypointsList }: TableMappingProps
     const [isEditMappingOpen, setIsEditMappingOpen] = useState(false)
     const [editingMapping, setEditingMapping] = useState<Mapping | null>(null)
 
+    // Add refs to track dialog states and prevent stale closures
+    const dialogStateRef = useRef({
+        isAddMappingOpen: false,
+        isEditMappingOpen: false,
+        editingMapping: null as Mapping | null
+    })
+
+    // Update ref whenever state changes
+    useEffect(() => {
+        dialogStateRef.current = {
+            isAddMappingOpen,
+            isEditMappingOpen,
+            editingMapping
+        }
+    }, [isAddMappingOpen, isEditMappingOpen, editingMapping])
+
     // Filter data based on search term
     const filteredData = useMemo(() => {
         if (!searchTerm) return datas
@@ -90,62 +106,74 @@ export default function TableMapping({ datas, keypointsList }: TableMappingProps
         }, {})
     }, [filteredData])
 
-    const toggleDCC = (dcc: string) => {
-        const newExpanded = new Set(expandedDCC)
-        if (newExpanded.has(dcc)) {
-            newExpanded.delete(dcc)
-            // Collapse all UP3 and ULP under this DCC
-            const up3KeysToRemove = Array.from(expandedUP3).filter((key) => key.startsWith(`${dcc}-`))
-            const ulpKeysToRemove = Array.from(expandedULP).filter((key) => key.startsWith(`${dcc}-`))
-            up3KeysToRemove.forEach((key) => expandedUP3.delete(key))
-            ulpKeysToRemove.forEach((key) => expandedULP.delete(key))
-            setExpandedUP3(new Set(expandedUP3))
-            setExpandedULP(new Set(expandedULP))
-        } else {
-            newExpanded.add(dcc)
-        }
-        setExpandedDCC(newExpanded)
-    }
+    const toggleDCC = useCallback((dcc: string) => {
+        setExpandedDCC(prev => {
+            const newExpanded = new Set(prev)
+            if (newExpanded.has(dcc)) {
+                newExpanded.delete(dcc)
+                // Collapse all UP3 and ULP under this DCC
+                setExpandedUP3(prevUP3 => {
+                    const newUP3 = new Set(prevUP3)
+                    Array.from(newUP3).filter(key => key.startsWith(`${dcc}-`)).forEach(key => newUP3.delete(key))
+                    return newUP3
+                })
+                setExpandedULP(prevULP => {
+                    const newULP = new Set(prevULP)
+                    Array.from(newULP).filter(key => key.startsWith(`${dcc}-`)).forEach(key => newULP.delete(key))
+                    return newULP
+                })
+            } else {
+                newExpanded.add(dcc)
+            }
+            return newExpanded
+        })
+    }, [])
 
-    const toggleUP3 = (dcc: string, up3: string) => {
+    const toggleUP3 = useCallback((dcc: string, up3: string) => {
         const groupKey = `${dcc}-${up3}`
-        const newExpanded = new Set(expandedUP3)
-        if (newExpanded.has(groupKey)) {
-            newExpanded.delete(groupKey)
-            // Collapse all ULP under this UP3
-            const ulpKeysToRemove = Array.from(expandedULP).filter((key) => key.startsWith(`${groupKey}-`))
-            ulpKeysToRemove.forEach((key) => expandedULP.delete(key))
-            setExpandedULP(new Set(expandedULP))
-        } else {
-            newExpanded.add(groupKey)
-        }
-        setExpandedUP3(newExpanded)
-    }
+        setExpandedUP3(prev => {
+            const newExpanded = new Set(prev)
+            if (newExpanded.has(groupKey)) {
+                newExpanded.delete(groupKey)
+                // Collapse all ULP under this UP3
+                setExpandedULP(prevULP => {
+                    const newULP = new Set(prevULP)
+                    Array.from(newULP).filter(key => key.startsWith(`${groupKey}-`)).forEach(key => newULP.delete(key))
+                    return newULP
+                })
+            } else {
+                newExpanded.add(groupKey)
+            }
+            return newExpanded
+        })
+    }, [])
 
-    const toggleULP = (dcc: string, up3: string, ulp: string) => {
+    const toggleULP = useCallback((dcc: string, up3: string, ulp: string) => {
         const groupKey = `${dcc}-${up3}-${ulp}`
-        const newExpanded = new Set(expandedULP)
-        if (newExpanded.has(groupKey)) {
-            newExpanded.delete(groupKey)
-        } else {
-            newExpanded.add(groupKey)
-        }
-        setExpandedULP(newExpanded)
-    }
+        setExpandedULP(prev => {
+            const newExpanded = new Set(prev)
+            if (newExpanded.has(groupKey)) {
+                newExpanded.delete(groupKey)
+            } else {
+                newExpanded.add(groupKey)
+            }
+            return newExpanded
+        })
+    }, [])
 
-    const getTotalInDCC = (dcc: string) => {
+    const getTotalInDCC = useCallback((dcc: string) => {
         return Object.values(tripleNestedGroupedData[dcc] || {}).reduce(
             (total, up3Data) => total + Object.values(up3Data).reduce(
                 (up3Total, ulpData) => up3Total + ulpData.length, 0
             ), 0
         )
-    }
+    }, [tripleNestedGroupedData])
 
-    const getTotalInUP3 = (dcc: string, up3: string) => {
+    const getTotalInUP3 = useCallback((dcc: string, up3: string) => {
         return Object.values(tripleNestedGroupedData[dcc]?.[up3] || {}).reduce(
             (total, ulpData) => total + ulpData.length, 0
         )
-    }
+    }, [tripleNestedGroupedData])
 
     const getKeypointTypeIcon = (keypoint: string) => {
         if (keypoint.includes("REC-") || keypoint.includes("rec-")) {
@@ -173,53 +201,103 @@ export default function TableMapping({ datas, keypointsList }: TableMappingProps
         return <Badge variant="outline" className="text-xs">OTHER</Badge>
     }
 
-    // Handle adding a new mapping
-    const handleAddMapping = (mappingData: any) => {
+    // Handle adding a new mapping with proper cleanup
+    const handleAddMapping = useCallback((mappingData: any) => {
         const submitData = {
             keypoints: mappingData.keypoints,
             ulp: mappingData.ulp,
         }
         router.post(route("master.mapping.store"), submitData, {
-            onSuccess: () => setIsAddMappingOpen(false),
-            onError: (errors) => alert("Error: " + JSON.stringify(errors)),
+            onSuccess: () => {
+                // Use timeout to ensure cleanup happens after state updates
+                setTimeout(() => {
+                    setIsAddMappingOpen(false)
+                }, 0)
+            },
+            onError: (errors) => {
+                console.error("Error adding mapping:", errors)
+                alert("Error: " + JSON.stringify(errors))
+            },
         })
-    }
+    }, [])
 
-    // Open edit dialog for a mapping
-    const openEditDialog = (mapping: MappingData) => {
-        setEditingMapping({ ...mapping } as Mapping)
-        setIsEditMappingOpen(true)
-    }
+    // Open edit dialog for a mapping with proper state reset
+    const openEditDialog = useCallback((mapping: MappingData) => {
+        // Reset any existing state first
+        setEditingMapping(null)
+        setIsEditMappingOpen(false)
 
-    // Handle editing a mapping
-    const handleEditMapping = (mappingData: any) => {
-        if (!editingMapping) return
+        // Use timeout to ensure clean state before opening
+        setTimeout(() => {
+            setEditingMapping({ ...mapping } as Mapping)
+            setIsEditMappingOpen(true)
+        }, 0)
+    }, [])
+
+    // Handle editing a mapping with proper cleanup
+    const handleEditMapping = useCallback((mappingData: any) => {
+        const currentEditingMapping = dialogStateRef.current.editingMapping
+        if (!currentEditingMapping) return
 
         const submitData = {
             keypoint: mappingData.keypoints?.[0] ?? mappingData.keypoint,
             ulp: mappingData.ulp,
         }
 
-        router.put(route("master.mapping.update", editingMapping.id), submitData, {
+        router.put(route("master.mapping.update", currentEditingMapping.id), submitData, {
             onSuccess: () => {
-                setIsEditMappingOpen(false)
-                setEditingMapping(null)
+                // Use timeout to ensure cleanup happens after state updates
+                setTimeout(() => {
+                    setIsEditMappingOpen(false)
+                    setEditingMapping(null)
+                }, 0)
             },
-            onError: (errors) => alert("Error: " + JSON.stringify(errors)),
+            onError: (errors) => {
+                console.error("Error editing mapping:", errors)
+                alert("Error: " + JSON.stringify(errors))
+            },
         })
-    }
+    }, [])
 
     // Handle deleting a mapping
-    const handleDeleteMapping = (mappingId: number) => {
+    const handleDeleteMapping = useCallback((mappingId: number) => {
         if (confirm("Are you sure you want to delete this mapping?")) {
-            router.delete(route("master.mapping.destroy", mappingId))
+            router.delete(route("master.mapping.destroy", mappingId), {
+                onError: (errors) => {
+                    console.error("Error deleting mapping:", errors)
+                    alert("Error: " + JSON.stringify(errors))
+                }
+            })
         }
-    }
+    }, [])
+
+    // Handle dialog close with proper cleanup
+    const handleAddMappingClose = useCallback((open: boolean) => {
+        if (!open) {
+            // Force cleanup when closing
+            setTimeout(() => {
+                setIsAddMappingOpen(false)
+            }, 0)
+        } else {
+            setIsAddMappingOpen(true)
+        }
+    }, [])
+
+    const handleEditMappingClose = useCallback((open: boolean) => {
+        if (!open) {
+            // Force cleanup when closing
+            setTimeout(() => {
+                setIsEditMappingOpen(false)
+                setEditingMapping(null)
+            }, 0)
+        } else {
+            setIsEditMappingOpen(true)
+        }
+    }, [])
 
     return (
         <div className="w-full max-w-7xl mx-auto space-y-6">
             <Card>
-
                 <CardContent>
                     <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:justify-between">
                         <div className="relative w-full sm:w-64">
@@ -426,16 +504,14 @@ export default function TableMapping({ datas, keypointsList }: TableMappingProps
                             </TableBody>
                         </Table>
                     </div>
-
-                    {/* Enhanced Summary Statistics */}
-
                 </CardContent>
             </Card>
 
             {/* Add Mapping Dialog */}
             <MappingDialog
+                key={`add-${isAddMappingOpen}`} // Force re-render when state changes
                 isOpen={isAddMappingOpen}
-                onOpenChange={setIsAddMappingOpen}
+                onOpenChange={handleAddMappingClose}
                 onSubmit={handleAddMapping}
                 keypointsList={keypointsList}
                 isEdit={false}
@@ -443,8 +519,9 @@ export default function TableMapping({ datas, keypointsList }: TableMappingProps
 
             {/* Edit Mapping Dialog */}
             <MappingDialog
+                key={`edit-${isEditMappingOpen}-${editingMapping?.id}`} // Force re-render when state changes
                 isOpen={isEditMappingOpen}
-                onOpenChange={setIsEditMappingOpen}
+                onOpenChange={handleEditMappingClose}
                 onSubmit={handleEditMapping}
                 mapping={editingMapping}
                 keypointsList={keypointsList}
