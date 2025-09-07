@@ -17,35 +17,31 @@ Route::middleware('auth')->group(function () {
 
         Route::apiResource('organization', OrganizationController::class, [
             'except' => ['show']
-        ]);
+        ])->middleware(['role:admin']);
 
         Route::apiResource('mapping', OrganizationGridController::class, [
             'except' => ['show'],
-        ]);
-
-        Route::get('maps', function () {
-            return Inertia::render('master/maps');
-        })->name('maps');
+        ])->middleware(['role:admin']);
 
         Route::apiResource('gardu-induk', GarduIndukController::class, [
             'except' => ['show']
-        ]);
+        ])->middleware(['role:admin']);
         Route::apiResource('feeder', FeederController::class, [
             'except' => ['show']
-        ]);
+        ])->middleware(['role:admin']);
 
         Route::apiResource('keypoint-ext', KeypointExtController::class, [
             'except' => ['show']
-        ]);
+        ])->middleware(['role:admin']);
 
-        Route::get('gardu-induk/keypoint-data', [GarduIndukController::class, 'getKeypoints'])->name('gardu-induk.keypoint-data');
+        Route::get('gardu-induk/keypoint-data', [GarduIndukController::class, 'getKeypoints'])->name('gardu-induk.keypoint-data')->middleware(['role:admin']);
 
-        Route::get('feeder/keypoint-data', [FeederController::class, 'getKeypoints'])->name('feeder.keypoint-data');
-        Route::get('feeder/statuspoint-data', [FeederController::class, 'getStatusPoints'])->name('feeder.statuspoint-data');
-        Route::get('feeder/analogpoint-data', [FeederController::class, 'getAnalogPoints'])->name('feeder.analogpoint-data');
+        Route::get('feeder/keypoint-data', [FeederController::class, 'getKeypoints'])->name('feeder.keypoint-data')->middleware(['role:admin']);
+        Route::get('feeder/statuspoint-data', [FeederController::class, 'getStatusPoints'])->name('feeder.statuspoint-data')->middleware(['role:admin']);
+        Route::get('feeder/analogpoint-data', [FeederController::class, 'getAnalogPoints'])->name('feeder.analogpoint-data')->middleware(['role:admin']);
 
-        Route::get('mapping/ulp', [OrganizationGridController::class, 'getUlpData'])->name('mapping.ulp');
+        Route::get('mapping/ulp', [OrganizationGridController::class, 'getUlpData'])->name('mapping.ulp')->middleware(['role:admin']);
 
-        Route::get('api/organizations', [UserController::class, 'getOrganizations'])->name('master.api.organizations');
+        Route::get('api/organizations', [UserController::class, 'getOrganizations'])->name('master.api.organizations')->middleware(['role:admin']);
     });
 });

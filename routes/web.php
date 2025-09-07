@@ -17,7 +17,7 @@ use App\Http\Controllers\Master\UserController;
 //
 
 Route::redirect('/', '/login')->name('home');
-Route::get('api/organizations', [UserController::class, 'getOrganizations'])->name('api.organizations');
+
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {
         return Inertia::render('dashboard');
@@ -62,6 +62,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // API Dropdown Data
     Route::get('/api/dropdown/feeders', [\App\Http\Controllers\DropDownData::class, 'getFeeders'])->name('api.dropdown.feeders');
     Route::get('/api/dropdown/keypoints', [\App\Http\Controllers\DropDownData::class, 'getKeypointNames'])->name('api.dropdown.keypoints');
+
+    //Route::get('/api/organizations', [UserController::class, 'getOrganizations'])->name('api.organizations');
 });
 
 require __DIR__ . '/settings.php';
