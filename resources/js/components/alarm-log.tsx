@@ -84,7 +84,7 @@ export default function AlarmLog() {
 
     // Filter alarms based on user permissions
     const filterAlarmsByPermissions = useCallback((alarmList: AlarmEntry[]) => {
-        if (isAdmin) {
+        if (isAdmin || userKeypoints.length === 0) {
             return alarmList;
         }
 
@@ -93,28 +93,17 @@ export default function AlarmLog() {
         );
     }, [isAdmin, userKeypoints]);
 
-    const sortAlarms = (alarmList: AlarmEntry[]) => {
-        return alarmList.sort((a, b) => new Date(b.TIME).getTime() - new Date(a.TIME).getTime());
-    };
-
     const fetchAlarms = async () => {
         try {
             let query = supabase
                 .from('alarms')
                 .select('id, TEXT, TIME, PRIORITY, STATIONPID')
-                .order('TIME', { ascending: false })
+                .order('id', { ascending: false })
                 .limit(30);
 
             // Apply server-side filtering if not admin and userKeypoints exist
-            if (!isAdmin) {
-                if (userKeypoints.length > 0) {
-                    query = query.in('STATIONPID', userKeypoints);
-                } else {
-                    // If non-admin has no keypoints, return no alarms
-                    setAlarms([]);
-                    setLoading(false);
-                    return;
-                }
+            if (!isAdmin && userKeypoints.length > 0) {
+                query = query.in('STATIONPID', userKeypoints);
             }
 
             const { data, error } = await query;
@@ -124,7 +113,7 @@ export default function AlarmLog() {
             }
 
             // No client-side filtering needed here as it's done server-side
-            setAlarms(sortAlarms(data || []));
+            setAlarms(data || []);
             setLoading(false);
         } catch (err) {
             console.error('Error fetching alarms:', err);
@@ -310,17 +299,16 @@ export default function AlarmLog() {
                                 const filteredNew = filterAlarmsByPermissions([newAlarm]);
                                 if (filteredNew.length === 0) return prev;
 
-                                const updated = sortAlarms([...filteredNew, ...prev]);
+                                const updated = [...filteredNew, ...prev];
                                 return updated.slice(0, 30);
                             });
                         }
                         else if (payload.eventType === 'UPDATE') {
-                            setAlarms(prev => {
-                                const updated = prev.map(alarm =>
+                            setAlarms(prev =>
+                                prev.map(alarm =>
                                     alarm.id === payload.new.id ? { ...alarm, ...payload.new } : alarm
-                                );
-                                return sortAlarms(updated);
-                            });
+                                )
+                            );
                         }
                         else if (payload.eventType === 'DELETE') {
                             setAlarms(prev =>
