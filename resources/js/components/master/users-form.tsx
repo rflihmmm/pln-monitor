@@ -54,19 +54,22 @@ export default function UserForm({ user, onSubmit, onCancel, isEdit = false }: U
 
   useEffect(() => {
     if (user && isEdit) {
+      const initialUnit = user.unit_id || user.unit;
       setUserData({
         name: user.name,
         email: user.email,
         role: user.role,
-        unit: user.unit_id || user.unit,
+        unit: initialUnit,
       })
 
       // Set initial search term for unit organization
-      if ((user.unit_id || user.unit) && organizations.length > 0) {
-        const selectedOrg = organizations.find(org => org.id === (user.unit_id || user.unit))
+      if (initialUnit && organizations.length > 0) {
+        const selectedOrg = organizations.find(org => org.id === initialUnit)
         if (selectedOrg) {
           setUnitSearchTerm(selectedOrg.display_name)
         }
+      } else if (initialUnit === null) {
+        setUnitSearchTerm("All")
       }
     }
   }, [user, isEdit, organizations])
@@ -119,10 +122,10 @@ export default function UserForm({ user, onSubmit, onCancel, isEdit = false }: U
     }
 
     // Validate unit for user role
-    if (userData.role === 'user' && !userData.unit) {
-      setUnitError('Unit is required for user role.')
-      return
-    }
+    // if (userData.role === 'user' && !userData.unit) {
+    //   setUnitError('Unit is required for user role.')
+    //   return
+    // }
     setUnitError('') // Clear error if validation passes
 
     onSubmit(userData)
@@ -138,7 +141,7 @@ export default function UserForm({ user, onSubmit, onCancel, isEdit = false }: U
     if (unitError) setUnitError("")
     if (value === "none") {
       handleChange("unit", null)
-      setUnitSearchTerm("")
+      setUnitSearchTerm("All")
     } else {
       const selectedOrg = organizations.find(org => org.id.toString() === value)
       if (selectedOrg) {
@@ -151,13 +154,13 @@ export default function UserForm({ user, onSubmit, onCancel, isEdit = false }: U
 
   const clearUnitSelection = () => {
     handleChange("unit", null)
-    setUnitSearchTerm("")
+    setUnitSearchTerm("All")
   }
 
   // Get selected unit name for display
   const selectedUnitName = userData.unit
     ? organizations.find(org => org.id === userData.unit)?.display_name
-    : null
+    : "All"
 
   return (
     <div className="grid gap-4 py-4">
@@ -211,7 +214,7 @@ export default function UserForm({ user, onSubmit, onCancel, isEdit = false }: U
               className="pr-20"
               disabled={isLoadingOrganizations}
             />
-            {selectedUnitName && (
+            {userData.unit !== null && (
               <Button
                 type="button"
                 variant="ghost"
@@ -229,8 +232,8 @@ export default function UserForm({ user, onSubmit, onCancel, isEdit = false }: U
                   className="px-3 py-2 cursor-pointer hover:bg-gray-100 text-sm border-b"
                   onClick={() => handleUnitSelect("none")}
                 >
-                  <span className="font-medium">None</span>
-                  <div className="text-xs text-gray-500">No unit assigned</div>
+                  <span className="font-medium">All</span>
+                  <div className="text-xs text-gray-500">All units assigned</div>
                 </div>
                 {filteredOrganizations.length > 0 ? (
                   filteredOrganizations.map((org) => (
@@ -257,10 +260,16 @@ export default function UserForm({ user, onSubmit, onCancel, isEdit = false }: U
           </div>
 
           {/* Show selected unit organization */}
-          {selectedUnitName && (
+          {userData.unit === null ? (
             <div className="text-sm text-gray-600 mt-1">
-              Selected: <span className="font-medium">{selectedUnitName}</span>
+              Selected: <span className="font-medium">All</span>
             </div>
+          ) : (
+            selectedUnitName && (
+              <div className="text-sm text-gray-600 mt-1">
+                Selected: <span className="font-medium">{selectedUnitName}</span>
+              </div>
+            )
           )}
           {unitError && (
             <div className="text-sm text-red-500 mt-1">

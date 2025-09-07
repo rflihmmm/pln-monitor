@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { AlertTriangle, Bell, Search, X, Database, Calendar } from 'lucide-react';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import axios from 'axios';
 
@@ -65,6 +65,22 @@ export default function AlarmLog() {
     const [isAdmin, setIsAdmin] = useState(false);
     const [keypointsLoading, setKeypointsLoading] = useState(true);
 
+    // State untuk menandai apakah timeout error sudah aktif
+    const [timeoutTriggered, setTimeoutTriggered] = useState(false);
+
+    // FIX: Use ref to store latest values for realtime subscription
+    const userKeypointsRef = useRef<number[]>([]);
+    const isAdminRef = useRef<boolean>(false);
+
+    // Update refs whenever values change
+    useEffect(() => {
+        userKeypointsRef.current = userKeypoints;
+    }, [userKeypoints]);
+
+    useEffect(() => {
+        isAdminRef.current = isAdmin;
+    }, [isAdmin]);
+
     // Fetch user keypoints and permissions
     const fetchUserKeypoints = async () => {
         try {
@@ -82,18 +98,21 @@ export default function AlarmLog() {
         }
     };
 
-    // Filter alarms based on user permissions
+    // FIX: Stable filter function using refs
     const filterAlarmsByPermissions = useCallback((alarmList: AlarmEntry[]) => {
-        if (isAdmin || userKeypoints.length === 0) {
+        const currentIsAdmin = isAdminRef.current;
+        const currentKeypoints = userKeypointsRef.current;
+
+        if (currentIsAdmin || currentKeypoints.length === 0) {
             return alarmList;
         }
 
         return alarmList.filter(alarm =>
-            userKeypoints.includes(alarm.STATIONPID)
+            currentKeypoints.includes(alarm.STATIONPID)
         );
-    }, [isAdmin, userKeypoints]);
+    }, []); // Empty dependency array since we use refs
 
-    const fetchAlarms = async () => {
+    const fetchAlarms = useCallback(async () => {
         try {
             let query = supabase
                 .from('alarms')
@@ -102,8 +121,8 @@ export default function AlarmLog() {
                 .limit(30);
 
             // Apply server-side filtering if not admin and userKeypoints exist
-            if (!isAdmin && userKeypoints.length > 0) {
-                query = query.in('STATIONPID', userKeypoints);
+            if (!isAdminRef.current && userKeypointsRef.current.length > 0) {
+                query = query.in('STATIONPID', userKeypointsRef.current);
             }
 
             const { data, error } = await query;
@@ -112,7 +131,6 @@ export default function AlarmLog() {
                 throw error;
             }
 
-            // No client-side filtering needed here as it's done server-side
             setAlarms(data || []);
             setLoading(false);
         } catch (err) {
@@ -120,7 +138,7 @@ export default function AlarmLog() {
             setError('Failed to load alarms');
             setLoading(false);
         }
-    };
+    }, []); // Empty dependency array since we use refs
 
     // Search alarms from database
     const searchAlarms = async (filters: SearchFilters) => {
@@ -253,23 +271,18 @@ export default function AlarmLog() {
         fetchUserKeypoints();
     }, []);
 
-    // State untuk menandai apakah timeout error sudah aktif
-    const [timeoutTriggered, setTimeoutTriggered] = useState(false);
-
+    // FIX: Simplified useEffect for realtime subscription
     useEffect(() => {
         if (keypointsLoading) return;
 
         let isMounted = true;
+
+        // Initial fetch
         fetchAlarms();
 
         // Timeout untuk fallback jika realtime gagal
         const realtimeTimeout = setTimeout(() => {
-            // Check current alarms and error state at the time of timeout
-            // This closure captures the initial state, but the functional update for alarms
-            // and the direct setError call will work correctly.
-            // We need to ensure we're not re-running the effect due to these states.
-            if (alarms.length === 0 && !error) { // This check uses the state from the render cycle when the effect was set up.
-                // It's acceptable for a timeout that fires once.
+            if (isMounted) {
                 setError('Realtime connection failed. Please refresh the page.');
                 setRealtimeError(true);
                 setTimeoutTriggered(true);
@@ -290,16 +303,25 @@ export default function AlarmLog() {
                     },
                     (payload) => {
                         if (!isMounted) return;
+
                         if (payload.eventType === 'INSERT') {
                             const newAlarm = payload.new as AlarmEntry;
                             setAlarms(prev => {
                                 const exists = prev.some(alarm => alarm.id === newAlarm.id);
                                 if (exists) return prev;
 
-                                const filteredNew = filterAlarmsByPermissions([newAlarm]);
-                                if (filteredNew.length === 0) return prev;
+                                // Use current ref values for filtering
+                                const currentIsAdmin = isAdminRef.current;
+                                const currentKeypoints = userKeypointsRef.current;
 
-                                const updated = [...filteredNew, ...prev];
+                                // Filter new alarm based on permissions
+                                if (!currentIsAdmin && currentKeypoints.length > 0) {
+                                    if (!currentKeypoints.includes(newAlarm.STATIONPID)) {
+                                        return prev;
+                                    }
+                                }
+
+                                const updated = [newAlarm, ...prev];
                                 return updated.slice(0, 30);
                             });
                         }
@@ -336,7 +358,7 @@ export default function AlarmLog() {
                 supabase.removeChannel(channel);
             }
         };
-    }, [keypointsLoading, isAdmin, userKeypoints, filterAlarmsByPermissions]);
+    }, [keypointsLoading]); // Only depend on keypointsLoading
 
     // Hilangkan pesan error jika data alarm berubah setelah timeout aktif
     useEffect(() => {
@@ -356,7 +378,7 @@ export default function AlarmLog() {
         }, 10000);
 
         return () => clearInterval(intervalId);
-    }, [realtimeError, keypointsLoading]);
+    }, [realtimeError, keypointsLoading, fetchAlarms]);
 
     // Format timestamp for display (convert GMT+0 to GMT+8)
     const formatTimestamp = (timestamp: string) => {

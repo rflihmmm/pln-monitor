@@ -210,7 +210,7 @@ export default function TableUsers({ users: initialUsers }: TableUsersProps) {
                       <div className="capitalize">{user.role}</div>
                     </TableCell>
                     <TableCell>
-                      <div className="capitalize">{user.unit || "No unit assigned"}</div>
+                      <div className="capitalize">{user.unit || "All"}</div>
                     </TableCell>
                     <TableCell>{formatDate(user.createdAt)}</TableCell>
                     <TableCell className="text-right">
