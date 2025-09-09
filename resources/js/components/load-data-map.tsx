@@ -11,6 +11,19 @@ interface RegionData {
     current: string;
 }
 
+const getBackgroundColorClass = (systemName: string) => {
+    switch (systemName) {
+        case 'Beban Sistem DCC SELATAN':
+            return 'bg-[#BEA42E]';
+        case 'Beban Sistem DCC TENGGARA':
+            return 'bg-[#7BD4CC]';
+        case 'Beban Sistem DCC UTARA':
+            return 'bg-[#7B895B]';
+        default:
+            return 'bg-sky-300'; // Default color if no match
+    }
+};
+
 interface SystemData {
     name: string;
     regions: RegionData[];
@@ -94,6 +107,22 @@ export default function LoadData() {
         return rowIndex === 0 || data[rowIndex][field] !== data[rowIndex - 1][field];
     };
 
+    const formatValueWithUnit = (value: string) => {
+        if (!value || value === 'N/A') {
+            return 'N/A';
+        }
+        const parts = value.split(' ');
+        if (parts.length === 2) {
+            return (
+                <>
+                    {parts[0]}{' '}
+                    <span className="text-red-500">{parts[1]}</span>
+                </>
+            );
+        }
+        return value;
+    };
+
     if (loading) {
         return (
             <Card>
@@ -165,8 +194,11 @@ export default function LoadData() {
                                         <>
                                             <tr key={`${region.name}-power`} className="bg-gray-100 border-4 border-white rounded-[50%]">
                                                 {shouldRenderCell(currentSystem.regions, rowIndex, 'name') && (
-                                                    <td
-                                                        className="p-2 text-center align-middle font-bold min-w-[150px] whitespace-normal bg-sky-300 border-3 border-white rounded-xl"
+                                                    <td id="up3"
+                                                        className={cn(
+                                                            "p-2 text-center align-middle font-bold min-w-[150px] whitespace-normal border-3 border-white rounded-xl text-white",
+                                                            getBackgroundColorClass(currentSystem.name)
+                                                        )}
                                                         rowSpan={2}
                                                     >
                                                         {region.name}
@@ -192,9 +224,12 @@ export default function LoadData() {
                                     <span className="font-bold text-xl">Total {currentSystem.name.split(' ').pop()}</span>
                                 </div>
                                 <div className="flex flex-col items-center gap-2 min-w-[130px]">
-                                    <span className="text-xl font-bold">{currentSystem.total.length > 0 ? currentSystem.total[0].power : 'N/A'}</span>
-                                    <span className="text-xl font-bold">{currentSystem.total.length > 0 ? currentSystem.total[0].current : 'N/A'}</span>
-
+                                    <span className="text-xl font-bold">
+                                        {formatValueWithUnit(currentSystem.total.length > 0 ? currentSystem.total[0].power : 'N/A')}
+                                    </span>
+                                    <span className="text-xl font-bold">
+                                        {formatValueWithUnit(currentSystem.total.length > 0 ? currentSystem.total[0].current : 'N/A')}
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -206,8 +241,12 @@ export default function LoadData() {
                                     <span className="font-bold text-xl">Total SULSELRABAR</span>
                                 </div>
                                 <div className="flex flex-col items-center gap-2 min-w-[130px]">
-                                    <span className="text-xl font-bold">{grandTotal.length > 0 ? grandTotal[0].power : 'N/A'}</span>
-                                    <span className="text-xl font-bold">{grandTotal.length > 0 ? grandTotal[0].current : 'N/A'}</span>
+                                    <span className="text-xl font-bold">
+                                        {formatValueWithUnit(grandTotal.length > 0 ? grandTotal[0].power : 'N/A')}
+                                    </span>
+                                    <span className="text-xl font-bold">
+                                        {formatValueWithUnit(grandTotal.length > 0 ? grandTotal[0].current : 'N/A')}
+                                    </span>
                                 </div>
                             </div>
                         </div>
