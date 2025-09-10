@@ -1,4 +1,4 @@
-import AppLogoIcon from '@/components/app-logo-icon';
+import AppPlnLogo from '@/components/app-pln-logo';
 import { Link } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
 import AppFooter from '../app/app-footer';
@@ -18,13 +18,15 @@ export default function AuthSimpleLayout({ children, title, description }: Props
                         <div className="flex flex-col items-center gap-4">
                             <Link href={route('home')} className="flex flex-col items-center gap-2 font-medium">
                                 <div className="mb-1 flex items-center justify-center rounded-md">
-                                    <AppLogoIcon className="scale-80 fill-current text-[var(--foreground)] dark:text-white" />
+                                    <AppPlnLogo className="scale-60 fill-current text-[var(--foreground)] dark:text-white" />
                                 </div>
                                 <span className="sr-only">{title}</span>
                             </Link>
 
-                            <div className="space-y-2 text-center">
-                                <h1 className="text-xl font-medium">{title}</h1>
+                            <div className="text-center">
+                                <h1 className="text-xl font-bold">{title}</h1>
+                                <h1 className="text-xl font-bold">UP2D SULSELRABAR SCADA</h1>
+                                <h1 className="text-xl font-bold">DASHBOARD MONITORING</h1>
                                 <p className="text-muted-foreground text-center text-sm">{description}</p>
                             </div>
                         </div>
