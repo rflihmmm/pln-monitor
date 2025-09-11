@@ -26,11 +26,7 @@ export default function Dashboard() {
                     <div className="space-y-6 lg:col-span-2">
                         <Card className="overflow-hidden">
                             <CardContent className="px-4 md:px-6">
-                                <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-                                    <StatusIndicator />
-                                    {/* <MapFilter currentFilter={mapFilter} onFilterChange={setMapFilter} /> */}
-                                </div>
-                                <div className="h-[500px] overflow-hidden rounded-md border md:h-[600px]">
+                                <div className="h-[80vh] overflow-hidden rounded-md border">
                                     <MapComponent filter={mapFilter} />
                                 </div>
                             </CardContent>

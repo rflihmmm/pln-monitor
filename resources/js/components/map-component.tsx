@@ -4,6 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useEffect, useRef, useState } from 'react';
 import { MapContainer, Marker, Popup, TileLayer, ZoomControl } from 'react-leaflet';
+import { CircleIcon } from 'lucide-react';
 
 // Define marker types based on API response
 interface SubstationMarker {
@@ -181,7 +182,17 @@ export default function MapComponent({ filter }: MapComponentProps) {
 
             {/* Display count of markers */}
             <div className="absolute top-4 left-4 z-[1000] bg-white px-3 py-2 rounded-md shadow-md">
-                <p className="text-sm font-medium">
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <CircleIcon className="h-4 w-4 fill-green-500 text-green-500" />
+                        <span className="text-sm font-medium">Active</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <CircleIcon className="fill-destructive text-destructive h-4 w-4" />
+                        <span className="text-sm font-medium">Inactive</span>
+                    </div>
+                </div>
+                <p className="text-sm font-medium mt-2">
                     {markers.length} {filter === 'ALL' ? 'Total' : filter} Substations
                 </p>
             </div>

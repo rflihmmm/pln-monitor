@@ -9,6 +9,7 @@ use App\Http\Controllers\AlarmController;
 use App\Http\Controllers\TableHmiController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SingleLineController;
+use App\Http\Controllers\StationPointsController;
 use App\Http\Controllers\Master\UserController;
 
 // Route::get('/', function () {
@@ -17,6 +18,12 @@ use App\Http\Controllers\Master\UserController;
 //
 
 Route::redirect('/', '/login')->name('home');
+
+// Public routes for StationPoints API (accessible by anyone without authentication)
+Route::prefix('get')->group(function () {
+    Route::get('/stationpoints', [StationPointsController::class, 'getAllStationPoints'])->name('api.stationpoints.all');
+    Route::get('/stationpoints/{code}', [StationPointsController::class, 'getStationPointByCode'])->name('api.stationpoints.single');
+});
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {

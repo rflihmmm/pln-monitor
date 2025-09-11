@@ -425,15 +425,16 @@ export function SingleLineNetwork() {
 
     return (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_360px]">
-            <div className="relative h-[600px]">
+            <div className="relative h-[full] md:h-[600px]">
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000]">
                     <MapFilter currentFilter={statusFilter} onFilterChange={setStatusFilter} />
                 </div>
                 <MapContainer
+                    className="h-[80vh] w-full rounded-md my-2"
                     center={defaultCenter}
                     zoom={7}
                     zoomControl={false}
-                    style={{ height: "100%", width: "100%", zIndex: 1 }}
+                    style={{ height: "76vh", width: "100%", zIndex: 1 }}
                     whenCreated={(m) => {
                         mapRef.current = m
                         setZoom(m.getZoom())
