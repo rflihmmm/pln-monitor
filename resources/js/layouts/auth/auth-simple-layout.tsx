@@ -25,8 +25,8 @@ export default function AuthSimpleLayout({ children, title, description }: Props
 
                             <div className="text-center">
                                 <h1 className="text-xl font-bold">{title}</h1>
-                                <h1 className="text-xl font-bold">UP2D SULSELRABAR SCADA</h1>
-                                <h1 className="text-xl font-bold">DASHBOARD MONITORING</h1>
+                                <h1 className="text-xl font-bold">UP2D SULSELRABAR</h1>
+                                <h1 className="text-xl font-bold">DASHBOARD MONITORING SCADA</h1>
                                 <p className="text-muted-foreground text-center text-sm">{description}</p>
                             </div>
                         </div>
