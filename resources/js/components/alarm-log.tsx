@@ -4,7 +4,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { AlertTriangle, Bell, Search, X, Database, Calendar } from 'lucide-react';
+import { AlertTriangle, Bell, Search, X, Database, Calendar, Download } from 'lucide-react';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import axios from 'axios';
@@ -59,6 +59,9 @@ export default function AlarmLog() {
     const [searchResults, setSearchResults] = useState<AlarmEntry[]>([]);
     const [searchMode, setSearchMode] = useState(false);
     const [showDateFilter, setShowDateFilter] = useState(false);
+
+    // Download functionality states
+    const [isDownloading, setIsDownloading] = useState(false);
 
     // User permissions
     const [userKeypoints, setUserKeypoints] = useState<number[]>([]);
@@ -193,6 +196,62 @@ export default function AlarmLog() {
             setError('Failed to search alarms: ' + (err.response?.data?.message || err.message));
         } finally {
             setIsSearching(false);
+        }
+    };
+
+    // Download CSV function
+    const downloadCSV = async () => {
+        if (!searchMode || searchResults.length === 0) {
+            return;
+        }
+
+        setIsDownloading(true);
+
+        try {
+            // Prepare CSV headers
+            const headers = ['ID', 'Time', 'Alarm Text', 'Priority', 'Station PID', 'Station Name'];
+
+            // Prepare CSV rows
+            const csvRows = [
+                headers.join(','), // Header row
+                ...searchResults.map(alarm => [
+                    alarm.id,
+                    `"${formatTimestamp(alarm.TIME)}"`, // Wrap in quotes to handle commas
+                    `"${(alarm.TEXT || '').replace(/"/g, '""')}"`, // Escape quotes and wrap in quotes
+                    alarm.PRIORITY,
+                    alarm.STATIONPID,
+                    `"${alarm.station_name || 'N/A'}"` // Wrap in quotes
+                ].join(','))
+            ];
+
+            // Create CSV content
+            const csvContent = csvRows.join('\n');
+
+            // Create blob and download
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+
+            if (link.download !== undefined) {
+                // Generate filename with current date
+                const now = new Date();
+                const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+                const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-'); // HH-MM-SS format
+                const filename = `alarm-log-${dateStr}_${timeStr}.csv`;
+
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }
+        } catch (err) {
+            console.error('Error downloading CSV:', err);
+            setError('Failed to download CSV file');
+        } finally {
+            setIsDownloading(false);
         }
     };
 
@@ -454,7 +513,7 @@ export default function AlarmLog() {
                 <div className="flex items-center gap-2">
                     {searchMode && (
                         <Badge variant="outline" className="font-normal flex items-center gap-1">
-                            <Database className="h-3 w-3" />
+                            <Database className="h-4 w-4" />
                             Database
                         </Badge>
                     )}
@@ -491,6 +550,19 @@ export default function AlarmLog() {
                         <Button type="submit" disabled={isSearching}>
                             {isSearching ? 'Searching...' : 'Search'}
                         </Button>
+                        {/* Download Button - Only visible in search mode */}
+                        {searchMode && searchResults.length > 0 && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={downloadCSV}
+                                disabled={isDownloading}
+                                className="flex items-center gap-2"
+                            >
+                                <Download className="h-4 w-4" />
+                                {isDownloading ? 'Downloading...' : 'CSV'}
+                            </Button>
+                        )}
                         {searchMode && (
                             <Button variant="outline" onClick={clearSearch}>
                                 <X className="h-4 w-4" />
