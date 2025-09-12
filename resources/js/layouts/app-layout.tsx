@@ -21,7 +21,7 @@ export default ({
     ...props
 }: AppLayoutProps) => {
     useFlashToast();
-    n8nWebhookUrl = 'http://163.61.80.13:5678/webhook/cb6a2d7e-09f3-4498-b8d6-7f5c7df1d219/chat';
+    n8nWebhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL;
 
     return (
         <AppLayoutTemplate breadcrumbs={breadcrumbs} {...props}>
