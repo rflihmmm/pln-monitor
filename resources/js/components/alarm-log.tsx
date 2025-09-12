@@ -118,7 +118,7 @@ export default function AlarmLog() {
                 .from('alarms')
                 .select('id, TEXT, TIME, PRIORITY, STATIONPID')
                 .order('id', { ascending: false })
-                .limit(30);
+                .limit(100);
 
             // Apply server-side filtering if not admin and userKeypoints exist
             if (!isAdminRef.current && userKeypointsRef.current.length > 0) {
@@ -156,7 +156,7 @@ export default function AlarmLog() {
 
         try {
             const params: any = {
-                limit: 50
+                limit: 1000
             };
 
             if (hasTextFilter) {
