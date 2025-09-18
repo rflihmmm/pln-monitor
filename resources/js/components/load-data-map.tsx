@@ -90,6 +90,27 @@ export default function LoadData() {
 
     const currentSystem = systemsData.find((system) => system.name === selectedSystem) || systemsData[0];
 
+    // Helper function to format numbers for Indonesian locale (swaps '.' and ',')
+    const formatNumberID = (numStr: string): string => {
+        if (!numStr) return numStr;
+
+        // Check if the number already uses Indonesian format (e.g., 10.545,23)
+        // This is a simple heuristic, assuming numbers with ',' as decimal separator are already formatted.
+        if (numStr.includes(',')) {
+            // If it has a comma, assume it's already in Indonesian format or needs to be converted from US to ID
+            // Example: 10,545.23 (US) -> 10.545,23 (ID)
+            return numStr.replace(/\./g, '#').replace(/,/g, '.').replace(/#/g, ',');
+        } else if (numStr.includes('.')) {
+            // If it has a dot, assume it's in US format (e.g., 10,545.23) and convert to ID
+            // Example: 10545.23 (US) -> 10.545,23 (ID)
+            const parts = numStr.split('.');
+            const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.'); // Add thousands separator
+            const decimalPart = parts.length > 1 ? `,${parts[1]}` : '';
+            return `${integerPart}${decimalPart}`;
+        }
+        return numStr;
+    };
+
     // Helper function to calculate rowspan for cells that should be merged
     const calculateRowSpan = (data: RegionData[], rowIndex: number, field: keyof RegionData): number | undefined => {
         if (rowIndex === 0 || data[rowIndex][field] !== data[rowIndex - 1][field]) {
@@ -113,14 +134,15 @@ export default function LoadData() {
         }
         const parts = value.split(' ');
         if (parts.length === 2) {
+            const formattedNumber = formatNumberID(parts[0]);
             return (
                 <>
-                    {parts[0]}{' '}
+                    {formattedNumber}{' '}
                     <span className="text-red-500">{parts[1]}</span>
                 </>
             );
         }
-        return value;
+        return formatNumberID(value);
     };
 
     if (loading) {
@@ -204,11 +226,11 @@ export default function LoadData() {
                                                         {region.name}
                                                     </td>
                                                 )}
-                                                <td className="p-2 text-right align-middle font-bold text-xl min-w-[100px]">{region.power.split(' ')[0]}</td>
+                                                <td className="p-2 text-right align-middle font-bold text-xl min-w-[100px]">{formatNumberID(region.power.split(' ')[0])}</td>
                                                 <td className="p-2 text-right align-middle text-sm min-w-[50px] text-red-500 font-bold">{region.power.split(' ')[1]}</td>
                                             </tr>
                                             <tr key={`${region.name}-current`} className="bg-gray-100 border-4 border-white rounded-2xl">
-                                                <td className="p-2 text-right align-middle font-bold text-xl min-w-[100px]">{region.current.split(' ')[0]}</td>
+                                                <td className="p-2 text-right align-middle font-bold text-xl min-w-[100px]">{formatNumberID(region.current.split(' ')[0])}</td>
                                                 <td className="p-2 text-right align-middle text-sm min-w-[50px] text-red-500 font-bold">{region.current.split(' ')[1]}</td>
                                             </tr>
                                         </>

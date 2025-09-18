@@ -6,8 +6,6 @@ import { Card } from './ui/card';
 // Chat component
 export default function AiChatBot({
     webhookUrl,
-    allowUploads = false,
-    allowedMimeTypes = '',
     showWelcome = true,
 }: {
     webhookUrl: string;
@@ -37,11 +35,11 @@ export default function AiChatBot({
                     closeButtonTooltip: 'Tutup',
                 },
             },
-            allowFileUploads: allowUploads,
-            allowedFilesMimeTypes: allowedMimeTypes,
+            allowFileUploads: true,
+            allowedFilesMimeTypes: 'application/pdf,text/csv,text/text,image/png,image/jpeg,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel',
             enableStreaming: false,
         });
-    }, [webhookUrl, allowUploads, allowedMimeTypes, showWelcome]);
+    }, [webhookUrl, showWelcome]);
 
     const containerStyle: React.CSSProperties = {
         width: '100%',

@@ -7,8 +7,6 @@ import { MessageCircle, X } from 'lucide-react';
 // Floating Chat component
 export default function AppChatBot({
     webhookUrl,
-    allowUploads = false,
-    allowedMimeTypes = '',
     showWelcome = true,
 }: {
     webhookUrl: string;
@@ -34,7 +32,7 @@ export default function AppChatBot({
                 ],
                 i18n: {
                     en: {
-                        title: '',
+                        title: 'SCADA Chat Bot',
                         subtitle: '',
                         footer: '',
                         getStarted: 'Percakapan Baru',
@@ -42,13 +40,13 @@ export default function AppChatBot({
                         closeButtonTooltip: 'Tutup',
                     },
                 },
-                allowFileUploads: allowUploads,
-                allowedFilesMimeTypes: allowedMimeTypes,
+                allowFileUploads: true,
+                allowedFilesMimeTypes: 'application/pdf,text/csv,text/text,image/png,image/jpeg,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel',
                 enableStreaming: false,
             });
             setChatInitialized(true);
         }, 100);
-    }, [webhookUrl, allowUploads, allowedMimeTypes, showWelcome, isOpen, chatInitialized]);
+    }, [webhookUrl, showWelcome, isOpen, chatInitialized]);
 
     const toggleChat = () => {
         setIsOpen(!isOpen);
