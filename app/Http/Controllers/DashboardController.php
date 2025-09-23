@@ -740,92 +740,111 @@ class DashboardController extends Controller
         ];
     }
 
-    private function aggregateAndFormatLoadData($orgStructure, $lbsLoads, $feederLoads)
-    {
-        // Aggregate data by UP3
-        $aggregatedData = [];
-        foreach ($orgStructure as $orgLink) {
-            $dccName = $orgLink->dcc_name;
-            $up3Id = $orgLink->up3_id;
-            $keypointId = $orgLink->keypoint_id;
+    private function calculatePowerBasedOnDCC($dccName, $current, $originalPower)
+{
+    $dccNameUpper = strtoupper(trim($dccName));
+    
+    // Cek apakah DCC UTARA atau SELATAN
+    if (strpos($dccNameUpper, 'UTARA') !== false) {
+        // Formula: current * 20.7 * 1.732 * 0.9 / 1000
+        return $current * 20.7 * 1.732 * 0.9 / 1000;
+    } elseif (strpos($dccNameUpper, 'SELATAN') !== false) {
+        // Formula: current * 20.7 * 1.732 * 0.9 / 1000
+        return $current * 20.7 * 1.732 * 0.9 / 1000;
+    } else {
+        // Untuk DCC lainnya, gunakan power original
+        return $originalPower;
+    }
+}
 
-            if (!isset($aggregatedData[$dccName])) {
-                $aggregatedData[$dccName] = ['up3s' => []];
-            }
-            if (!isset($aggregatedData[$dccName]['up3s'][$up3Id])) {
-                $aggregatedData[$dccName]['up3s'][$up3Id] = [
-                    'name' => $orgLink->up3_name,
-                    'lbs_power' => 0,
-                    'lbs_current' => 0,
-                    'feeder_power' => 0,
-                    'feeder_current' => 0,
-                ];
-            }
+/**
+ * Modifikasi method aggregateAndFormatLoadData
+ */
+private function aggregateAndFormatLoadData($orgStructure, $lbsLoads, $feederLoads)
+{
+    // Aggregate data by UP3
+    $aggregatedData = [];
+    foreach ($orgStructure as $orgLink) {
+        $dccName = $orgLink->dcc_name;
+        $up3Id = $orgLink->up3_id;
+        $keypointId = $orgLink->keypoint_id;
 
-            $lbsValues = $lbsLoads[$keypointId] ?? ['power' => 0, 'current' => 0];
-            $aggregatedData[$dccName]['up3s'][$up3Id]['lbs_power'] += $lbsValues['power'];
-            $aggregatedData[$dccName]['up3s'][$up3Id]['lbs_current'] += $lbsValues['current'];
-
-            $feederValues = $feederLoads[$keypointId] ?? ['power' => 0, 'current' => 0];
-            $aggregatedData[$dccName]['up3s'][$up3Id]['feeder_power'] += $feederValues['power'];
-            $aggregatedData[$dccName]['up3s'][$up3Id]['feeder_current'] += $feederValues['current'];
+        if (!isset($aggregatedData[$dccName])) {
+            $aggregatedData[$dccName] = ['up3s' => []];
+        }
+        if (!isset($aggregatedData[$dccName]['up3s'][$up3Id])) {
+            $aggregatedData[$dccName]['up3s'][$up3Id] = [
+                'name' => $orgLink->up3_name,
+                'lbs_power' => 0,
+                'lbs_current' => 0,
+                'feeder_power' => 0,
+                'feeder_current' => 0,
+            ];
         }
 
-        // Format the final response
-        $systemLoadData = [];
-        $grandTotalLbsPower = 0;
-        $grandTotalLbsCurrent = 0;
-        $grandTotalFeederPower = 0;
-        $grandTotalFeederCurrent = 0;
+        $lbsValues = $lbsLoads[$keypointId] ?? ['power' => 0, 'current' => 0];
+        $aggregatedData[$dccName]['up3s'][$up3Id]['lbs_power'] += $lbsValues['power'];
+        $aggregatedData[$dccName]['up3s'][$up3Id]['lbs_current'] += $lbsValues['current'];
 
-        foreach ($aggregatedData as $dccName => $dccData) {
-            $regions = [];
-            $dccTotalLbsPower = 0;
-            $dccTotalLbsCurrent = 0;
-            $dccTotalFeederPower = 0;
-            $dccTotalFeederCurrent = 0;
+        $feederValues = $feederLoads[$keypointId] ?? ['power' => 0, 'current' => 0];
+        $aggregatedData[$dccName]['up3s'][$up3Id]['feeder_power'] += $feederValues['power'];
+        $aggregatedData[$dccName]['up3s'][$up3Id]['feeder_current'] += $feederValues['current'];
+    }
 
-            foreach ($dccData['up3s'] as $up3) {
-                // Add Feeder data for the region
-                $regions[] = [
-                    'name' => $up3['name'],
-                    'power' => number_format($up3['feeder_power'], 2) . ' MW',
-                    'current' => number_format($up3['feeder_current'], 2) . ' A',
-                ];
+    // Format the final response
+    $systemLoadData = [];
+    $grandTotalPower = 0;
+    $grandTotalCurrent = 0;
 
-                $dccTotalLbsPower += $up3['lbs_power'];
-                $dccTotalLbsCurrent += $up3['lbs_current'];
-                $dccTotalFeederPower += $up3['feeder_power'];
-                $dccTotalFeederCurrent += $up3['feeder_current'];
-            }
+    foreach ($aggregatedData as $dccName => $dccData) {
+        $regions = [];
+        $dccTotalPower = 0;
+        $dccTotalCurrent = 0;
 
-            $systemLoadData[] = [
-                'name' => 'Beban Sistem ' . $dccName,
-                'regions' => $regions,
-                'total' => [
-                    [
-                        'power' => number_format($dccTotalFeederPower, 2) . ' MW',
-                        'current' => number_format($dccTotalFeederCurrent, 2) . ' A',
-                    ]
-                ]
+        foreach ($dccData['up3s'] as $up3) {
+            // Hitung power berdasarkan DCC name
+            $calculatedPower = $this->calculatePowerBasedOnDCC(
+                $dccName, 
+                $up3['feeder_current'], 
+                $up3['feeder_power']
+            );
+
+            // Add Feeder data for the region
+            $regions[] = [
+                'name' => $up3['name'],
+                'power' => number_format($calculatedPower, 2) . ' MW',
+                'current' => number_format($up3['feeder_current'], 2) . ' A',
             ];
 
-            $grandTotalLbsPower += $dccTotalLbsPower;
-            $grandTotalLbsCurrent += $dccTotalLbsCurrent;
-            $grandTotalFeederPower += $dccTotalFeederPower;
-            $grandTotalFeederCurrent += $dccTotalFeederCurrent;
+            $dccTotalPower += $calculatedPower;
+            $dccTotalCurrent += $up3['feeder_current'];
         }
 
-        $grandTotal = [
-            [
-                'power' => number_format($grandTotalFeederPower, 2) . ' MW',
-                'current' => number_format($grandTotalFeederCurrent, 2) . ' A',
+        $systemLoadData[] = [
+            'name' => 'Beban Sistem ' . $dccName,
+            'regions' => $regions,
+            'total' => [
+                [
+                    'power' => number_format($dccTotalPower, 2) . ' MW',
+                    'current' => number_format($dccTotalCurrent, 2) . ' A',
+                ]
             ]
         ];
 
-        return [
-            'data' => $systemLoadData,
-            'grandTotal' => $grandTotal
-        ];
+        $grandTotalPower += $dccTotalPower;
+        $grandTotalCurrent += $dccTotalCurrent;
     }
+
+    $grandTotal = [
+        [
+            'power' => number_format($grandTotalPower, 2) . ' MW',
+            'current' => number_format($grandTotalCurrent, 2) . ' A',
+        ]
+    ];
+
+    return [
+        'data' => $systemLoadData,
+        'grandTotal' => $grandTotal
+    ];
+}
 }

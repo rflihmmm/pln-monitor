@@ -10,6 +10,8 @@ use App\Models\FeederKeypoint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
+use App\Models\Organization;
+use App\Models\OrganizationKeypoint;
 
 class StationPointsController extends Controller
 {
@@ -279,6 +281,9 @@ class StationPointsController extends Controller
             $parent = ($type !== 'GI' && isset($keypointData->parent_stationpoints))
                 ? $keypointData->parent_stationpoints : null;
 
+            // Resolve organization string (ULP | UP3 | DCC) for this keypoint
+            $organizationString = $this->getOrganizationStringForKeypoint($keypointId);
+
             $status = $this->getKeypointStatusOptimized($keypointId, $preloadedData['status_points']);
             $loadData = $this->calculateKeypointLoadOptimized(
                 $keypointId,
@@ -312,6 +317,7 @@ class StationPointsController extends Controller
                 'type' => $type,
                 'coordinate' => $coordinate,
                 'parent' => $parent,
+                'organization' => $organizationString,
                 'status' => $status,
                 'data' => [
                     'load-mw' => $loadData['load_mw'] . ' MW',
@@ -581,5 +587,61 @@ class StationPointsController extends Controller
         }
 
         return $allAnalogPoints;
+    }
+
+    /**
+     * Return organization string for a keypoint in format "ULP | UP3 | DCC".
+     * If multiple organizations map to the keypoint, join them with `; `.
+     */
+    private function getOrganizationStringForKeypoint($keypointId)
+    {
+        try {
+            $orgIds = OrganizationKeypoint::where('keypoint_id', $keypointId)
+                ->pluck('organization_id')
+                ->unique()
+                ->filter()
+                ->values()
+                ->all();
+
+            if (empty($orgIds)) {
+                return null;
+            }
+
+            $strings = [];
+
+            foreach ($orgIds as $orgId) {
+                $org = Organization::find($orgId);
+                if (!$org) continue;
+
+                // Walk up to find ULP (3), UP3 (2), DCC (1)
+                $current = $org;
+                $ulpName = null;
+                $up3Name = null;
+                $dccName = null;
+
+                while ($current) {
+                    if ($current->level == 3) {
+                        $ulpName = $current->name;
+                    } elseif ($current->level == 2) {
+                        $up3Name = $current->name;
+                    } elseif ($current->level == 1) {
+                        $dccName = $current->name;
+                    }
+                    $current = $current->parent;
+                }
+
+                $parts = [];
+                if ($ulpName) $parts[] = $ulpName;
+                if ($up3Name) $parts[] = $up3Name;
+                if ($dccName) $parts[] = $dccName;
+
+                $strings[] = implode(' | ', $parts);
+            }
+
+            return implode('; ', $strings);
+        } catch (\Exception $e) {
+            Log::error('Error resolving organization for keypoint ' . $keypointId . ': ' . $e->getMessage());
+            return null;
+        }
     }
 }

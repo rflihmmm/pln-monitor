@@ -19,6 +19,8 @@ const getBackgroundColorClass = (systemName: string) => {
             return 'bg-[#7BD4CC]';
         case 'Beban Sistem DCC UTARA':
             return 'bg-[#7B895B]';
+        case 'Beban Sistem DCC ALL':
+            return 'bg-blue-600'; // A distinct color for DCC ALL
         default:
             return 'bg-sky-300'; // Default color if no match
     }
@@ -65,9 +67,25 @@ export default function LoadData() {
                     setSystemsData(result.data);
                     setGrandTotal(result.grandTotal || []);
 
-                    // Set default selected system to first system if none selected
-                    if (result.data.length > 0 && !selectedSystem) {
-                        setSelectedSystem(result.data[0].name);
+                    // Create "Beban Sistem DCC ALL" entry
+                    const dccAllTotalRegions: RegionData[] = result.data.map(system => ({
+                        name: system.name,
+                        power: system.total[0]?.power || 'N/A',
+                        current: system.total[0]?.current || 'N/A',
+                    }));
+
+                    const dccAllSystem: SystemData = {
+                        name: 'Beban Sistem DCC ALL',
+                        regions: dccAllTotalRegions,
+                        total: result.grandTotal || [],
+                    };
+
+                    const updatedSystemsData = [dccAllSystem, ...result.data];
+                    setSystemsData(updatedSystemsData);
+
+                    // Set default selected system to "Beban Sistem DCC ALL" if none selected
+                    if (!selectedSystem) {
+                        setSelectedSystem('Beban Sistem DCC ALL');
                     }
                 } else {
                     setError(result.message || 'Failed to fetch system load data');
@@ -111,38 +129,19 @@ export default function LoadData() {
         return numStr;
     };
 
-    // Helper function to calculate rowspan for cells that should be merged
-    const calculateRowSpan = (data: RegionData[], rowIndex: number, field: keyof RegionData): number | undefined => {
-        if (rowIndex === 0 || data[rowIndex][field] !== data[rowIndex - 1][field]) {
-            let span = 1;
-            while (rowIndex + span < data.length && data[rowIndex + span][field] === data[rowIndex][field]) {
-                span++;
-            }
-            return span;
-        }
-        return undefined;
-    };
-
     // Helper function to determine if a cell should be rendered
     const shouldRenderCell = (data: RegionData[], rowIndex: number, field: keyof RegionData): boolean => {
         return rowIndex === 0 || data[rowIndex][field] !== data[rowIndex - 1][field];
     };
 
-    const formatValueWithUnit = (value: string) => {
-        if (!value || value === 'N/A') {
-            return 'N/A';
-        }
+    // Reusable helper: split a value like "26,67 MW" into formatted number and unit
+    const splitNumberAndUnit = (value: string): { number: string; unit: string } => {
+        if (!value || value === 'N/A') return { number: 'N/A', unit: '' };
         const parts = value.split(' ');
-        if (parts.length === 2) {
-            const formattedNumber = formatNumberID(parts[0]);
-            return (
-                <>
-                    {formattedNumber}{' '}
-                    <span className="text-red-500">{parts[1]}</span>
-                </>
-            );
-        }
-        return formatNumberID(value);
+        const numRaw = parts[0] || 'N/A';
+        const num = numRaw === 'N/A' ? 'N/A' : formatNumberID(numRaw);
+        const unit = parts.slice(1).join(' ') || '';
+        return { number: num, unit };
     };
 
     if (loading) {
@@ -239,22 +238,48 @@ export default function LoadData() {
                             </table>
                         </div>
 
-                        <div className="bg-muted mt-4 rounded-lg border p-3 shadow-sm">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 min-w-[180px]">
-                                    <Zap className="text-primary h-5 w-5" />
-                                    <span className="font-bold text-xl">Total {currentSystem.name.split(' ').pop()}</span>
-                                </div>
-                                <div className="flex flex-col items-center gap-2 min-w-[130px]">
-                                    <span className="text-xl font-bold">
-                                        {formatValueWithUnit(currentSystem.total.length > 0 ? currentSystem.total[0].power : 'N/A')}
-                                    </span>
-                                    <span className="text-xl font-bold">
-                                        {formatValueWithUnit(currentSystem.total.length > 0 ? currentSystem.total[0].current : 'N/A')}
-                                    </span>
+                        {selectedSystem !== 'Beban Sistem DCC ALL' && (
+                            <div className="bg-muted mt-4 rounded-lg border p-3 shadow-sm">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 min-w-[180px]">
+                                        <Zap className="text-primary h-5 w-5" />
+                                        <span className="font-bold text-xl">
+                                            {currentSystem.name === 'Beban Sistem DCC ALL' ? 'Total DCC ALL' : `Total ${currentSystem.name.split(' ').pop()}`}
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-col items-center gap-2 min-w-[130px]">
+                                        <table className="w-full text-right min-w-[130px]">
+                                            <tbody>
+                                                <tr>
+                                                    {(() => {
+                                                        const val = currentSystem.total.length > 0 ? currentSystem.total[0].power : 'N/A';
+                                                        const { number: num, unit } = splitNumberAndUnit(val);
+                                                        return (
+                                                            <>
+                                                                <td className="p-1 text-xl font-bold align-middle">{num}</td>
+                                                                <td className="p-1 text-sm text-red-500 font-bold align-middle">{unit}</td>
+                                                            </>
+                                                        );
+                                                    })()}
+                                                </tr>
+                                                <tr>
+                                                    {(() => {
+                                                        const val = currentSystem.total.length > 0 ? currentSystem.total[0].current : 'N/A';
+                                                        const { number: num, unit } = splitNumberAndUnit(val);
+                                                        return (
+                                                            <>
+                                                                <td className="p-1 text-xl font-bold align-middle">{num}</td>
+                                                                <td className="p-1 text-sm text-red-500 font-bold align-middle">{unit}</td>
+                                                            </>
+                                                        );
+                                                    })()}
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        )}
 
                         <div className="bg-muted mt-4 rounded-lg border p-3 shadow-sm">
                             <div className="flex items-center justify-between gap-3">
@@ -263,12 +288,34 @@ export default function LoadData() {
                                     <span className="font-bold text-xl">Total SULSELRABAR</span>
                                 </div>
                                 <div className="flex flex-col items-center gap-2 min-w-[130px]">
-                                    <span className="text-xl font-bold">
-                                        {formatValueWithUnit(grandTotal.length > 0 ? grandTotal[0].power : 'N/A')}
-                                    </span>
-                                    <span className="text-xl font-bold">
-                                        {formatValueWithUnit(grandTotal.length > 0 ? grandTotal[0].current : 'N/A')}
-                                    </span>
+                                    <table className="w-full text-right min-w-[130px]">
+                                        <tbody>
+                                            <tr>
+                                                {(() => {
+                                                    const val = grandTotal.length > 0 ? grandTotal[0].power : 'N/A';
+                                                    const { number: num, unit } = splitNumberAndUnit(val);
+                                                    return (
+                                                        <>
+                                                            <td className="p-1 text-xl font-bold align-middle">{num}</td>
+                                                            <td className="p-1 text-sm text-red-500 font-bold align-middle">{unit}</td>
+                                                        </>
+                                                    );
+                                                })()}
+                                            </tr>
+                                            <tr>
+                                                {(() => {
+                                                    const val = grandTotal.length > 0 ? grandTotal[0].current : 'N/A';
+                                                    const { number: num, unit } = splitNumberAndUnit(val);
+                                                    return (
+                                                        <>
+                                                            <td className="p-1 text-xl font-bold align-middle">{num}</td>
+                                                            <td className="p-1 text-sm text-red-500 font-bold align-middle">{unit}</td>
+                                                        </>
+                                                    );
+                                                })()}
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
