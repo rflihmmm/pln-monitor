@@ -750,7 +750,7 @@ class DashboardController extends Controller
         return $current * 20.7 * 1.732 * 0.9 / 1000;
     } elseif (strpos($dccNameUpper, 'SELATAN') !== false) {
         // Formula: current * 20.7 * 1.732 * 0.9 / 1000
-        return $current * 20.7 * 1.732 * 0.9 / 1000;
+        return $current * 20.4 * 1.732 * 0.9 / 1000;
     } else {
         // Untuk DCC lainnya, gunakan power original
         return $originalPower;

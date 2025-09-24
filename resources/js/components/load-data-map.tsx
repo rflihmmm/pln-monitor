@@ -20,7 +20,7 @@ const getBackgroundColorClass = (systemName: string) => {
         case 'Beban Sistem DCC UTARA':
             return 'bg-[#7B895B]';
         case 'Beban Sistem DCC ALL':
-            return 'bg-blue-600'; // A distinct color for DCC ALL
+            return 'bg-[#AAD3DF]'; // A distinct color for DCC ALL
         default:
             return 'bg-sky-300'; // Default color if no match
     }
