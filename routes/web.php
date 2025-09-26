@@ -10,6 +10,7 @@ use App\Http\Controllers\TableHmiController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SingleLineController;
 use App\Http\Controllers\StationPointsController;
+use App\Http\Controllers\SystemLoadController;
 use App\Http\Controllers\Master\UserController;
 
 // Route::get('/', function () {
@@ -23,6 +24,15 @@ Route::redirect('/', '/login')->name('home');
 Route::prefix('get')->group(function () {
     Route::get('/stationpoints', [StationPointsController::class, 'getAllStationPoints'])->name('api.stationpoints.all');
     Route::get('/stationpoints/{code}', [StationPointsController::class, 'getStationPointByCode'])->name('api.stationpoints.single');
+
+    // Public routes for System Load Data
+    // Route::get('/load', [SystemLoadController::class, 'getSystemLoadData']);
+    // Route::get('/load/{id}', [SystemLoadController::class, 'getSystemLoadById']);
+    // Route::get('/load/all', [SystemLoadController::class, 'getAllSystemLoads']);
+
+    Route::get('/load', [SystemLoadController::class, 'getLoad']);
+    Route::get('/load/all', [SystemLoadController::class, 'getAll']);
+    Route::get('/load/{id}', [SystemLoadController::class, 'getById']);
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
