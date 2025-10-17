@@ -551,7 +551,7 @@ export default function AlarmLog() {
                             {isSearching ? 'Searching...' : 'Search'}
                         </Button>
                         {/* Download Button - Only visible in search mode */}
-                        {searchMode && searchResults.length > 0 && (
+                        {searchMode && searchResults.length > 0 && isAdmin && (
                             <Button
                                 type="button"
                                 variant="outline"
