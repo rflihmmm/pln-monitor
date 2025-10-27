@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Spatie\Permission\Models\Role;
 
 class AlarmController extends Controller
 {
@@ -224,11 +225,18 @@ class AlarmController extends Controller
 
         try {
             // If user is admin (no specific unit), return all keypoints
-            if (!$user || $user->unit === null) {
+            if ($user->hasRole('admin')) {
                 return response()->json([
                     'success' => true,
                     'data' => [],
                     'is_admin' => true
+                ]);
+            }
+            if ($user->unit === null) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [],
+                    'is_admin' => false
                 ]);
             }
 
