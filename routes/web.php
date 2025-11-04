@@ -83,6 +83,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     //Route::get('/api/organizations', [UserController::class, 'getOrganizations'])->name('api.organizations');
 });
 
+Route::get('/generate-token', [\App\Http\Controllers\JwtController::class, 'generateToken']);
+
 require __DIR__ . '/settings.php';
 require __DIR__ . '/auth.php';
 require __DIR__ . '/master.php';
