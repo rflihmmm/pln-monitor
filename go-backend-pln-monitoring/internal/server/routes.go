@@ -3,6 +3,7 @@ package server
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"go-backend-pln-monitoring/internal/middleware"
 )
 
 func (s *FiberServer) RegisterFiberRoutes() {
@@ -19,6 +20,9 @@ func (s *FiberServer) RegisterFiberRoutes() {
 
 	s.App.Get("/health", s.healthHandler)
 
+	api := s.App.Group("/api", middleware.AuthMiddleware())
+	api.Get("/user", s.UserHandler)
+
 }
 
 func (s *FiberServer) HelloWorldHandler(c *fiber.Ctx) error {
@@ -31,4 +35,14 @@ func (s *FiberServer) HelloWorldHandler(c *fiber.Ctx) error {
 
 func (s *FiberServer) healthHandler(c *fiber.Ctx) error {
 	return c.JSON(s.db.Health())
+}
+
+func (s *FiberServer) UserHandler(c *fiber.Ctx) error {
+	resp := fiber.Map{
+		"user_id": c.Locals("user_id"),
+		"roles":   c.Locals("roles"),
+		"unit":    c.Locals("unit"),
+	}
+
+	return c.JSON(resp)
 }
