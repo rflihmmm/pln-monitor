@@ -46,6 +46,7 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
                 'roles' => $request->user()?->getRoleNames(),
+                'accessToken' => $request->attributes->get('access_token'),
             ],
             'ziggy' => fn(): array => [
                 ...(new Ziggy)->toArray(),

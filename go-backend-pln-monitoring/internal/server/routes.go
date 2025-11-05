@@ -18,8 +18,6 @@ func (s *FiberServer) RegisterFiberRoutes() {
 
 	s.App.Get("/", s.HelloWorldHandler)
 
-	s.App.Get("/health", s.healthHandler)
-
 	api := s.App.Group("/api", middleware.AuthMiddleware())
 	api.Get("/user", s.UserHandler)
 
@@ -31,10 +29,6 @@ func (s *FiberServer) HelloWorldHandler(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(resp)
-}
-
-func (s *FiberServer) healthHandler(c *fiber.Ctx) error {
-	return c.JSON(s.db.Health())
 }
 
 func (s *FiberServer) UserHandler(c *fiber.Ctx) error {

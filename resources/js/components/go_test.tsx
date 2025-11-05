@@ -1,15 +1,23 @@
 import React, { useState, useEffect } from 'react';
+import { usePage } from '@inertiajs/react';
+import { PageProps } from '@/types';
 
 const GoTest: React.FC = () => {
     const [status, setStatus] = useState<string>('loading...');
+    const { auth } = usePage<PageProps>().props;
+    const { accessToken } = auth;
 
     useEffect(() => {
         const fetchHealth = async () => {
+            if (!accessToken) {
+                setStatus('error: missing token');
+                return;
+            }
+
             try {
-                const token = localStorage.getItem('jwt_token');
-                const response = await fetch('http://localhost:8080/', {
+                const response = await fetch('http://localhost:8080/api/user', {
                     headers: {
-                        Authorization: `Bearer ${token}`,
+                        Authorization: `Bearer ${accessToken}`,
                     },
                 });
                 if (response.ok) {
@@ -24,7 +32,7 @@ const GoTest: React.FC = () => {
         };
 
         fetchHealth();
-    }, []);
+    }, [accessToken]);
 
     return (
         <div>
