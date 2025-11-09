@@ -9,8 +9,11 @@ import (
 	"strconv"
 	"time"
 
+	_ "github.com/denisenkom/go-mssqldb"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/joho/godotenv/autoload"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 // Service represents a service that interacts with a database.
@@ -22,19 +25,33 @@ type Service interface {
 	// Close terminates the database connection.
 	// It returns an error if the connection cannot be closed.
 	Close() error
+	GetDB() *sql.DB
+	GetUP2DDB() *sql.DB
+	GetGormDB() *gorm.DB
 }
 
 type service struct {
-	db *sql.DB
+	db      *sql.DB
+	dbUp2d  *sql.DB
+	gormDB  *gorm.DB
 }
 
 var (
-	database   = os.Getenv("BLUEPRINT_DB_DATABASE")
-	password   = os.Getenv("BLUEPRINT_DB_PASSWORD")
-	username   = os.Getenv("BLUEPRINT_DB_USERNAME")
-	port       = os.Getenv("BLUEPRINT_DB_PORT")
-	host       = os.Getenv("BLUEPRINT_DB_HOST")
-	schema     = os.Getenv("BLUEPRINT_DB_SCHEMA")
+	// PostgreSQL config
+	password = os.Getenv("DB_PASSWORD")
+	database = os.Getenv("DB_DATABASE")
+	username = os.Getenv("DB_USERNAME")
+	port     = os.Getenv("DB_PORT")
+	host     = os.Getenv("DB_HOST")
+	schema   = os.Getenv("DB_SCHEMA")
+
+	// MSSQL config
+	dbUp2dHost     = os.Getenv("DB_UP2D_HOST")
+	dbUp2dPort     = os.Getenv("DB_UP2D_PORT")
+	dbUp2dDatabase = os.Getenv("DB_UP2D_DATABASE")
+	dbUp2dUsername = os.Getenv("DB_UP2D_USERNAME")
+	dbUp2dPassword = os.Getenv("DB_UP2D_PASSWORD")
+
 	dbInstance *service
 )
 
@@ -43,15 +60,47 @@ func New() Service {
 	if dbInstance != nil {
 		return dbInstance
 	}
-	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable&search_path=%s", username, password, host, port, database, schema)
-	db, err := sql.Open("pgx", connStr)
+
+	// PostgreSQL connection
+	connStrPg := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable&search_path=%s", username, password, host, port, database, schema)
+	db, err := sql.Open("pgx", connStrPg)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// MSSQL connection
+	connStrMssql := fmt.Sprintf("server=%s;user id=%s;password=%s;port=%s;database=%s;",
+		dbUp2dHost, dbUp2dUsername, dbUp2dPassword, dbUp2dPort, dbUp2dDatabase)
+	dbUp2d, err := sql.Open("sqlserver", connStrMssql)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	gormDB, err := gorm.Open(postgres.New(postgres.Config{
+		Conn: db,
+	}), &gorm.Config{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	dbInstance = &service{
-		db: db,
+		db:      db,
+		dbUp2d:  dbUp2d,
+		gormDB:  gormDB,
 	}
 	return dbInstance
+}
+
+func (s *service) GetDB() *sql.DB {
+	return s.db
+}
+
+func (s *service) GetGormDB() *gorm.DB {
+	return s.gormDB
+}
+
+func (s *service) GetUP2DDB() *sql.DB {
+	return s.dbUp2d
 }
 
 // Health checks the health of the database connection by pinging the database.
@@ -62,18 +111,34 @@ func (s *service) Health() map[string]string {
 
 	stats := make(map[string]string)
 
-	// Ping the database
+	// Ping the PostgreSQL database
 	err := s.db.PingContext(ctx)
 	if err != nil {
-		stats["status"] = "down"
-		stats["error"] = fmt.Sprintf("db down: %v", err)
-		log.Fatalf("db down: %v", err) // Log the error and terminate the program
+		stats["status_pg"] = "down"
+		stats["error_pg"] = fmt.Sprintf("db pg down: %v", err)
+		log.Printf("db pg down: %v", err)
+	} else {
+		stats["status_pg"] = "up"
+		stats["message_pg"] = "PostgreSQL is healthy"
+	}
+
+	// Ping the MSSQL database
+	err = s.dbUp2d.PingContext(ctx)
+	if err != nil {
+		stats["status_mssql"] = "down"
+		stats["error_mssql"] = fmt.Sprintf("db mssql down: %v", err)
+		log.Printf("db mssql down: %v", err)
+	} else {
+		stats["status_mssql"] = "up"
+		stats["message_mssql"] = "MSSQL is healthy"
+	}
+
+	if stats["status_pg"] == "down" || stats["status_mssql"] == "down" {
 		return stats
 	}
 
-	// Database is up, add more statistics
 	stats["status"] = "up"
-	stats["message"] = "It's healthy"
+	stats["message"] = "All databases are healthy"
 
 	// Get database stats (like open connections, in use, idle, etc.)
 	dbStats := s.db.Stats()
@@ -111,5 +176,16 @@ func (s *service) Health() map[string]string {
 // If an error occurs while closing the connection, it returns the error.
 func (s *service) Close() error {
 	log.Printf("Disconnected from database: %s", database)
-	return s.db.Close()
+	err := s.db.Close()
+	if err != nil {
+		return err
+	}
+
+	log.Printf("Disconnected from database: %s", dbUp2dDatabase)
+	err = s.dbUp2d.Close()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

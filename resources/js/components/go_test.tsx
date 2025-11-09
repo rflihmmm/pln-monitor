@@ -15,7 +15,7 @@ const GoTest: React.FC = () => {
             }
 
             try {
-                const response = await fetch('http://localhost:8080/api/user', {
+                const response = await fetch('http://localhost:8080/api/hello', {
                     headers: {
                         Authorization: `Bearer ${accessToken}`,
                     },

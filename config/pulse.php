@@ -64,7 +64,7 @@ return [
         ],
 
         'database' => [
-            'connection' => env('PULSE_DB_CONNECTION'),
+            'connection' => env('PULSE_DB_CONNECTION', 'pgsql'),
             'chunk' => 1000,
         ],
     ],
